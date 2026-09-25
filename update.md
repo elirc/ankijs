@@ -282,3 +282,7 @@ actions, SameSite Lax default, --env-file, VITE_ exposure); low RAM — no paral
      Build real apps card with "New") and that existing progress is intact.
   5. Optional future work: A3 (measure `loadStudy` per rating, N4); add a linter (#9) and a coverage
      gate (#10); the full seed.test "rolls back every batch" case needs a longer timeout on this host.
+- 2026-09-24: **Committed** on branch `content-v16-v17` (not pushed, `main` untouched):
+  `754fb1d` v16 content-quality pass (verified standalone in a temp worktree: content:check PASS,
+  2,871 cards) and `24222f9` v17 track + app fixes + docs. `handoff/` (pre-existing, untracked) was
+  left out. To ship: merge the branch into `main`, then deploy.
