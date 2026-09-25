@@ -16,7 +16,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,txt}"],
         // Install-only data: fetched once while online, then it lives in IndexedDB.
-        globIgnores: ["**/expanded-cards-*.js", "**/retired-retrieval-hashes-*.js"],
+        globIgnores: ["**/expanded-cards-*.js", "**/retired-retrieval-hashes-*.js", "**/content-corrections-*.js"],
         navigateFallback: "/index.html",
         runtimeCaching: [
           {

@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "baseCards": 2799,
   "scenarioCards": 72,
   "activeCards": 2871,
@@ -11,12 +11,12 @@
     "output-recall": 640
   },
   "legacyPackBytes": 11992599,
-  "scenarioPackBytes": 67236,
+  "scenarioPackBytes": 68495,
   "retiredLibraryPrefixes": [
     "a3000000-",
     "a4000000-"
   ],
-  "rewrittenBaseCards": 14,
-  "correctedBaseCards": 18,
+  "rewrittenBaseCards": 2202,
+  "correctedBaseCards": 2233,
   "scope": "Every shipped card passes structural checks (identity, duplicates, fences, credits). Authored cards were reviewed by hand; adapted examples were not all executed."
 }

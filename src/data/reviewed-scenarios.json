@@ -19,7 +19,7 @@
       {
         "key": "sort-mutates-input",
         "question": "A function receives a caller-owned prices array and returns prices.sort((a, b) => a - b)[0]. The caller's display order changes afterward. What caused it, and what is a small fix?",
-        "answer": "sort mutates the array it receives. Sort a copy: [...prices].sort((a, b) => a - b)[0]. Define the empty-array result explicitly; this expression returns undefined when there are no prices.",
+        "answer": "sort mutates the array it is called on, so the caller's array is reordered. Sort a copy instead: prices.toSorted((a, b) => a - b)[0] (ES2023) or [...prices].sort((a, b) => a - b)[0]. Define the empty-array result explicitly; both expressions return undefined when there are no prices.",
         "explanation": "Copying the array prevents rearranging the caller's elements. It is still a shallow copy, so changing a property on an object element would affect the original object. A minimum-only operation can also scan without sorting.",
         "check": "For [10, 2, 7], assert the result is 2 and the original array is still [10, 2, 7]. Add an empty-array case."
       },
@@ -127,7 +127,7 @@
       {
         "key": "api-lost-response",
         "question": "A create-note request commits, but its response is lost. The client retries and creates a second note. What must the server remember to make this logical operation safe to retry?",
-        "answer": "Use a stable operation key scoped to the caller, store its request identity and result, and enforce uniqueness atomically with the create. Replaying the same operation returns the recorded result.",
+        "answer": "Remember an idempotency key: the client sends a stable key per logical operation (often an Idempotency-Key header), and the server stores it, scoped to the caller, with the request identity and result, enforcing uniqueness atomically with the create. Replaying the same key returns the recorded result instead of creating another note.",
         "explanation": "The same key with different input must not silently become a different operation. Define mismatch and retention behavior. A disabled submit button cannot protect against network retries or concurrent clients.",
         "check": "Send two concurrent requests with the same caller, key, and body. Expect one note. Repeat after a simulated lost response, then test the same key with a different body."
       },
@@ -135,27 +135,27 @@
         "key": "api-object-ownership",
         "question": "A signed-in user changes /notes/42 to /notes/43 and can edit someone else's note. The endpoint checks authentication. Which additional check is required?",
         "answer": "Authorize access to the specific note for the authenticated caller. Scope the lookup or mutation by both note identity and the caller's permitted ownership or membership.",
-        "explanation": "Authentication proves who the caller is, not which records they may change. Never treat an owner ID supplied in the body as proof. Apply the rule to reads, updates, deletes, and related resources.",
+        "explanation": "Authentication proves who the caller is, not which records they may change; this gap is called an insecure direct object reference (IDOR). Never treat an owner ID supplied in the body as proof. Apply the rule to reads, updates, deletes, and related resources, and decide whether a foreign record returns 403 or 404.",
         "check": "Create records for two test users. Attempt each operation as the other user and verify both the response policy and the unchanged stored record."
       },
       {
         "key": "api-allowlist-update",
         "question": "An update endpoint spreads the entire request body onto a user row. A client supplies {\"displayName\":\"Ada\",\"isAdmin\":true}. What boundary should control which fields may change?",
         "answer": "Define an explicit input contract and allowlist the editable fields. Authorization-sensitive fields such as isAdmin must be assigned only through separately authorized server logic.",
-        "explanation": "Frontend forms are not a security boundary. Reject or ignore unknown fields according to the API contract, but never let generic object merging grant privileges or change ownership.",
+        "explanation": "Blindly copying request fields onto a model is the mass-assignment vulnerability. Frontend forms are not a security boundary. Reject or ignore unknown fields according to the API contract, but never let generic object merging grant privileges or change ownership.",
         "check": "Send the normal payload plus isAdmin, ownerId, and an immutable ID. Confirm that none of those fields changes and that the expected validation response is returned."
       },
       {
         "key": "api-email-transaction",
         "question": "A signup handler commits a user and then sends a welcome email. If email sending fails, the handler reports total failure even though the user exists. How can the system track the email reliably?",
-        "answer": "Commit the user and an email-job record in the same database transaction. A worker delivers pending jobs and records completion; the API can report the durable signup result.",
+        "answer": "Use the transactional outbox pattern: commit the user and an email-job (outbox) record in the same database transaction. A worker delivers pending jobs and records completion, so the API can report the durable signup result even if the email is sent later.",
         "explanation": "A database transaction cannot roll back an email already sent through an external provider. Workers may retry after a crash, so delivery needs a duplicate-handling policy or provider idempotency support.",
         "check": "Stop the worker after signup and verify the user and pending job exist together. Restart it, retry a job, and inspect both delivery behavior and job state."
       },
       {
         "key": "api-stale-patch",
         "question": "Two editors load version 7 of a note. The first saves version 8; the second later sends its whole version-7 copy. How can the API detect the stale write before overwriting the first edit?",
-        "answer": "Require the client's original version and perform a conditional update that matches both ID and version. If no row matches, report a conflict and preserve the user's draft for resolution.",
+        "answer": "Use optimistic concurrency: require the client's original version (a field or an If-Match ETag header) and perform a conditional update that matches both ID and version, e.g. UPDATE notes SET ..., version = version + 1 WHERE id = $1 AND version = $2. If no row matches, return a conflict (409, or 412 for a failed If-Match) and preserve the user's draft for resolution.",
         "explanation": "Checking the version in one query and writing unconditionally in another leaves a race. The version condition and mutation must be one atomic operation, with the new version produced only on success.",
         "check": "Load twice, save the first copy, then save the second with the old version. The second write must fail without changing the first edit."
       },
@@ -169,8 +169,8 @@
       {
         "key": "api-validation-retry",
         "question": "A client retries every failed request five times, including an invalid-title response. Why will backoff not fix that case, and what should decide whether to retry?",
-        "answer": "The unchanged invalid input will fail again. Classify failures using the API contract, operation safety, and remaining deadline. Validation failures normally require corrected input, not another identical attempt.",
-        "explanation": "Transient failures can merit bounded backoff, but writes also need protection against duplicate effects. Honor server retry guidance where applicable and keep a visible recovery path after the retry budget is exhausted.",
+        "answer": "The unchanged invalid input will fail again. Classify failures using the API contract, operation safety, and remaining deadline: validation failures (typically 400 or 422) need corrected input, while transient ones such as a network error, 429, or 503 may merit a bounded retry.",
+        "explanation": "Transient failures can merit bounded backoff, but retried writes also need protection against duplicate effects (for example, an idempotency key). Honor server guidance such as a Retry-After header, and keep a visible recovery path after the retry budget is exhausted.",
         "check": "Return a validation failure and assert one request. Separately simulate a documented transient failure and verify the bounded retry schedule and final error state."
       },
       {
@@ -209,14 +209,14 @@
       {
         "key": "sql-duplicate-unique",
         "question": "A registration handler SELECTs by normalized username, then INSERTs if none exists. Two concurrent requests still create duplicates. Where should uniqueness be enforced?",
-        "answer": "Add a database unique constraint or index on the stored normalized username. Keep any precheck for feedback, but handle a uniqueness violation from the insert as an expected conflict.",
+        "answer": "Add a database unique constraint or index on the stored normalized username. Keep any precheck for friendly feedback, but handle the insert's uniqueness violation (PostgreSQL error 23505, unique_violation) as an expected conflict.",
         "explanation": "Both prechecks can observe absence before either insert commits. The database constraint arbitrates concurrent writes. Define normalization consistently before storing and querying the value.",
         "check": "Submit the same normalized username concurrently. Verify one stored user and one success; the other request must produce the documented conflict response."
       },
       {
         "key": "sql-stable-pagination",
         "question": "An activity feed orders only by created_at. Several events share the same timestamp, and page boundaries repeat or skip records. What additional ordering information is needed?",
-        "answer": "Use a unique tiebreaker, such as ORDER BY created_at DESC, id DESC. For cursor pagination, include both values in the cursor and continuation condition.",
+        "answer": "Add a unique tiebreaker, such as ORDER BY created_at DESC, id DESC. For cursor (keyset) pagination, put both values in the cursor and continue with a row comparison: WHERE (created_at, id) < ($1, $2).",
         "explanation": "A timestamp alone does not define a total order. Stable ordering solves tie ambiguity; concurrent insertions still require a documented pagination consistency policy. Offset pagination and cursor pagination have different behavior under changes.",
         "check": "Create several records with identical timestamps and page through them with a small page size. Each original record must appear once in a stable, unchanged dataset."
       },
@@ -231,7 +231,7 @@
         "key": "sql-index-order",
         "question": "A common PostgreSQL query filters notes by owner_id and orders by created_at DESC, id DESC with a small LIMIT. What index would you evaluate first, and how would you validate it?",
         "answer": "Evaluate a B-tree index on (owner_id, created_at DESC, id DESC). It aligns the owner equality filter with the requested ordering, but measure the actual plan and workload before deciding.",
-        "explanation": "Use representative row counts and owner distributions. Compare plan, time, and rows examined. Indexes consume storage and add write work; a tiny fixture or an unused index is weak evidence of an improvement.",
+        "explanation": "A plain (owner_id, created_at, id) index also works, because PostgreSQL can scan a B-tree backward; explicit DESC matters only for mixed directions. Use representative row counts and owner distributions, and compare plan, time, and rows examined. Indexes consume storage and add write work; a tiny fixture is weak evidence of an improvement.",
         "check": "Compare the query plan before and after the index on representative disposable data. Also measure insert cost and confirm the query still returns the same ordered rows."
       },
       {
@@ -249,7 +249,7 @@
       {
         "key": "browser-fetch-status",
         "question": "A browser save uses try { await fetch('/notes', options); showSuccess(); } catch { showError(); }. The server returns HTTP 500, but the UI shows success. Why?",
-        "answer": "fetch normally fulfills for HTTP error responses. Inspect response.ok or the documented status before reporting success; throw or handle an error response explicitly.",
+        "answer": "fetch rejects only when no response arrives (network failure or abort). An HTTP 500 still fulfills, with response.ok === false. Check response.ok or the documented status before reporting success, and throw or handle an error response explicitly.",
         "explanation": "A received HTTP response and a successful application operation are different outcomes. Network failures reject the promise, while response parsing can also fail separately. Preserve the user's input through each failure path.",
         "check": "Test a 500 response, a validation response, a network rejection, and the endpoint's successful status. Only the documented successful outcome should show success."
       },
@@ -263,7 +263,7 @@
       {
         "key": "browser-button-submit",
         "question": "A 'Show password' button is inside a form and has no type attribute. Clicking it unexpectedly submits the form. What is the smallest markup fix?",
-        "answer": "Set type=\"button\" on the visibility toggle. In a form, a button's default behavior can be submission; reserve type=\"submit\" for the submit control.",
+        "answer": "Set type=\"button\" on the visibility toggle. A <button> with no type attribute inside a form defaults to type=\"submit\", so any click submits the form; reserve submit for the real submit control.",
         "explanation": "Use the semantic behavior intended for each control instead of relying on every click handler to prevent submission. The toggle should also have an accessible name that reflects its action.",
         "check": "Click the toggle and confirm the password visibility changes without invoking the submit handler. Press Enter in the form and verify intentional submission still works."
       },
@@ -277,7 +277,7 @@
       {
         "key": "browser-date-only",
         "question": "A due date is stored as '2026-01-01'. The UI constructs new Date(value) and formats it in Los Angeles, displaying December 31. What data-model mismatch caused this?",
-        "answer": "A date-only ISO string is interpreted as a UTC date by this constructor, while local formatting converts that instant to the previous evening. A calendar due date is not necessarily an instant.",
+        "answer": "new Date('2026-01-01') parses a date-only ISO string as UTC midnight, and formatting in Los Angeles (UTC-8) shifts that instant to 4 p.m. on December 31. A calendar due date is a date, not an instant. Keep it as year/month/day components, or format it with timeZone: 'UTC' so no offset is applied.",
         "explanation": "Keep calendar dates as date components or use an established date-only representation. Convert to an instant only when a time and timezone are explicitly part of the requirement. Do not patch the bug by adding a fixed number of hours.",
         "check": "Render the same date in positive and negative UTC offsets. A calendar-date field should keep January 1 in both; an actual timestamp should convert according to its timezone policy."
       },
@@ -431,7 +431,7 @@
     "lessons": [
       {
         "key": "ef-untracked-edit",
-        "question": "An EF Core handler loads a note using AsNoTracking(), changes its Title, and calls SaveChangesAsync(). Nothing is updated. Which missing relationship explains this?",
+        "question": "An EF Core handler loads a note using AsNoTracking(), changes its Title, and calls SaveChangesAsync(). Nothing is updated and no error is thrown. Why?",
         "answer": "The entity is not tracked by that context, so its property change is not detected for saving. Use a tracked entity for the edit or deliberately attach and mark the permitted changes.",
         "explanation": "Do not mark every incoming property modified just to make saving work. Keep ownership checks and an explicit list of editable fields at the write boundary.",
         "check": "Save through the handler, then read the note using a fresh context. Assert the new title and unchanged owner and ID."

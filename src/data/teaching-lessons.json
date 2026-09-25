@@ -9,9 +9,9 @@
     ],
     "question": "What is the difference between a value and an expression?",
     "plain": "A value is a piece of data, such as the number 7 or the text \"hello\". An expression is a piece of code that produces a value. The computer evaluates an expression by doing its operations and obtaining a result. A single value can also be an expression.",
-    "analogy": "Think of a value as a finished sandwich. An expression is an instruction such as \"combine these ingredients.\" Its result is another value. The analogy describes producing a result; code can also produce results that are not physical objects.",
+    "analogy": "Think of a calculator. The keys you press, `2 + 3`, are the expression: an instruction to compute something. The 5 on the display is the value it produces. Typing just `5` is also an expression; it simply produces itself.",
     "example": "```js\n2 + 3       // 5\n\"hi\"        // \"hi\"\n10 > 4      // true\n```\n\nRead each line as \"what value does this produce?\" Addition produces a number. Quoted text produces a string. A comparison produces a yes-or-no value called a boolean.",
-    "mistake": "Do not assume every line produces a useful result you can use elsewhere. A statement can organize work, such as an if block. Learning to identify expressions helps you understand what can be assigned to a variable or passed to a function.",
+    "mistake": "Not every piece of code is an expression. A statement such as an `if` block or a `let` declaration does work but does not produce a value you can store. `const x = if (ok) 1;` is a syntax error, while `const x = ok ? 1 : 2;` works because `? :` is an expression.",
     "check": "What value does `(2 + 3) * 4` produce, and why?",
     "answer": "It produces **20**. Parentheses make the computer evaluate 2 + 3 first, giving 5. It then multiplies 5 by 4. Without the parentheses, multiplication normally happens before addition."
   },
@@ -44,7 +44,7 @@
     ],
     "question": "Why do programmers put quotation marks around text?",
     "plain": "Quotation marks tell the language that the enclosed characters are text, called a string. Without quotes, a word usually names a variable or has a special meaning in the language. The quotes mark where the string starts and ends; they are not normally part of its contents.",
-    "analogy": "Compare a written label saying \"door\" with an instruction to find the object named door. Quotes tell the program to use the label itself. This is about distinguishing data from names, not about whether the text has meaning to a person.",
+    "analogy": "Compare \"Say your name\" with \"Say 'your name'\". The first means look up your name and say it; the second means say the literal words \"your name\". Quotes in code work the same way: `name` looks up a variable, while `\"name\"` is just those four letters.",
     "example": "```js\nconst name = \"Ada\";\nconsole.log(\"Hello \" + name); // Hello Ada\nconsole.log(\"name\");         // name\n```\n\nThe first log combines two pieces of text. The second uses the literal letters n-a-m-e rather than looking up the name variable.",
     "mistake": "The plus sign can join strings instead of doing arithmetic. `\"2\" + 3` produces the string \"23\" in JavaScript. Convert input deliberately when you intend to calculate with numbers.",
     "check": "What does `\"cat\".toUpperCase()` produce? Does the original string change?",
@@ -62,7 +62,7 @@
     ],
     "question": "What does a data type tell you about a value?",
     "plain": "A type describes the kind of data and what operations make sense for it. Numbers support arithmetic, strings represent text, and booleans represent true or false. JavaScript can convert between types automatically in some operations, which is why knowing the input types matters.",
-    "analogy": "A kitchen distinguishes water, flour, and a measuring cup. You handle each differently even if they are all on the same counter. A data type is a similar clue about how a value behaves; it is not always a guarantee that the value is valid for your task.",
+    "analogy": "A phone number and a price are both written with digits, but you add prices and never add phone numbers. The type tells the program which operations make sense for a value. It is a clue about behavior, not a guarantee the value is valid for your task.",
     "example": "```js\ntypeof 7       // \"number\"\ntypeof \"7\"     // \"string\"\ntypeof true    // \"boolean\"\nNumber(\"7\") + 2 // 9\n```\n\nThe digit inside quotes is text. Number explicitly asks for a numeric conversion before addition.",
     "mistake": "A value can have the right type and still be invalid. A negative age is a number, but probably not a valid age. Validate the rules of your application as well as the basic type.",
     "check": "A form gives you the string \"12\". Why might `input + 1` produce \"121\"?",
@@ -232,7 +232,7 @@
     "question": "What is a callback, without the jargon?",
     "plain": "A callback is a function you give to another function so that it can call yours when needed. You provide a little piece of behavior, while the other function controls when to use it. A callback may run immediately during a loop or later after an event; the word alone does not mean asynchronous.",
     "analogy": "You leave a set of instructions with a helper: \"For every parcel, write its address here.\" The helper decides when each parcel is ready, then follows your instructions. The instructions are the callback.",
-    "example": "```js\nconst numbers = [1, 2, 3];\nconst doubled = numbers.map(n => n * 2);\n// [2, 4, 6]\n```\n\nThe small function n => n * 2 is passed to map. map calls it for each present item and collects the returned values into a new array.",
+    "example": "```js\nconst numbers = [1, 2, 3];\nconst doubled = numbers.map(n => n * 2);\n// [2, 4, 6]\n```\n\nThe small function n => n * 2 is passed to map. map calls it once for each item and collects the returned values into a new array.",
     "mistake": "Do not confuse passing a callback with invoking it yourself. `onClick={handleClick}` gives React a function to call later. `onClick={handleClick()}` runs it during rendering and passes its result instead.",
     "check": "Is every callback asynchronous?",
     "answer": "**No.** The callback given to array map normally runs synchronously while map is working. A timer callback runs later. You must look at the API receiving the callback to understand the timing."
@@ -260,7 +260,7 @@
     "aliases": [],
     "question": "A save function receives a blank task title. Where should you handle that?",
     "plain": "Check the input before saving anything. A guard clause is an early return for a case that cannot continue. It keeps the normal save path easy to read and prevents an invalid value from reaching the write operation. The server must also validate requests because a browser check can be bypassed.",
-    "example": "```js\nfunction validateTitle(title) {\n  if (typeof title !== \"string\") return \"Enter a title\";\n  if (!title.trim()) return \"Enter a title\";\n  return null;\n}\n```\n\nA message means validation failed; null means this check passed. The caller displays the message and stops before saving.",
+    "example": "```js\nfunction saveTask(title) {\n  if (typeof title !== \"string\" || title.trim() === \"\") {\n    return { ok: false, error: \"Enter a title\" }; // guard: stop here\n  }\n  // Only valid titles reach this line.\n  return db.insertTask({ title: title.trim() });\n}\n```\n\nThe early return is the guard clause. A missing or blank title never reaches the insert, and the normal save path below it stays uncluttered.",
     "analogy": "A receptionist checks that a form has a name before passing it to the filing desk. An incomplete form goes back for correction immediately.",
     "mistake": "Do not show an error and then keep executing the save. Reporting an error and stopping the operation are separate steps. Do not assume this one check validates every field.",
     "check": "A handler displays \"Title required\" but still calls saveTask afterward. What is missing?",
@@ -294,12 +294,12 @@
       "transform each"
     ],
     "question": "What does array map do in plain English?",
-    "plain": "map builds a new list by transforming each present item in an existing list. You supply a small function describing the transformation. For each item, map uses the value your function returns as the corresponding item in the new list.",
+    "plain": "map builds a new list by transforming each item in an existing list. You supply a small function describing the transformation. For each item, map uses the value your function returns as the matching item in the new list. The original array is left unchanged.",
     "analogy": "Imagine a conveyor belt passing plain mugs through a painting station. Each incoming mug produces one painted mug. map is good when you want one transformed result per item; it is not the tool for deciding which mugs to throw away.",
     "example": "```js\nconst prices = [2, 5, 8];\nconst doubled = prices.map(price => price * 2);\n// doubled: [4, 10, 16]\n// prices:  [2, 5, 8]\n```\n\nFollow the first item: 2 goes into the small function, which returns 4. Then 5 becomes 10, and 8 becomes 16.",
     "mistake": "The callback must return the new value. With braces, write an explicit return. `prices.map(p => { p * 2; })` produces undefined entries. map creates a new array, but your callback can still mutate objects if you write it that way.",
     "check": "What does `[1, 3, 5].map(n => n + 1)` produce?",
-    "answer": "**[2, 4, 6].** Each number is transformed independently by adding one. The result has one item for every present item in the original array, in the same order."
+    "answer": "**[2, 4, 6].** Each number is transformed independently by adding one. The result has one item for every item in the original array, in the same order."
   },
   {
     "key": "filter",
@@ -331,7 +331,7 @@
     "plain": "The accumulator is the result you are building as you walk through a list. Each step receives that running result and the current item, then returns the running result for the next step. You choose an initial value that makes sense, such as zero for a sum.",
     "analogy": "A cashier adds prices to a running total. The running total is the accumulator. After each item, the updated total is handed to the next step. The accumulator can also be an object or another collection, not only a number.",
     "example": "```js\n[2, 3, 4].reduce((total, n) => total + n, 0);\n// 9\n```\n\nStart with total = 0. Add 2 to get 2. Add 3 to get 5. Add 4 to get 9. The final running result becomes the return value.",
-    "mistake": "If you omit the initial value, JavaScript uses the first present item as the starting result. That changes which callbacks run, and an empty array without an initial value throws an error. Be deliberate about the initial value.",
+    "mistake": "If you omit the initial value, JavaScript uses the first item as the starting result and the callback starts at the second item. On an empty array with no initial value, reduce throws a TypeError. Pass an initial value, such as 0 for a sum, unless you have a clear reason not to.",
     "check": "What does `[2, 3].reduce((total, n) => total + n, 10)` return?",
     "answer": "**15.** The starting accumulator is 10, not zero. The first step adds 2, producing 12. The second adds 3, producing 15."
   },
@@ -366,7 +366,7 @@
     "plain": "Two variables can refer to the same object. Assigning one object variable to another usually copies the reference, not all the object contents. A change through either reference changes the one shared object, so both variables can observe it.",
     "analogy": "Two people can have the same shared document bookmarked. Changing the document through one bookmark changes what the other person sees. Copying the bookmark is not the same as copying the document.",
     "example": "```js\nconst first = { score: 1 };\nconst second = first;\nsecond.score = 9;\nconsole.log(first.score); // 9\n```\n\nThere is one object and two names referring to it. No new object was created by the second line.",
-    "mistake": "Creating a new outer object does not automatically copy nested objects. `{...first}` is a shallow copy. Decide whether you need a new outer object, new nested objects, or an explicit deep-copy operation suitable for the data.",
+    "mistake": "Copying the outer object does not copy nested objects. `{...first}` is a shallow copy: nested objects are still shared. When you need fully independent nested data, use a deep copy such as `structuredClone(first)`, which works for plain data but not for functions.",
     "check": "What does this print?\n\n```js\nconst a = { n: 1 };\nconst b = { n: 1 };\nconsole.log(a === b);\n```",
     "answer": "**false.** a and b refer to two different objects. Their properties happen to contain equal numbers, but strict equality on objects checks identity rather than comparing every property."
   },
@@ -383,7 +383,7 @@
     "plain": "A Set stores each distinct value at most once. It is useful when you care about membership or uniqueness, such as whether an ID has already been seen. You can add values, test whether they are present, and remove them.",
     "analogy": "Imagine a guest list where each name is checked off only once. Adding the same entry again does not create another seat. For objects, JavaScript distinguishes separate object identities, even if their visible contents look the same.",
     "example": "```js\nconst seen = new Set([\"a\", \"b\", \"a\"]);\nseen.size;     // 2\nseen.has(\"a\"); // true\n[...seen];     // [\"a\", \"b\"]\n```\n\nThe repeated string \"a\" does not become a second entry. Spreading the Set creates an array of its values.",
-    "mistake": "A Set does not automatically merge objects with equal-looking properties. Two separately created `{id: 1}` objects are different identities. To deduplicate records by ID, use their IDs as keys.",
+    "mistake": "A Set does not merge objects with equal-looking properties. Two separately created `{id: 1}` objects are different identities, so both stay in the Set. To deduplicate records, track their IDs instead, for example with a Set of ids or a Map keyed by id.",
     "check": "How many values are in `new Set([1, 1, 2, 2, 3])`?",
     "answer": "**Three.** The distinct values are 1, 2, and 3. Repeated additions of those same numeric values do not increase the Set's size."
   },
@@ -397,10 +397,10 @@
       "sort order"
     ],
     "question": "Why does JavaScript sometimes need a comparison function to sort numbers?",
-    "plain": "By default, array sort compares string forms of values. That can put 10 before 2. A numeric comparison function tells it which number should come first. Returning a negative number puts a before b; positive puts a after b; zero means they compare equally.",
+    "plain": "By default, array sort converts values to strings and compares them character by character. \"10\" starts with \"1\", so 10 lands before 2. A comparison function tells sort which of two values comes first: return a negative number to put a before b, positive to put a after b, and zero if they are equal.",
     "analogy": "Alphabetizing labels reading \"10\" and \"2\" is different from arranging quantities from small to large. A comparison function tells the sorter which kind of ordering you actually intend.",
     "example": "```js\nconst numbers = [10, 2, 1];\nnumbers.sort((a, b) => a - b);\n// [1, 2, 10]\n```\n\nFor a = 2 and b = 10, a - b is negative, so 2 belongs before 10. The function compares pairs; it does not directly return the whole sorted array.",
-    "mistake": "sort changes the array it is called on. If the original order must remain available, sort a copy, such as `[...numbers].sort(...)`, or use a suitable non-mutating API supported by your environment.",
+    "mistake": "sort changes the array it is called on. If the original order must stay available, use `numbers.toSorted((a, b) => a - b)` (ES2023), which returns a sorted copy, or sort a copy with `[...numbers].sort(...)`.",
     "check": "What is the result of `[3, 12, 1].sort((a, b) => a - b)`?",
     "answer": "**[1, 3, 12].** Subtracting b from a gives the comparison rule for ascending numeric order. Using b - a would reverse the direction."
   },
@@ -470,8 +470,8 @@
     "analogy": "Imagine a normal route through a building with an emergency exit. An exception takes the emergency route. The catch block decides what happens next. It should not quietly pretend the destination was reached if the work actually failed.",
     "example": "```js\ntry {\n  JSON.parse(\"not valid JSON\");\n} catch (error) {\n  console.log(\"Please check the input\");\n}\n```\n\nParsing fails, so control moves to catch. Code after the failing expression inside the try block would be skipped.",
     "mistake": "A catch block that does nothing can hide bugs and leave callers believing an operation succeeded. Recover meaningfully, report the failure, or rethrow it. Async failures need to be awaited or handled through the Promise chain.",
-    "check": "Will `try { fetch(\"/data\"); } catch (...) { ... }` catch a later Promise rejection from fetch?",
-    "answer": "**Not by itself.** The rejection happens through the Promise after fetch returns. Await the Promise inside an async try block, or attach an appropriate rejection handler."
+    "check": "Will this try/catch catch a network failure from fetch?\n\n```js\ntry {\n  fetch(\"/data\");\n} catch (error) {\n  showError();\n}\n```",
+    "answer": "**No.** fetch returns a Promise immediately, so the try block finishes before the request fails. The later rejection is not caught here. Write `await fetch(\"/data\")` inside an async function's try block, or attach a `.catch()` handler to the Promise."
   },
   {
     "key": "debugging",
@@ -503,7 +503,7 @@
     "question": "What is a useful automated test?",
     "plain": "A test supplies a known situation, performs an action, and checks an expected outcome. It turns an example of correct behavior into something the computer can repeat. A useful test fails when an important behavior is wrong, not merely when internal formatting changes.",
     "analogy": "A test is like a small checklist a machine can carry out exactly. The checklist needs an actual expected result. \"Turn the machine on\" checks less than \"turn it on and verify that the light becomes green.\"",
-    "example": "For an add function, a simple test is:\n\n- Input: 2 and 3.\n- Action: call add(2, 3).\n- Expected result: 5.\n\nThen add examples that explore real boundaries, such as zero or negative values, if those are allowed inputs.",
+    "example": "```js\nimport { test, expect } from \"vitest\";\n\ntest(\"adds two numbers\", () => {\n  expect(add(2, 3)).toBe(5);\n});\n```\n\nKnown input (2 and 3), action (call add), expected result (5). Then add examples at real boundaries, such as zero or negative values, if those are allowed inputs.",
     "mistake": "A test that repeats the same formula as the implementation can repeat the same mistake. Use independently understandable examples or meaningful properties. Do not mock away the very behavior you intend to verify.",
     "check": "A discount starts at 100. Which three totals make a useful boundary test?",
     "answer": "**99, 100, and 101.** They check below the cutoff, exactly at the cutoff, and above it. The expected result at 100 must match whether the rule means \"at least 100\" or \"more than 100.\""
@@ -572,7 +572,7 @@
       "cascade"
     ],
     "question": "How does a CSS rule decide which elements to style?",
-    "plain": "A rule has a selector and declarations. The selector describes which elements match. The declarations set visual properties for those matches, such as color or spacing. When several rules compete, the cascade decides which declarations win using factors including origin, importance, layers, specificity, and order.",
+    "plain": "A rule has a selector and declarations. The selector describes which elements match. The declarations set visual properties for those matches, such as color or spacing. When several rules set the same property on the same element, the cascade picks a winner: mainly the more specific selector wins, and if they tie, the rule written later wins.",
     "analogy": "Imagine an instruction saying \"give everyone wearing a blue badge a green folder.\" The badge description is the selector; the green-folder instruction is the declaration. CSS rules can overlap, so there must also be rules for resolving competing instructions.",
     "example": "```css\n.notice {\n  color: green;\n  padding: 12px;\n}\n```\n\nThe dot means a class selector. Elements with class=\"notice\" receive the matching styles. Padding adds space inside the element around its content.",
     "mistake": "Do not immediately add !important whenever a style loses. Inspect which rule is winning and why. Repeated overrides make later changes difficult to predict.",
@@ -818,7 +818,7 @@
     "question": "What does React context help you avoid?",
     "plain": "Context lets a component read a value from an appropriate provider above it without passing that value through every intermediate component as a prop. It is useful for shared concerns such as a theme. It does not automatically manage state or remove the need to think about updates.",
     "analogy": "A building-wide noticeboard can make information available without every person forwarding the same message down a chain. The noticeboard still needs an owner, and changing it may affect everyone who reads it.",
-    "example": "A Theme provider can expose a theme value. A deeply nested button reads that context to decide its styling. The intermediate layout components do not all need theme props solely to pass the value onward.",
+    "example": "```jsx\nconst ThemeContext = React.createContext(\"light\");\n\nfunction App() {\n  return (\n    <ThemeContext value=\"dark\">\n      <Layout />\n    </ThemeContext>\n  );\n}\n\nfunction SaveButton() {\n  const theme = React.useContext(ThemeContext);\n  return <button className={theme}>Save</button>;\n}\n```\n\nSaveButton, nested somewhere inside Layout, reads \"dark\" directly. Layout never has to accept or pass a theme prop. (React 19 lets you render the context itself as the provider.)",
     "mistake": "Putting all application data into one frequently changing context can cause broad updates and make ownership unclear. Keep related concerns separate and use simpler props when they communicate the relationship clearly.",
     "check": "Does creating a context automatically make its value persistent across browser reloads?",
     "answer": "**No.** Context distributes a value within the component tree. Persistence requires a separate storage mechanism, such as a server or browser storage, plus code to restore the value."
@@ -973,7 +973,7 @@
     "question": "What happens when you type a command into a terminal?",
     "plain": "The terminal displays a text interface to a shell. The shell interprets your command and runs a built-in action or a program. The command usually has a program name and arguments that tell it what to do. Its working directory helps determine which files it uses.",
     "analogy": "Think of giving written instructions to an assistant who is currently standing in one room. “List the files here” depends on which room they are in. The shell has a current directory, and different commands can change or use it.",
-    "example": "In PowerShell, `Get-Location` shows your current directory and `Get-ChildItem` lists its contents. `Set-Location src` moves into the src child directory if it exists. In many Unix shells, the corresponding commands are `pwd`, `ls`, and `cd src`.",
+    "example": "In PowerShell, `Get-Location` shows your current directory and `Get-ChildItem` lists its contents. `Set-Location src` moves into the src child directory if it exists. In Unix shells such as bash, the commands are `pwd`, `ls`, and `cd src`; PowerShell on Windows also accepts those three short names as aliases.",
     "mistake": "Commands differ across shells and operating systems. Read what a command does before pasting it, particularly when it deletes files, changes permissions, or downloads and executes code.",
     "check": "A tool says it cannot find package.json, but the file exists inside your project. What simple thing should you check first?",
     "answer": "Check your **current working directory**. You may be running the tool from the parent folder or a different project. Move to the intended project directory and verify the file is there."
@@ -1331,7 +1331,7 @@
     "question": "How do parameterized queries help prevent SQL injection?",
     "plain": "A parameterized query supplies SQL instructions separately from user-provided values. The database driver binds those values as data, so characters in a name do not become new SQL syntax. You should use the driver's parameter mechanism rather than constructing SQL by joining raw input strings.",
     "analogy": "A form has separate boxes for an instruction and a customer's name. Writing instruction-like words in the name box should still produce a name, not change what the office is asked to do.",
-    "example": "With a driver that uses $1 placeholders, the query text can be `SELECT id FROM users WHERE email = $1`, and the email is passed separately in the parameters list. Placeholder syntax differs across drivers. The value is not pasted into the SQL text by your code.",
+    "example": "```js\n// Unsafe: user input becomes part of the SQL text\ndb.query(\"SELECT id FROM users WHERE email = '\" + email + \"'\");\n\n// Safe: SQL text and value travel separately\ndb.query(\"SELECT id FROM users WHERE email = $1\", [email]);\n```\n\nThe $1 placeholder (node-postgres style) is filled by the driver as data. Placeholder syntax differs across drivers, such as ? or @email.",
     "mistake": "Parameters generally represent values, not arbitrary table names, column names, or sort directions. Dynamic identifiers need a controlled allowlist or an appropriate safe API. Validation alone is not a substitute for parameterization.",
     "check": "A search accepts a name containing an apostrophe. Should you manually paste that name into the SQL query string?",
     "answer": "**No.** Pass the name as a bound parameter through the database driver. Apostrophes and other characters then remain part of the data rather than changing the SQL structure."

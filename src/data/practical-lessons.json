@@ -81,7 +81,7 @@
     "analogy": "A coat-check ticket links your particular coat to the one returned later. The service works for many coats while preserving each handover relationship.",
     "mistake": "Using any for the result loses the useful connection and allows callers to assume unsupported operations. A generic also does not make empty input impossible.",
     "check": "Why should a generic first-item function include undefined in its return type?",
-    "answer": "An empty list has no first item. The type should make callers handle that possibility, unless the function instead requires a non-empty input or deliberately throws for empty lists."
+    "answer": "An empty list has no first item, so the return type should make callers handle that case. TypeScript will not add it for you: by default `items[0]` is typed as plain `T` even for `[]`, unless you write `T | undefined` or enable `noUncheckedIndexedAccess`. The alternative is to require a non-empty input or throw deliberately for empty lists."
   },
   {
     "key": "next-ts-tagged",
@@ -93,7 +93,7 @@
     "analogy": "A form marked pickup asks for a collection time; one marked delivery asks for an address. The form type determines the required details.",
     "mistake": "Several optional fields can accidentally allow impossible states, such as no result and no error. A tagged union expresses the intended alternatives more clearly.",
     "check": "For this union, should code read message before checking kind?\n\n```ts\ntype Result =\n  | { kind: \"ok\"; value: number }\n  | { kind: \"error\"; message: string };\n```",
-    "answer": "**No.** An ok result has value instead of message. Check the tag first; inside the error branch, message is guaranteed by the declared shape."
+    "answer": "**No.** TypeScript rejects `r.message` before the check (\"Property 'message' does not exist on type 'Result'\"), because an ok result has `value` instead. Check `r.kind` first; inside the `\"error\"` branch, `message` is guaranteed by the declared shape."
   },
   {
     "key": "next-ts-readonly",
@@ -115,7 +115,7 @@
     "plain": "Record<Key, Value> describes properties for each allowed key with a chosen value type. When Key is a finite union, the compiler can check that each required entry exists. It is useful for small complete lookup tables such as labels for every status.",
     "example": "```ts\ntype Status = \"open\" | \"closed\";\nconst labels: Record<Status, string> = {\n  open: \"Still working\",\n  closed: \"Finished\",\n};\n```\n\nBoth statuses need text labels. Adding another status prompts you to consider its label too.",
     "analogy": "A checklist of two required rooms needs a label for each room. A complete lookup table is that checklist expressed as data.",
-    "mistake": "Record<string, T> does not create values for arbitrary keys at runtime. A lookup for a key that was never stored can still be missing; model and check that possibility.",
+    "mistake": "With `Record<string, T>`, TypeScript types every lookup as `T`, even for a key that was never stored, so `labels[userInput]` can be `undefined` at runtime without a compiler warning. Declare `Record<string, T | undefined>` (or enable `noUncheckedIndexedAccess`) and check the result.",
     "check": "A label table uses `Record<Status, string>`, where `Status` is `\"open\" | \"closed\"`. If Status gains `\"paused\"`, what must the table add?",
     "answer": "Add a paused label. With Record<Status, string>, TypeScript reports the missing required key, helping keep the table aligned with the states your program supports."
   },
@@ -137,7 +137,7 @@
     "aliases": [],
     "question": "How do the start and stop positions in a Python list slice work?",
     "plain": "A slice such as items[start:stop] returns a new list containing positions from start up to, but excluding, stop. Leaving out start means begin at the beginning. Leaving out stop means continue to the end. The elements themselves are not deep-copied.",
-    "example": "```python\nletters = [\"a\", \"b\", \"c\", \"d\"]\nprint(letters[1:3])  # [\"b\", \"c\"]\nprint(letters[:2])   # [\"a\", \"b\"]\n```\n\nPositions 1 and 2 belong to the first slice. Position 3 is the excluded boundary.",
+    "example": "```python\nletters = [\"a\", \"b\", \"c\", \"d\"]\nprint(letters[1:3])  # ['b', 'c']\nprint(letters[:2])   # ['a', 'b']\n```\n\nPositions 1 and 2 belong to the first slice. Position 3 is the excluded boundary.",
     "analogy": "Imagine cutting a strip between two ruler marks. The marks define its edges; the right-hand edge does not add another item.",
     "mistake": "A new outer list can still contain references to the same nested objects. Changing a nested dictionary through the slice can affect the original list's contents.",
     "check": "For `[10, 20, 30, 40]`, what does the slice `[-2:]` return?",
@@ -173,7 +173,7 @@
     "aliases": [],
     "question": "How does Python dictionary get differ from square-bracket lookup?",
     "plain": "Square-bracket lookup requires the key to exist and raises KeyError if it does not. get returns a default for a missing key, using None when no default is given. Choose based on whether missing data is expected or represents a bug.",
-    "example": "```python\ncounts = {\"apple\": 2}\nprint(counts.get(\"pear\", 0))  # 0\nprint(counts)  # {\"apple\": 2}\n```\n\nThe default is returned without inserting pear into the dictionary. Storing a new count is a separate assignment.",
+    "example": "```python\ncounts = {\"apple\": 2}\nprint(counts.get(\"pear\", 0))  # 0\nprint(counts)  # {'apple': 2}\n```\n\nThe default is returned without inserting pear into the dictionary. Storing a new count is a separate assignment.",
     "analogy": "A receptionist can either require a reservation record or politely give a default answer when no record exists. Those are different policies for absence.",
     "mistake": "get does not replace a present None value with the default. It checks whether the key exists, not whether its stored value is useful for your task.",
     "check": "What does `{\"name\": None}.get(\"name\", \"Guest\")` return in Python?",
@@ -197,7 +197,7 @@
     "aliases": [],
     "question": "Why can a Python function with a default argument of [] remember earlier calls?",
     "plain": "Default argument values are evaluated when the function definition runs, not freshly for each call. If the default is a mutable list, calls that omit the argument use that same list. Mutating it can unexpectedly carry data into later calls.",
-    "example": "```python\ndef collect(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket\n```\n\nHere an omitted bucket creates a new list during each call. A caller can still intentionally supply a list to update.",
+    "example": "```python\ndef add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nprint(add_tag(\"a\"))  # ['a']\nprint(add_tag(\"b\"))  # ['a', 'b']  same list reused\n```\n\nThe `[]` was created once, when `def` ran, so the second call sees the first call's data. The fix is `tags=None` plus `if tags is None: tags = []` inside the function, which builds a fresh list per call.",
     "analogy": "A shared scratchpad left at a service counter keeps earlier notes. Handing out a fresh sheet for each visitor prevents accidental carryover.",
     "mistake": "Replacing the list default with another mutable object, such as {}, has the same issue. Choose a sentinel and create the object inside the function.",
     "check": "Do `collect(\"a\")` and then `collect(\"b\")` return one growing list here?\n\n```python\ndef collect(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket\n```",
@@ -260,7 +260,7 @@
     "example": "A table fails with 500 records. Try a small copied set, then reduce it until one record with a missing city still fails. The investigation can now focus on handling that missing field instead of table size.",
     "analogy": "If one ingredient spoils a recipe, reducing the recipe helps isolate which ingredient matters. The reduced version must still produce the same bad result.",
     "mistake": "If simplifying makes the bug disappear, you may have removed an essential condition. Restore that part and reduce somewhere else.",
-    "check": "Why keep retesting the failure after each simplification?",
+    "check": "While shrinking a failing bug example down to a minimal case, why rerun it after each simplification?",
     "answer": "To prove the simplified example still represents the same issue. Otherwise you can end up explaining a different problem, or a case that does not fail at all."
   },
   {
@@ -297,7 +297,7 @@
     "analogy": "A mechanic tests whether a battery is flat before replacing several unrelated parts. Each test should distinguish possible explanations.",
     "mistake": "A passing result after one edit is evidence, not proof of every assumption. Recheck the original failing case and nearby valid cases.",
     "check": "What is a useful prediction for \"this request runs twice because the handler is registered twice\"?",
-    "answer": "One user action should reach two registered handler executions. Inspect registration and invocation counts; if there is only one handler call, look for duplication elsewhere in the request path."
+    "answer": "Prediction: one click produces two handler calls, for example a log or breakpoint in the handler fires twice and the Network panel shows two identical requests. Then confirm where the handler is registered. If the handler runs only once per click, the hypothesis is wrong and the duplicate comes from elsewhere in the request path."
   },
   {
     "key": "next-debug-network",
@@ -309,7 +309,7 @@
     "analogy": "Checking the delivery receipt and opening the parcel tells you more than staring at an empty shelf. Sending, receiving, and displaying are separate steps.",
     "mistake": "A 200 status does not prove the response contains valid application data. Inspect the body and remember that debug payloads can contain sensitive information.",
     "check": "The expected request does not appear at all. Should your first investigation be a database query?",
-    "answer": "Start earlier: check whether the event handler ran, validation stopped submission, or a client error occurred before the request. Evidence points to the path before the server query."
+    "answer": "**No.** If the request never appears, the server was never reached. Start earlier: check whether the event handler ran, whether validation stopped the submission, or whether a client-side error was thrown before the request was sent."
   },
   {
     "key": "next-debug-boundary",
@@ -449,7 +449,7 @@
     "aliases": [],
     "question": "How can passing a clock into code make time-based behavior easier to test?",
     "plain": "A controllable clock lets the test choose the current time instead of depending on the real date or waiting for time to pass. You can check exact expiration boundaries and scheduling behavior quickly and repeatably.",
-    "example": "```js\nfunction isExpired(expiresAt, now) {\n  return now >= expiresAt;\n}\nexpect(isExpired(1000, 999)).toBe(false);\nexpect(isExpired(1000, 1000)).toBe(true);\n```\n\nAll values use the same time unit. The test controls both sides of the comparison.",
+    "example": "```js\nfunction isExpired(expiresAt, now = Date.now()) {\n  return now >= expiresAt;\n}\nexpect(isExpired(1000, 999)).toBe(false);\nexpect(isExpired(1000, 1000)).toBe(true);\n```\n\nProduction callers omit `now` and get the real time; the test passes its own time, so both sides of the comparison are fixed and repeatable. All values use the same unit (milliseconds).",
     "analogy": "A rehearsal clock can jump directly to midnight so you can practice what happens then without staying awake until the real midnight.",
     "mistake": "Replacing the current date may not also advance timers. Understand whether your test controls wall-clock readings, scheduled callbacks, or both.",
     "check": "Why can a test using the real current date fail only around midnight?",
@@ -523,7 +523,7 @@
     "plain": "Opening a modal should move focus into an appropriate place in the dialog, and keyboard interaction should remain within the active modal. Closing normally returns focus to the control that opened it, if that control still exists. This keeps the user's location understandable.",
     "example": "A Rename button opens a dialog. Focus enters the name field; Tab moves among the dialog controls. Cancel closes the dialog and focus returns to Rename. A user can complete the flow without hunting through the background page.",
     "analogy": "Entering a service booth moves your conversation inside it. When you leave, you return to the place in the queue where you started.",
-    "mistake": "Adding aria-modal alone does not implement focus movement or prevent background interaction. Use a suitable dialog implementation and test its actual behavior.",
+    "mistake": "Adding aria-modal alone does not move focus or block the background page. Prefer the native `<dialog>` element opened with `showModal()`: browsers move focus into it, make the rest of the page inert, close it on Escape, and restore focus on close. Still test the real behavior.",
     "check": "After closing a dialog, why is sending focus to the top of the page usually unhelpful?",
     "answer": "It loses the user's working position and forces extra navigation. Return focus to the opener or another logical next control if the opener was removed by the completed action."
   },
@@ -605,7 +605,7 @@
     "aliases": [],
     "question": "What different jobs do an HTTP request's method, URL, headers, and body perform?",
     "plain": "The method expresses the kind of operation, and the URL identifies the target. Headers carry metadata such as accepted formats or credentials. A body can carry submitted data. Reading these parts separately helps you diagnose a request and describe its contract clearly.",
-    "example": "A POST to /notes with Content-Type: application/json and body `{ \"text\": \"Review closures\" }` asks the server to process submitted note data. The path names the resource area; the body carries the new text.",
+    "example": "```http\nPOST /notes HTTP/1.1\nHost: api.example.com\nContent-Type: application/json\nAuthorization: Bearer <token>\n\n{ \"text\": \"Review closures\" }\n```\n\nPOST is the operation, /notes names the target collection, the headers say the body is JSON and who is calling, and the body carries the new note's data.",
     "analogy": "A parcel has a destination, handling instructions, and contents. Confusing the label with the contents makes delivery harder to reason about.",
     "mistake": "A body is not automatically JSON merely because the client sent text that resembles an object. The content type and server parsing rules need to agree.",
     "check": "If a server expects JSON but receives an unparseable body, which parts of the request should you inspect?",
@@ -629,7 +629,7 @@
     "aliases": [],
     "question": "Why should a GET endpoint avoid performing an action such as deleting a record?",
     "plain": "GET has safe semantics: the caller is asking to retrieve information, not requesting a state-changing action. Browsers, crawlers, and intermediaries may fetch or repeat such requests. Encoding deletion in a GET URL makes ordinary retrieval behavior dangerous.",
-    "example": "A link to `/notes/7` can display a note. Deleting it should use an appropriately designed mutation endpoint with authorization and request protections. A crawler following a display link should not delete the note.",
+    "example": "```http\nGET /notes/7      -> show note 7 (safe to repeat, prefetch, or crawl)\nDELETE /notes/7   -> delete note 7 (authorized, CSRF-protected)\n```\n\nA crawler or link prefetcher following the GET should never delete anything. The deletion lives on a separate method the browser will not send just by visiting a link.",
     "analogy": "Opening a product catalog should not place an order. Looking and acting are different commitments even if both involve the same product.",
     "mistake": "Safe does not mean nothing whatsoever changes internally: access logging may occur. The distinction is whether the client requested a meaningful mutation through the operation.",
     "check": "Why is a GET link such as `/account/delete` a poor deletion design?",
@@ -645,7 +645,7 @@
     "analogy": "A service desk can say completed, please correct the request, or our equipment is unavailable. Those categories suggest different next steps.",
     "mistake": "The broad category does not determine a safe retry policy by itself. Some failures need corrected input, some may be transient, and repeated mutations may duplicate effects.",
     "check": "If a client sends a required field in the wrong format, is a generic 500 usually the clearest response?",
-    "answer": "**No.** Use an appropriate documented client-error response and a useful validation message. A 500 incorrectly suggests an unexpected server failure rather than a correctable request problem."
+    "answer": "**No.** Return a 4xx client error, typically 400 Bad Request or 422 Unprocessable Content, with a message naming the invalid field. A 500 wrongly signals an unexpected server failure instead of a request the client can correct."
   },
   {
     "key": "next-http-fetch-errors",
@@ -665,7 +665,7 @@
     "aliases": [],
     "question": "Why can response.json() fail even after an HTTP request succeeds?",
     "plain": "json() parses the body as JSON. A success status does not guarantee that the body contains JSON; it could be empty, HTML, or another format. The client and server need an agreed response contract, including cases that intentionally return no body.",
-    "example": "A delete endpoint returns 204 No Content. Calling json() expects a JSON value that is not present. Handle the no-content success directly instead of trying to parse an empty body.",
+    "example": "```js\nconst res = await fetch(`/api/notes/${id}`, { method: \"DELETE\" });\nif (!res.ok) throw new Error(`Delete failed: ${res.status}`);\n// 204 No Content: there is no body, so do not call res.json()\n// (it would throw SyntaxError: Unexpected end of JSON input)\nif (res.status !== 204) console.log(await res.json());\n```\n\nThe delete succeeded; the client just has nothing to parse.",
     "analogy": "A delivered envelope may intentionally be empty. Receiving it successfully does not mean there is a letter inside to read.",
     "mistake": "A proxy or login redirect can produce HTML where your API client expected JSON. Inspect status, final response details, and content type when parsing unexpectedly fails.",
     "check": "After a documented 204 response, should the client require a JSON object before showing success?",
@@ -725,7 +725,7 @@
     "aliases": [],
     "question": "Before writing an aggregate query, why define what one output row should represent?",
     "plain": "A row might represent an order, a customer, or a customer-month. That level of detail determines grouping and which joins are appropriate. Stating it first helps avoid combining unrelated quantities or accidentally returning several rows when the caller expects one.",
-    "example": "For \"total spending per customer,\" one output row represents a customer. Group order amounts by customer_id. Adding order_id to that grouping changes the level to individual orders and no longer produces one total per customer.",
+    "example": "```sql\n-- one row per customer\nSELECT customer_id, SUM(amount) AS total_spent\nFROM orders\nGROUP BY customer_id;\n```\n\nAdding order_id to the SELECT and GROUP BY would silently change the grain to one row per order, so you would no longer get one total per customer.",
     "analogy": "A school report can have one row per student or one per class. Mixing those meanings makes averages and totals hard to interpret.",
     "mistake": "Do not select extra grouping columns just to make a SQL error disappear. Each extra column may change what a row means.",
     "check": "If a report needs one row per day, what happens if you also group by individual event ID?",
@@ -749,7 +749,7 @@
     "aliases": [],
     "question": "Why can a WHERE condition on the right table remove unmatched rows from a LEFT JOIN?",
     "plain": "A left join keeps left-side rows without a match by filling right-side columns with NULL. A later WHERE condition keeps only rows where its condition is true. If that condition rejects the NULL-filled rows, those unmatched left rows disappear.",
-    "example": "To show every customer with any paid orders, put `orders.status = 'paid'` in the ON condition alongside the customer match. Putting it in WHERE instead removes customers whose joined status is NULL.",
+    "example": "```sql\n-- every customer, plus their paid orders if any\nSELECT c.name, o.id AS order_id\nFROM customers c\nLEFT JOIN orders o\n  ON o.customer_id = c.id AND o.status = 'paid';\n```\n\nCustomers with no paid orders still appear with order_id NULL. Moving `o.status = 'paid'` into WHERE would drop them, because `NULL = 'paid'` is not true.",
     "analogy": "A guest list first includes everyone, even those without meal orders. A later rule saying \"keep only people with a vegetarian order\" removes guests with no order.",
     "mistake": "Moving a condition changes meaning. Decide whether you want to filter possible matches or filter final result rows; neither placement is always correct for every question.",
     "check": "To retain customers with no orders while matching only shipped orders, where should the shipped condition usually go?",
@@ -787,7 +787,7 @@
     "plain": "A window function computes across a related set of rows while retaining the individual result rows. GROUP BY normally collapses rows into groups. Window functions help when you need both each item and a comparison or calculation over its peers.",
     "example": "```sql\nSELECT name, team_id,\n       COUNT(*) OVER (PARTITION BY team_id) AS team_size\nFROM members;\n```\n\nEach member still gets a row. team_size repeats the count for that member's team beside their name.",
     "analogy": "Each student keeps an individual report card with the class size written beside their own information. You did not replace the class with one summary card.",
-    "mistake": "Ordering and window frames affect functions such as running sums. Learn the specific frame rather than assuming every window automatically means the entire partition.",
+    "mistake": "Adding ORDER BY inside OVER changes the default frame to \"start of the partition up to the current row\" (plus ties), so `SUM(x) OVER (PARTITION BY team_id ORDER BY created_at)` becomes a running total, not the team total. Know which frame you are getting.",
     "check": "Five members belong to one team. How many rows does this query return for that team?\n\n```sql\nSELECT name, team_id,\n       COUNT(*) OVER (PARTITION BY team_id) AS team_size\nFROM members;\n```",
     "answer": "**Five rows**, each showing team_size as 5. A grouped team-count query would instead usually return one summary row for that team."
   },
@@ -845,7 +845,7 @@
     "aliases": [],
     "question": "Why is checking that a user is signed in insufficient before returning a private note by ID?",
     "plain": "Signing in establishes identity, but the server must also check whether that identity may access this particular note. A caller can change an ID in a request. Restrict the lookup by the authenticated user's permissions or ownership rules before returning private data.",
-    "example": "For a personal-note app, query for the requested note ID together with the owner ID from the verified session. Do not accept an owner ID supplied by the browser as proof of ownership. Shared notes need an explicit sharing policy instead.",
+    "example": "```sql\nSELECT id, title, body\nFROM notes\nWHERE id = $1          -- note ID from the URL\n  AND owner_id = $2;   -- user ID from the verified session\n```\n\nNo row means \"not found\" for this user. Never take owner_id from the request body or query string. Shared notes need an explicit sharing rule instead.",
     "analogy": "A building pass proves who you are; it does not give you permission to open every tenant's mailbox.",
     "mistake": "Hiding an Edit button is useful UI behavior but does not enforce server permissions. Direct requests can bypass the page entirely.",
     "check": "If note IDs are long random strings, can the API skip checking ownership?",
@@ -871,7 +871,7 @@
     "plain": "Code and configuration delivered to a browser can be inspected by the person using it. A private credential included in that bundle is therefore exposed. Keep server secrets in an appropriate server environment and have the browser use an authorized server API.",
     "example": "A weather-provider secret used for billed server requests belongs behind your backend. The browser calls your endpoint, which enforces its own access and request limits. A public publishable key is different only when the provider explicitly designed it to be public.",
     "analogy": "Writing a safe combination on a customer receipt does not keep it secret just because the receipt was printed by trusted staff.",
-    "mistake": "An environment variable is not automatically secret: build tools can insert selected variables into browser assets. Inspect what is actually shipped and follow the provider's key model.",
+    "mistake": "An environment variable is not automatically secret. Bundlers inline variables with public prefixes such as `VITE_` or `NEXT_PUBLIC_` into the browser bundle. Check what actually ships and follow the provider's key model.",
     "check": "Does minifying JavaScript protect a private API key embedded in it?",
     "answer": "**No.** Minification changes presentation, not access. Anyone receiving the bundle can recover its values; move the private credential to the proper server boundary and rotate it if exposed."
   },
@@ -880,10 +880,10 @@
     "title": "Store a password verifier, not the password",
     "aliases": [],
     "question": "Why should a server use a dedicated password-hashing algorithm rather than plain text or a fast general hash?",
-    "plain": "A password verifier should make offline guessing expensive if the database leaks. Dedicated password-hashing schemes use a salt and configurable work costs suited to that purpose. Use a maintained implementation and current parameters rather than inventing your own scheme.",
+    "plain": "If the database leaks, a password verifier should make offline guessing slow and expensive. Dedicated password-hashing algorithms add a unique salt per password and a tunable work factor. OWASP currently recommends Argon2id first, then scrypt; bcrypt for legacy systems; PBKDF2 where FIPS compliance is required. Use a maintained library with current parameters rather than inventing a scheme.",
     "example": "At registration, the password library produces a stored verifier including algorithm settings and salt information. At login, its verify operation checks the submitted password against that verifier. The server does not need to recover the original password.",
     "analogy": "The system keeps a way to check the answer, not a readable copy of the answer. The checking process is intentionally costly enough to slow mass guessing.",
-    "mistake": "A fast hash such as plain SHA-256 is not an appropriate standalone password-storage scheme. Hashing also does not replace rate limits, secure transport, or account recovery design.",
+    "mistake": "A fast hash such as plain SHA-256 (even salted) is not a password-storage scheme; GPUs can try billions per second. Also note bcrypt ignores input beyond 72 bytes. Hashing does not replace rate limits, HTTPS, or a safe reset flow.",
     "check": "Should a password-reset feature email the user their existing password?",
     "answer": "**No.** The system should not be able to retrieve it from a proper verifier. Use a secure, time-limited reset process that allows the user to choose a new password."
   },
@@ -968,8 +968,8 @@
     "example": "A bug fix for saved filters includes the URL initialization change and a regression test. A broad restyling of every button would make that review harder without helping establish whether filters survive refresh.",
     "analogy": "Proofreading one revised paragraph is easier than finding it among pages of unrelated formatting edits. The important change should remain visible.",
     "mistake": "Splitting code into tiny commits does not automatically create a coherent review. Keep pieces together when they are necessary to understand and safely apply one behavior change.",
-    "check": "What should the description of a filter-refresh fix tell a reviewer first?",
-    "answer": "State the failing trigger and the corrected behavior, then the relevant verification. That context lets the reviewer judge the code against a clear intended outcome."
+    "check": "You fixed a bug where a list's saved filters reset when the page is refreshed. What should the pull-request description tell the reviewer first?",
+    "answer": "The trigger and the fix: \"Filters were lost on refresh because they were not read from the URL on load; now they are.\" Then how you verified it (e.g. the regression test). That lets the reviewer judge the code against a clear intended outcome."
   },
   {
     "key": "next-ship-diff",
@@ -1097,7 +1097,7 @@
     "aliases": [],
     "question": "Two people edit the same customer record. How can the second save avoid overwriting the first?",
     "plain": "Include a version from the record the form loaded. The server updates only if the stored version still matches. If another save has changed it, report a conflict and let the user reload or reconcile their edits. The version check and write must be one coordinated database operation.",
-    "example": "An update can use WHERE id = :id AND version = :oldVersion and set version = version + 1. If no allowed row matches, the server determines whether the record changed or no longer exists. The form keeps its draft while showing the conflict.",
+    "example": "```sql\nUPDATE customers\nSET name = $1, version = version + 1\nWHERE id = $2 AND version = $3;  -- version the form loaded\n```\n\nIf the update affects 0 rows, the record changed (or was deleted) since the form loaded: return 409 Conflict and keep the user's draft on screen.",
     "analogy": "A checkout slip records which edition you borrowed. You cannot silently replace the current edition with handwritten changes based on an older one.",
     "mistake": "Checking the version in one request and updating unconditionally afterward leaves a race between the two steps. Put the condition in the write or use your database's concurrency mechanism.",
     "check": "An edit form loaded version 7, but the server now has version 8. Should it automatically overwrite version 8?",
@@ -1109,7 +1109,7 @@
     "aliases": [],
     "question": "Two registration requests both check that an email is unused, then both insert it. What prevents duplicates?",
     "plain": "A pre-check can improve feedback, but it cannot guarantee uniqueness while requests overlap. Define the intended uniqueness rule and enforce it with a database constraint or unique index. Catch the constraint failure and translate it into an appropriate, understandable application response.",
-    "example": "If the application uses a normalized email field as its account identifier, enforce uniqueness on that stored identifier. Both requests may pass an earlier availability check, but the database admits only one conflicting value.",
+    "example": "```sql\nCREATE UNIQUE INDEX users_email_unique ON users (lower(email));\n```\n\nBoth requests can pass the availability check, but the second INSERT fails with a unique violation (PostgreSQL error code 23505). Catch that and return a friendly \"email already registered\" (e.g. 409).",
     "analogy": "Two clerks can both see an empty seat on an old printout. A central reservation system must decide who actually gets the seat at the moment of booking.",
     "mistake": "Be explicit about normalization and scope. Unique within one organization differs from unique across the entire application. Do not assume every email comparison rule is interchangeable.",
     "check": "Can a \"Check availability\" endpoint replace a database uniqueness rule?",
@@ -1121,7 +1121,7 @@
     "aliases": [],
     "question": "A user types \"cat\", then \"caterer\", but the screen ends up showing results for \"cat\". Why?",
     "plain": "Requests can finish in a different order from the order they started. The earlier search may be slower and arrive last. Associate results with the active query or request generation and apply only the current result. Cancel obsolete requests where supported to avoid unnecessary work.",
-    "example": "Request A searches cat. Request B searches caterer and finishes first. If B is the current request, ignore A when it eventually finishes. Loading and error state should also belong to the active request, so A cannot clear B's spinner or replace B's error.",
+    "example": "```js\nlet controller;\nasync function search(q) {\n  controller?.abort(); // cancel the previous request\n  const current = (controller = new AbortController());\n  try {\n    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: current.signal });\n    const data = await res.json();\n    if (current === controller) showResults(data); // only the latest wins\n  } catch (err) {\n    if (err.name !== \"AbortError\") throw err;\n  }\n}\n```\n\nLoading and error state should also belong to the active request, so an old one cannot clear the new spinner.",
     "analogy": "You ask two assistants for different reports. The report delivered last is not necessarily the report you requested most recently.",
     "mistake": "Debouncing reduces how often requests start; it does not guarantee their completion order. An old in-flight request can still finish after the latest one.",
     "check": "Does waiting 300 milliseconds before issuing each search fully prevent stale results?",
@@ -1133,7 +1133,7 @@
     "aliases": [],
     "question": "Why is saving every property from a profile request into the user row dangerous?",
     "plain": "An incoming object can contain fields that the form never offered. Build an update command from explicitly allowed fields and validate each one. Sensitive fields such as owner IDs, account roles, and approval status must come from trusted logic or separate authorized operations.",
-    "example": "A profile edit accepts displayName and bio. Construct an update containing only those fields. If the body also contains isAdmin: true, that value must not become part of the database update.",
+    "example": "```js\nconst ALLOWED = [\"displayName\", \"bio\"];\nconst update = Object.fromEntries(\n  ALLOWED.filter((k) => Object.hasOwn(body, k)).map((k) => [k, body[k]])\n);\n// body   { displayName: \"Ada\", bio: \"hi\", isAdmin: true }\n// update { displayName: \"Ada\", bio: \"hi\" }\n```\n\nOnly allowlisted fields reach the database update; isAdmin is dropped. Validate each allowed value too.",
     "analogy": "A change-of-address form authorizes changing an address. Writing \"make me the manager\" in the margin should not grant the clerk authority to change your job title.",
     "mistake": "Hiding a field in the interface is not a defense: callers can construct JSON directly. Likewise, a broad Partial<User> type is not a runtime allowlist.",
     "check": "The browser sends ownerId along with a new note. Which value should determine ownership?",
@@ -1157,7 +1157,7 @@
     "aliases": [],
     "question": "In a partial profile update, how can an omitted phone field differ from phone: null?",
     "plain": "A partial-update contract can define omission as leaving a value unchanged and explicit null as clearing it. The server must preserve that distinction when validating and building its update. An empty string is a third input whose meaning should also be defined rather than guessed.",
-    "example": "Stored phone is \"555-0100\". A body containing only displayName keeps that phone. A body containing phone: null clears it if the field is nullable and the API allows clearing it.",
+    "example": "```js\nconst update = {};\nif (Object.hasOwn(body, \"phone\")) update.phone = body.phone; // null clears it\n// { displayName: \"Ada\" } -> update {} : phone unchanged\n// { phone: null }         -> update { phone: null } : phone cleared\n```\n\nCheck whether the key is present, not whether its value is truthy or non-null. Clearing is allowed only if the column is nullable and the API permits it.",
     "analogy": "Leaving an instruction box blank can mean \"do nothing to this field.\" Writing \"erase this value\" is a separate instruction with a different result.",
     "mistake": "Using incoming.phone ?? existing.phone treats null like omission and prevents clearing. Conversely, filling every missing property with null can erase values the user never intended to change.",
     "check": "A PATCH request changes only a biography, but the server clears the address too. What may be wrong?",
@@ -1173,7 +1173,7 @@
     "analogy": "Changing the master address book does not automatically update every printed contact sheet. Each copy needs to be replaced or refreshed.",
     "mistake": "Do not indiscriminately clear all application data after every save. Target the records and queries affected by the mutation, and handle refetch failures without claiming the save failed.",
     "check": "A completed task still appears under the \"Open\" filter after a successful save. Is changing its checkbox enough?",
-    "answer": "No. Membership in the filtered list changed too. Update the list consistently or refetch it using the active filter, and refresh any affected totals."
+    "answer": "**No.** Its membership in the filtered list changed too. Remove it from the \"Open\" list or refetch that list with the active filter, and refresh any affected counts."
   },
   {
     "key": "next-crud-safe-sort",
@@ -1181,11 +1181,11 @@
     "aliases": [],
     "question": "A table accepts sort=title from the URL. How should the API use it in a database query?",
     "plain": "Map public sort options to a small set of trusted query expressions. Bind ordinary filter values using the database driver. A parameter placeholder usually represents a value, so it does not automatically make arbitrary table names, column names, or sort directions safe.",
-    "example": "Accept title and newest as named choices. Map title to a fixed title ordering with ID as a tie breaker, and newest to a fixed created-at ordering with ID as a tie breaker. Reject or default unknown choices according to the API contract.",
+    "example": "```js\nconst SORTS = {\n  title: \"title ASC, id ASC\",\n  newest: \"created_at DESC, id DESC\",\n};\nconst sort = req.query.sort;\nconst orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.newest; // unknown -> default\nconst sql = `SELECT id, title FROM tasks WHERE owner_id = $1 ORDER BY ${orderBy}`;\n```\n\nOnly fixed strings from the map reach the SQL; the user's text never does. The id tie-breaker keeps equal titles in a stable order across pages.",
     "analogy": "A restaurant lets you choose from a menu. It does not let the text you write in the order box become instructions for rewiring the kitchen.",
     "mistake": "Do not append a raw sort string to SQL. Also specify a stable tie breaker so records with equal titles do not jump unpredictably between pages.",
     "check": "Does putting a user-provided column name in a value parameter select that SQL column?",
-    "answer": "Usually no: parameters bind data values, not arbitrary SQL identifiers. Choose the column through an allowlist or a safe query-builder API that enforces the allowed options."
+    "answer": "**No.** Parameters bind data values, not SQL identifiers, so `ORDER BY $1` is treated as a constant value (or rejected), never as the named column. Choose the column through an allowlist or a query builder that enforces allowed options."
   },
   {
     "key": "next-crud-test-feature",

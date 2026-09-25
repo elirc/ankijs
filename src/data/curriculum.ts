@@ -2,7 +2,7 @@ import expandedCatalog from "./expanded-catalog.json";
 import { loadSectionExpansion, sectionAdditionCount } from "./section-expansion";
 
 export type Track =
-  "Start here" | "Keep going" | "C# & .NET" | "Foundations" | "Frontend" | "Backend" | "Practice";
+  "Start here" | "Keep going" | "Build real apps" | "C# & .NET" | "Foundations" | "Frontend" | "Backend" | "Practice";
 export interface StarterDeck {
   id: string;
   name: string;
@@ -48,7 +48,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "What does a closure remember?",
-        "A function retains access to its lexical environment, including variables from an enclosing scope. It captures access to bindings, not necessarily a frozen snapshot of values.",
+        "**Access to the outer variables themselves, not a copy of their values.** A function keeps its enclosing scope alive, so it sees the variable's *current* value when it runs.\n```js\nlet count = 1;\nconst read = () => count;\ncount = 2;\nconsole.log(read()); // 2\n```\nThis is how event handlers and callbacks \"remember\" data after the outer function has returned.",
       ],
       [
         "What is the difference between `unknown` and `any`?",
@@ -56,7 +56,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "Predict the output:\n```js\nconst a = { nested: { count: 1 } };\nconst b = { ...a };\nb.nested.count = 2;\nconsole.log(a.nested.count);\n```",
-        "**2.** Object spread makes a shallow copy. Both objects still reference the same nested object. Copy each changed layer or use an appropriate deep-cloning operation.",
+        "**2.** Object spread makes a shallow copy: `b.nested` and `a.nested` are the same object. Copy each layer you change (`{ ...a, nested: { ...a.nested, count: 2 } }`) or deep-copy plain data with `structuredClone(a)`.",
       ],
       [
         "Does a TypeScript interface validate JSON from an API?",
@@ -64,7 +64,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "When should you use `Promise.all` versus `Promise.allSettled`?",
-        "**all** resolves with ordered results when all succeed and rejects on the first rejection. **allSettled** waits for every outcome.\n\nNeither automatically cancels the underlying operations.",
+        "Use **`Promise.all`** when you need *every* result and one failure should fail the whole operation (e.g. load a user and their settings). It rejects as soon as any promise rejects.\n\nUse **`Promise.allSettled`** when partial success is fine (e.g. independent dashboard widgets): it waits for all and gives `{ status, value | reason }` for each.\n\nNeither cancels the other operations.",
       ],
       [
         "What does `value ?? fallback` preserve that `value || fallback` does not?",
@@ -84,11 +84,11 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "How would you cancel a fetch when a screen is no longer relevant?",
-        "Create an AbortController, pass its signal to fetch, and abort during cleanup. Treat an expected abort separately from a network failure. Ignore stale responses as appropriate.",
+        "**Pass an `AbortController`'s signal to `fetch` and call `abort()` in cleanup.**\n```js\nuseEffect(() => {\n  const ctrl = new AbortController();\n  fetch(url, { signal: ctrl.signal })\n    .then(r => r.json()).then(setData)\n    .catch(e => { if (e.name !== 'AbortError') setError(e); });\n  return () => ctrl.abort();\n}, [url]);\n```\nTreat an expected `AbortError` differently from a real network failure.",
       ],
       [
         "Debounce versus throttle: which fits search-as-you-type?",
-        "**Debounce**: wait until input has been quiet for a period, then search. **Throttle**: cap how frequently an action runs during continuous events, such as scrolling.",
+        "**Debounce.** It waits until typing has paused (e.g. 300 ms), then searches once. **Throttle** instead caps how often an action runs during continuous events, such as scroll or resize handlers.",
       ],
       [
         "What does `const` guarantee for an object?",
@@ -136,7 +136,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "Why does mutating an array in React state cause problems?",
-        "React updates rely on state identity, and mutation also changes previous snapshots. Create a new array and copy changed objects.\n```tsx\nsetItems(items => items.map(item =>\n  item.id === id ? { ...item, done: true } : item\n));\n```",
+        "React decides whether to re-render by comparing the old and new state with `Object.is`. Mutating the array keeps the **same reference**, so React may skip the update, and earlier snapshots change too. Create a new array and copy changed objects:\n```tsx\nsetItems(items => items.map(item =>\n  item.id === id ? { ...item, done: true } : item\n));\n```",
       ],
       [
         "When would you use a ref instead of state?",
@@ -160,11 +160,11 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "What should happen to focus when a modal opens and closes?",
-        "Move focus into it, keep keyboard focus inside while open, support Escape when appropriate, and return focus to the trigger on close. Give the dialog an accessible name.",
+        "**Move focus into the modal when it opens, keep Tab inside it, close on Escape, and return focus to the button that opened it.** Give the dialog an accessible name. The native `<dialog>` element with `showModal()` handles most of this (focus, Escape, inert background) for you.",
       ],
       [
         "A button contains only a trash icon. What is missing?",
-        'An accessible name, such as aria-label="Delete card". The decorative icon should be hidden from assistive technology. Keep the tap target comfortably large.',
+        "**An accessible name**, e.g. `<button aria-label=\"Delete card\">`. Screen readers otherwise announce just \"button\". Hide the decorative icon with `aria-hidden=\"true\"` and keep the tap target large (about 44×44 px).",
       ],
       [
         "Why use a native `<button>` instead of a clickable `<div>`?",
@@ -176,7 +176,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "What problem does an Error Boundary solve, and what does it miss?",
-        "It can render fallback UI when descendants throw during rendering and relevant lifecycle work. It does not generally catch event-handler errors or arbitrary async failures; handle those explicitly.",
+        "**It shows fallback UI instead of a blank screen when a child component throws while rendering** (or in lifecycle methods/constructors below it). It does **not** catch errors in event handlers, async code (`setTimeout`, promise callbacks), server rendering, or the boundary itself; handle those with try/catch or error state. In React 19 you still write one as a class component (or use the `react-error-boundary` package).",
       ],
       [
         "A page works at 1440px but overflows on a phone. Name three things to inspect.",
@@ -223,7 +223,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "What tradeoff does CAP describe during a network partition?",
-        "A distributed system cannot guarantee both linearizable consistency and availability for every request across the partition. It must sometimes reject/delay requests or serve potentially inconsistent data.",
+        "During a network partition, a distributed system must choose per request between **consistency** (every read sees the latest write, known as linearizability) and **availability** (every request gets a non-error answer). So it either rejects/delays some requests or serves possibly stale data. Without a partition, both are possible.",
       ],
       [
         "Why might a message consumer see the same event twice?",
@@ -242,7 +242,7 @@ export const originalCurriculum: StarterDeck[] = [
         "A guard that temporarily stops calling a failing dependency after a threshold. It can allow limited probes later. This reduces repeated wasted work while exposing a clear fallback or error.",
       ],
       [
-        "Replication versus sharding: which increases data distribution?",
+        "Replication vs sharding: which one splits the data so each node holds a different part?",
         "**Sharding** divides different data across nodes. **Replication** keeps copies of data on multiple nodes. They can be combined; sharding complicates cross-shard queries and rebalancing.",
       ],
       [
@@ -318,7 +318,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "What does `NULL = NULL` return in SQL?",
-        "**Unknown**, not true. Use IS NULL to test for null. SQL’s three-valued logic affects filtering and comparisons.",
+        "**NULL (unknown), not true.** Any `=` comparison with NULL yields NULL, and `WHERE` keeps only rows that are true, so `WHERE col = NULL` matches nothing. Use `IS NULL` / `IS NOT NULL` (or `IS [NOT] DISTINCT FROM` for null-safe comparison).",
       ],
       [
         "How does normalization help with data integrity?",
@@ -334,7 +334,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "How do you safely add a required column to a large live table?",
-        "Plan a compatible staged migration: add a nullable/defaulted field as appropriate, deploy compatible readers/writers, backfill safely, validate, then enforce the constraint. Locking costs depend on the database and operation.",
+        "**In stages:** add the column (nullable, or with a constant default), deploy code that writes it, backfill existing rows in batches, then enforce NOT NULL. In PostgreSQL 11+, `ADD COLUMN ... DEFAULT 'x' NOT NULL` with a constant default is a fast metadata change. A later `SET NOT NULL` scans the table under a lock; adding `CHECK (col IS NOT NULL) NOT VALID` and then `VALIDATE` first avoids a long lock.",
       ],
       [
         "Why should backup restoration be tested?",
@@ -361,7 +361,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "401 versus 403: what is the useful distinction?",
-        "**401:** valid authentication is missing or required. **403:** the server understands the request but refuses it, often because authorization is insufficient.",
+        "**401 Unauthorized** means \"we don't know who you are\": credentials are missing, invalid, or expired, so log in again. **403 Forbidden** means \"we know who you are, but you're not allowed\": logging in again as the same user won't help.",
       ],
       [
         "What does HTTP method idempotency mean?",
@@ -393,7 +393,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "A fetch resolves successfully for a 500 response. Why?",
-        "fetch rejects for transport failures, not ordinary HTTP error statuses. Check response.ok or response.status before treating the body as a successful result.",
+        "**`fetch` only rejects for network failures (no response at all).** A 404 or 500 is still a response, so the promise resolves. Check `res.ok` yourself:\n```js\nconst res = await fetch('/api/cards');\nif (!res.ok) throw new Error(`HTTP ${res.status}`);\nconst cards = await res.json();\n```",
       ],
       [
         "What is CSRF, and when does it matter?",
@@ -409,11 +409,11 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "Why set a timeout or deadline on a network request?",
-        "A dependency can hang and consume resources indefinitely. Bound waiting, cancel work when possible, and distinguish retryable failures from operations whose outcome is unknown.",
+        "**Because a dependency can hang forever**, holding connections, memory, and the user's patience. Bound the wait, e.g. `fetch(url, { signal: AbortSignal.timeout(5000) })`. After a timeout the outcome may be unknown (a write might have succeeded), so only retry safe or idempotent operations.",
       ],
       [
         "What enables a web app to reopen without a network connection?",
-        "A service worker can cache the application shell; local storage such as IndexedDB holds user data. It must be installed and assets cached beforehand. Service workers require a secure context outside localhost.",
+        "**A service worker that caches the app's files (HTML, JS, CSS)**, plus IndexedDB for user data. The worker must have been installed and cached those files on an earlier online visit. Service workers only run over HTTPS (or on `localhost` during development).",
       ],
       [
         "When would you choose server-sent events over WebSockets?",
