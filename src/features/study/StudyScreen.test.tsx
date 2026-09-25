@@ -9,6 +9,7 @@ import { createDeck } from "../../db/repos/deckRepo";
 import { db, resetDatabaseForTests } from "../../db/schema";
 import { StudyScreen } from "./StudyScreen";
 import { teachingMarker } from "../../teaching/answers";
+import { curriculum } from "../../data/curriculum";
 
 describe("StudyScreen", () => {
   beforeEach(async () => {
@@ -192,5 +193,119 @@ describe("StudyScreen", () => {
     await screen.findByRole("heading", { name: "Session complete" }, { timeout: 5000 });
     await waitFor(async () => expect(await db.review_logs.count()).toBe(1));
     expect((await db.cards.toArray())[0].reps).toBe(1);
+  });
+
+  it("keeps the revealed card in front when a background refresh finds a newly due card", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      const user = userEvent.setup();
+      const deck = await createDeck("Background refresh");
+      const shown = await createCard({ deck_id: deck.id, front: "First question", back: "First answer" });
+      await db.cards.update(shown.id, { created_at: "2020-01-01T00:00:00.000Z" });
+      const later = await createCard({ deck_id: deck.id, front: "Second question", back: "Second answer" });
+      // Not yet due: a review card scheduled for the future stays out of the queue.
+      await db.cards.update(later.id, {
+        state: "review", reps: 1, stability: 5, due: new Date(Date.now() + 3_600_000).toISOString(),
+      });
+      render(<MemoryRouter><StudyScreen /></MemoryRouter>);
+      await screen.findByText("First question");
+      expect(screen.getByText("1 left")).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Show answer" }));
+      expect(await screen.findByText("First answer", { selector: "p" })).toBeVisible();
+
+      // The second card becomes due; due reviews normally sort ahead of new cards.
+      await db.cards.update(later.id, { due: new Date(Date.now() - 1_000).toISOString() });
+      const read = studyRepository.loadStudy;
+      let background: ReturnType<typeof read> | undefined;
+      vi.spyOn(studyRepository, "loadStudy").mockImplementationOnce((...args) => {
+        background = read(...args);
+        return background;
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(30_000);
+      });
+      await act(async () => { await background; });
+      expect(background).toBeDefined();
+      expect(await screen.findByText("2 left")).toBeVisible();
+      expect(screen.getByText("First question")).toBeVisible();
+      expect(screen.getByText("First answer", { selector: "p" })).toBeVisible();
+      expect(screen.queryByText("Second question")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /Easy/ }));
+      expect(await screen.findByText("Second question")).toBeVisible();
+      expect((await db.review_logs.toArray()).map((log) => log.card_id)).toEqual([shown.id]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not count time spent in another app toward the session limit", async () => {
+    const user = userEvent.setup();
+    let clock = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    const deck = await createDeck("Timed");
+    const first = await createCard({ deck_id: deck.id, front: "First question", back: "First answer" });
+    await db.cards.update(first.id, { created_at: "2020-01-01T00:00:00.000Z" });
+    await createCard({ deck_id: deck.id, front: "Second question", back: "Second answer" });
+    render(
+      <MemoryRouter initialEntries={["/study?minutes=2"]}>
+        <Routes><Route path="/study" element={<StudyScreen />} /></Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText("First question");
+
+    visibility.mockReturnValue("hidden");
+    fireEvent(document, new Event("visibilitychange"));
+    clock += 10 * 60_000;
+    visibility.mockReturnValue("visible");
+    fireEvent(document, new Event("visibilitychange"));
+    expect(await screen.findByText("2:00")).toBeVisible();
+    expect(screen.queryByText(/Time well spent/)).not.toBeInTheDocument();
+
+    clock += 30_000;
+    fireEvent(document, new Event("visibilitychange"));
+    expect(await screen.findByText("1:30")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Show answer" }));
+    await user.click(screen.getByRole("button", { name: /Easy/ }));
+    expect(await screen.findByText("Second question")).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Session complete" })).not.toBeInTheDocument();
+  });
+
+  it("limits a ?track= session to that curriculum track", async () => {
+    const startHere = curriculum.find((info) => info.track === "Start here")!;
+    const frontend = curriculum.find((info) => info.track === "Frontend")!;
+    const timestamp = new Date().toISOString();
+    for (const info of [startHere, frontend])
+      await db.decks.add({
+        id: info.id, user_id: null, name: info.name, new_per_day: 10,
+        created_at: timestamp, updated_at: timestamp, deleted_at: null,
+      });
+    await createCard({ deck_id: startHere.id, front: "Start here question", back: "Start answer" });
+    await createCard({ deck_id: frontend.id, front: "Frontend question", back: "Frontend answer" });
+    render(
+      <MemoryRouter initialEntries={[`/study?track=${encodeURIComponent("Start here")}`]}>
+        <Routes><Route path="/study" element={<StudyScreen />} /></Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("heading", { name: "Start here study" })).toBeVisible();
+    expect(screen.getByText("Start here question")).toBeVisible();
+    expect(screen.getByText("1 left")).toBeVisible();
+    expect(screen.queryByText("Frontend question")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Home" })).toBeVisible();
+  });
+
+  it("reveals and rates with keyboard shortcuts", async () => {
+    const user = userEvent.setup();
+    const deck = await createDeck("Keys");
+    await createCard({ deck_id: deck.id, front: "Key question", back: "Key answer" });
+    render(<MemoryRouter><StudyScreen /></MemoryRouter>);
+    await screen.findByText("Key question");
+    await user.keyboard(" ");
+    expect(await screen.findByText("Key answer", { selector: "p" })).toBeVisible();
+    await user.keyboard("3");
+    await screen.findByRole("heading", { name: "Session complete" }, { timeout: 5000 });
+    expect(await db.review_logs.count()).toBe(1);
   });
 });

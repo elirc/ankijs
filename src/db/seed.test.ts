@@ -105,9 +105,10 @@ describe("starter curriculum", () => {
   });
 
   it.each([
-    { version: "v2", count: 2247, excluded: ["Start here", "Keep going", "C# & .NET"] },
-    { version: "v3", count: 2407, excluded: ["Keep going", "C# & .NET"] },
-    { version: "v4", count: 2607, excluded: ["C# & .NET"] },
+    { version: "v2", count: 2247, excluded: ["Start here", "Keep going", "C# & .NET", "Build real apps"] },
+    { version: "v3", count: 2407, excluded: ["Keep going", "C# & .NET", "Build real apps"] },
+    { version: "v4", count: 2607, excluded: ["C# & .NET", "Build real apps"] },
+    { version: "v16", count: 2799, excluded: ["Build real apps"] },
   ])("upgrades $version without changing any existing card or review", async ({ version, count, excluded }) => {
     const content = await loadStarterCards();
     const baseline = curriculum.filter((d) => !excluded.includes(d.track));

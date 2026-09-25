@@ -1,6 +1,21 @@
 # Recall curriculum
 
-The current v15 library contains 2,871 cards across 75 decks: 2,799 retained base cards plus 72 authored scenarios, including 552 guided lesson cards across 276 lessons, alongside 48 hands-on engineering missions. Version 15 retires the generated source-derived library added in curriculum versions 12 through 14; [the release notes](RELEASE.md) record what that does to an existing installation. The automatic retrieval layer remains retired as well; [the earlier quality review](CONTENT-REVIEW.md) documents that decision.
+The current v17 library contains 3,103 cards across 83 decks: 2,959 retained base cards plus 144 authored scenarios. It includes 712 guided lesson cards across 356 lessons, alongside 48 hands-on engineering missions. Version 15 retired the generated source-derived library added in curriculum versions 12 through 14; [the release notes](RELEASE.md) record what that does to an existing installation. The automatic retrieval layer remains retired as well; [the earlier quality review](CONTENT-REVIEW.md) documents that decision.
+
+Version 16 was a content-quality pass with no new cards: about 2,200 existing cards and lessons were rewritten for accuracy, plain wording, and phone-sized examples. Installed apps receive those rewrites through the correction migration, and review history is kept.
+
+Version 17 adds 232 cards. The new **Build real apps** track has 8 decks with 10 guided lessons (20 cards) and 6 scenarios each, for 208 cards. Another 24 scenarios go into existing decks: TypeScript, Git, Python, CSS, and HTML. Every stated output and command in the new material was run or checked against official documentation before release. Existing installations get the new decks when the app next opens; nothing else is reset.
+
+| Deck | Covers | Further reading |
+| --- | --- | --- |
+| 21 · HTTP and REST in practice | Idempotent retries, status codes, Content-Type, caching and ETags, CORS preflight, redirects, query strings, curl | MDN · HTTP |
+| 22 · Build a Node and Express API | Express 5 routing, middleware order, async errors, error handlers, validation, `--env-file` | Express 5 guide |
+| 23 · Logins, sessions, and cookies | Session IDs, cookie attributes, logout, JWT limits, token storage, OAuth code flow with PKCE, rate limiting | OWASP Session Management Cheat Sheet |
+| 24 · SQL for everyday CRUD | INSERT … RETURNING, upserts, join tables, ON DELETE, EXISTS, CTEs, date ranges, adding columns | PostgreSQL documentation |
+| 25 · React forms and server data | Form actions, `useActionState`, double submits, fetch with AbortController, optimistic updates, React Router | react.dev reference |
+| 26 · Test a web app with Vitest | Matchers, mocks and spies, fake timers, Testing Library queries, userEvent, API and database tests | Vitest guide |
+| 27 · Debug with browser DevTools | Network panel, cache and throttling, breakpoints, source maps, cookies, service workers, computed styles | Chrome DevTools documentation |
+| 28 · Review, merge, and deploy | Pull requests, answering review, merge vs rebase, revert vs reset, `npm ci`, public `VITE_` variables, migrations, smoke checks | GitHub Docs · Pull requests |
 
 ## Historical v8 inventory
 
@@ -84,13 +99,13 @@ The following table records the superseded v8 expansion, not current counts. Cur
 | 11 · Run a reliable .NET service | C# & .NET | 16 | 64 | 80 |
 | 12 · Build a real notes app, one decision at a time | C# & .NET | 16 | 64 | 80 |
 
-808 cards are original Recall material. 1,991 cards are adapted from 30 seconds of code under CC BY 4.0: 1,211 explanation prompts and 780 code-completion prompts. See the bundled [credits](../public/content-credits.html) and [license](../public/licenses/30-seconds.txt).
+1,112 cards are original Recall material, including all 144 scenarios. 1,991 cards are adapted from 30 seconds of code under CC BY 4.0: 1,211 explanation prompts and 780 code-completion prompts. See the bundled [credits](../public/content-credits.html) and [license](../public/licenses/30-seconds.txt).
 
 The base Start here path teaches 80 ideas, and Keep going teaches 100 further ideas, through 360 paired understanding and application cards. The follow-on decks cover TypeScript, Python, debugging, testing, accessible interfaces, HTTP APIs, SQL reasoning, security, delivery, and real CRUD app problems. Each card has five explanations with plain English, a worked example, an analogy, a common mistake, and a practice prompt whose solution is hidden until requested. Older answers keep their full content and receive related supporting lessons when applicable. Browsing explanations does not change the spaced-repetition schedule.
 
 The default schedule introduces 10 new cards per local day across all decks, with due reviews first. Related introductions revisit the same idea after 1, then 3, then 7 local calendar days. Eligible familiar ideas take priority within a deck. Due reviews and learning retries are not delayed by this introduction spacing. FSRS retention defaults to 90%, configurable in Settings.
 
-The authored C# & .NET path contains 96 lessons and 192 paired cards. Together with the earlier authored paths, the retained guided set contains 276 lessons and 552 cards. The dedicated `/dotnet` page groups its decks into C# fundamentals, web backend development, and completing a working app. Focused sessions keep due reviews first and introduce new cards in deck order while sharing the existing global daily allowance. The authored path uses .NET 10 as its baseline, with official Microsoft Learn links for further reading. Source references retain their documented platform context.
+The authored C# & .NET path contains 96 lessons and 192 paired cards. Together with the earlier authored paths and the 80 lessons of Build real apps, the guided set contains 356 lessons and 712 cards. The dedicated `/dotnet` page groups its decks into C# fundamentals, web backend development, and completing a working app. Focused sessions keep due reviews first and introduce new cards in deck order while sharing the existing global daily allowance. The authored path uses .NET 10 as its baseline, with official Microsoft Learn links for further reading. Source references retain their documented platform context.
 
 Curriculum version 6 removes 434 bundled DSA, puzzle, and unrelated math cards and replaces the guided algorithm material with 38 CRUD cards. The new decks are **09 · Build your first CRUD feature** and **20 · Fix real CRUD app problems**; an early-return lesson also replaces the recursion exercise. The C# & .NET path remains available at `/dotnet`.
 

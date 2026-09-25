@@ -46,12 +46,15 @@ for (const card of scenarios) {
   assert(!/____|\[recall\]/.test(card.front));
   for (const heading of ['## The answer', '## Why it works', '## Verify it']) assert(card.back.includes(heading));
 }
-for (const file of ['teaching-lessons', 'practical-lessons', 'dotnet-lessons']) {
+let guidedLessons = 0;
+for (const file of ['teaching-lessons', 'practical-lessons', 'dotnet-lessons', 'applied-lessons']) {
   const lessons = read(`src/data/${file}.json`);
+  guidedLessons += lessons.length;
   assert.equal(new Set(lessons.map(lesson => lesson.key)).size, lessons.length, `${file}: duplicate lesson`);
   for (const lesson of lessons) for (const field of ['question', 'plain', 'example', 'analogy', 'mistake', 'check', 'answer']) {
     assert(typeof lesson[field] === 'string' && lesson[field].trim().length > 15, `${lesson.key}: missing ${field}`);
     assert.equal((lesson[field].match(/```/g) ?? []).length % 2, 0, `${lesson.key}: unbalanced ${field}`);
   }
 }
-console.log(`PASS: ${all.length} active cards, ${scenarios.length} authored scenarios, 276 retained guided lessons, counts, identities, credits, fences, and retired-card exclusion.`);
+assert.equal(guidedLessons, read('src/data/content-report.json').teachingLessons, 'Guided lesson count drifted');
+console.log(`PASS: ${all.length} active cards, ${scenarios.length} authored scenarios, ${guidedLessons} retained guided lessons, counts, identities, credits, fences, and retired-card exclusion.`);

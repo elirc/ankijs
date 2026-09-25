@@ -8,7 +8,7 @@ describe("practical follow-on curriculum", () => {
   it("delivers a concept and application card with five usable teaching views for every lesson", async () => {
     expect(lessons).toHaveLength(100);
     expect(new Set([...teachingLessons, ...lessons].map((l) => l.key)).size)
-      .toBe(report.teachingLessons - report.dotnetLessons);
+      .toBe(report.teachingLessons - report.dotnetLessons - report.appliedLessons);
     const decks = curriculum.filter((deck) => deck.track === "Keep going");
     expect(decks).toHaveLength(10);
     const packs = await loadStarterCards();

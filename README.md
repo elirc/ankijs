@@ -1,6 +1,6 @@
 # Recall — Engineering practice, in your pocket
 
-A local-first spaced-repetition web app with **2,871 practical web development flashcards across 75 decks** and 48 hands-on engineering missions. The card library includes 72 authored debugging scenarios and 552 guided lesson cards. No API key or account is required. The library focuses on forms, APIs, SQL, authentication, validation, testing, and shipping CRUD apps. LeetCode and DSA exercises are excluded.
+A local-first spaced-repetition web app with **3,103 practical web development flashcards across 83 decks** and 48 hands-on engineering missions. The card library includes 144 authored debugging scenarios and 712 guided lesson cards. No API key or account is required. The library focuses on forms, APIs, SQL, authentication, validation, testing, and shipping CRUD apps. LeetCode and DSA exercises are excluded.
 
 ## Start the app
 
@@ -32,16 +32,17 @@ The development server also prints your local network address for testing on the
 
 ## Included toolkit
 
-The library is **2,871 cards across 75 decks**:
+The library is **3,103 cards across 83 decks** (curriculum v17):
 
-- **808 original cards:** core SWE foundations, realistic engineering scenarios, 160 beginner cards, 200 follow-on cards, and 192 C#/.NET cards.
+- **1,112 original cards:** core SWE foundations, realistic engineering scenarios, 144 authored debugging scenarios, 160 beginner cards, 200 follow-on cards, 192 C#/.NET cards, and 160 Build real apps cards.
 - **Start here:** ten numbered beginner decks covering your first program, control flow, collections, async and debugging, web pages, React, databases, Git, CRUD features, and reliable services.
 - **Keep going:** ten more guided decks covering TypeScript, Python, debugging, testing, accessible interfaces, HTTP APIs, SQL reasoning, security, delivery, and real CRUD app problems. Find them from the home page or [open the collection locally](http://localhost:4173/decks?track=Keep+going). Track filters persist in the URL for bookmarks.
+- **Build real apps:** eight decks (21–28) with 80 lessons and 48 scenarios on HTTP and REST, a Node and Express API, logins and sessions, everyday SQL writes, React forms and server data, testing with Vitest, browser DevTools, and review, merge, and deploy. Find it from the home page or [open the collection locally](http://localhost:4173/decks?track=Build+real+apps).
 - **1,991 adapted cards:** 1,211 explanation exercises and 780 code-completion exercises from the CC BY 4.0 licensed _30 seconds of code_ collection. Topics include JavaScript, Python, Git, CSS, HTML, and React.
 - **C# & .NET web development:** a [dedicated learning area](http://localhost:4173/dotnet) with 12 ordered decks and 96 lessons, built around .NET 10. Learn C#, object modeling, LINQ, async, ASP.NET Core endpoints, dependency injection, EF Core, security, MVC/Razor Pages/Blazor, testing, deployment, and a notes-app capstone. Its 2-, 5-, and 10-minute sessions contain only .NET cards, with due reviews first and new cards in deck order. Daily limits still apply across the whole library. Editing, undo, suspension, and offline reload preserve the session's subject.
 - Searchable topic decks, 30-at-a-time card browsing, and editable Markdown/code answers. Related new exercises are separated until another day.
 
-Revealing an answer opens an explanation reader. **Next explanation**, Previous, and the explanation picker let you try another teaching approach without recording a review. All 552 guided cards have five views: plain English, a worked example, an analogy, a common mistake, and a practice prompt with a separate **Check my answer** button. Rate the card based on what you remembered before revealing it.
+Revealing an answer opens an explanation reader. **Next explanation**, Previous, and the explanation picker let you try another teaching approach without recording a review. All 712 guided cards have five views: plain English, a worked example, an analogy, a common mistake, and a practice prompt with a separate **Check my answer** button. Rate the card based on what you remembered before revealing it.
 
 Existing installations receive the CRUD curriculum automatically on the next app load after updating. Version 6 removes retired bundled puzzle cards, adds the new practical lessons, and preserves personal content and progress on retained cards. Version 15 removes the generated source-derived library the same way; see [Version 15](#version-15--the-curated-library).
 
@@ -116,6 +117,10 @@ python scripts/build-curriculum.py
 ```
 
 The builder downloads only the declared pinned public source revision when its local cache is absent. It does not execute downloaded examples. Generated IDs depend on source identity, not card position. `src/data/content-report.json` records the content totals and source provenance. The `c0000000` and `e0000000` UUID prefixes and final variant digit identify related adapted exercises and guided cards; preserve these IDs when maintaining the curriculum. Curriculum v6 removes 434 bundled algorithm/puzzle cards and adds 38 guided CRUD cards. Retained card identities, deck membership, edits, and review schedules stay unchanged. Explicit retirement IDs also apply to older backups and cloud pulls; personal cards remain visible. The builder filters after assigning the original deck boundaries, so repeated builds cannot move retained cards between decks. `scripts/crud-content-policy.json` records the source exclusions.
+
+### Versions 16 and 17
+
+Version 16 rewrote about 2,200 existing cards and lessons for accuracy and clarity; installed apps receive the new text through the correction migration. Version 17 adds 232 cards: the eight Build real apps decks (208 cards) and 24 scenarios in the TypeScript, Git, Python, CSS, and HTML decks. The scenario pack is now about 168 KB. Existing installations get the new cards on the next app load; progress and review history are unchanged.
 
 ### Version 15 — the curated library
 

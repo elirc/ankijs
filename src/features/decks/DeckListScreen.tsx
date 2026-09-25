@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Plus, Search } from "lucide-react";
+import { Clock3, Plus, Search } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DeckCard } from "../../components/DeckCard";
 import { getDashboard } from "../../db/repos/dashboardRepo";
@@ -10,7 +10,7 @@ import { CreateDeckDialog } from "./CreateDeckDialog";
 import { useNow } from "../../lib/useNow";
 
 const filters = [
-  "All decks", "Start here", "Keep going", "C# & .NET", "Foundations", "Frontend",
+  "All decks", "Start here", "Keep going", "Build real apps", "C# & .NET", "Foundations", "Frontend",
   "Backend", "Practice", "Personal",
 ];
 
@@ -79,6 +79,15 @@ export function DeckListScreen() {
       {filter === "C# & .NET" && <Link to="/dotnet" className="next-step-link">
         Open the C# & .NET path for these decks in order
       </Link>}
+      {filter !== "All decks" && filter !== "Personal" && (
+        <Link
+          to={`/study?track=${encodeURIComponent(filter)}&minutes=5`}
+          className="next-step-link"
+        >
+          <Clock3 size={16} aria-hidden="true" />
+          Study this path · 5 min
+        </Link>
+      )}
       {rows.length ? (
         <div className="deck-grid">
           {rows.map((summary) => (

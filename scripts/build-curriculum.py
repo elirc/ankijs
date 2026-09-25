@@ -149,9 +149,11 @@ authored = json.loads(authored_path.read_text(encoding="utf-8")) if authored_pat
 beginner = json.loads((ROOT / "src/data/beginner-expansion.json").read_text(encoding="utf-8"))
 practical = json.loads((ROOT / "src/data/practical-expansion.json").read_text(encoding="utf-8"))
 dotnet = json.loads((ROOT / "src/data/dotnet-expansion.json").read_text(encoding="utf-8"))
+applied = json.loads((ROOT / "src/data/applied-expansion.json").read_text(encoding="utf-8"))
 authored.extend(beginner)
 authored.extend(practical)
 authored.extend(dotnet)
+authored.extend(applied)
 # Add original lessons without displacing cards from the pinned source corpus.
 # Trimming this list as authored content grows would silently move deck boundaries.
 grouped = defaultdict(list)
@@ -191,9 +193,11 @@ report = {"totalCards": total, "originalCards": 112 + sum(len(d["cards"]) for d 
           "beginnerCards": sum(len(d["cards"]) for d in beginner),
           "practicalCards": sum(len(d["cards"]) for d in practical),
           "dotnetCards": sum(len(d["cards"]) for d in dotnet),
+          "appliedCards": sum(len(d["cards"]) for d in applied),
+          "appliedLessons": len(json.loads((out / "applied-lessons.json").read_text(encoding="utf-8"))),
           "dotnetLessons": len(json.loads((out / "dotnet-lessons.json").read_text(encoding="utf-8"))),
           "teachingLessons": sum(len(json.loads((out / name).read_text(encoding="utf-8")))
-                                 for name in ("teaching-lessons.json", "practical-lessons.json", "dotnet-lessons.json")),
+                                 for name in ("teaching-lessons.json", "practical-lessons.json", "dotnet-lessons.json", "applied-lessons.json")),
           "decks": len(catalog) + 7, "kinds": dict(Counter(c["kind"] for c in cards)), "source": SOURCE, "revision": REVISION,
           "license": "CC-BY-4.0", "excluded": dict(excluded)}
 (out / "content-report.json").write_text(json.dumps(report, indent=2) + '\n', encoding="utf-8")

@@ -1,13 +1,13 @@
 {
-  "totalCards": 2871,
-  "originalCards": 880,
+  "totalCards": 3103,
+  "originalCards": 1112,
   "adaptedCards": 1991,
   "beginnerCards": 160,
   "practicalCards": 200,
   "dotnetCards": 192,
   "dotnetLessons": 96,
-  "teachingLessons": 276,
-  "decks": 75,
+  "teachingLessons": 356,
+  "decks": 83,
   "kinds": {
     "complete": 780,
     "explain": 1211
@@ -21,14 +21,16 @@
     "missing context or obsolete API": 277,
     "outside practical CRUD scope": 364
   },
-  "baseCards": 2799,
-  "curriculumVersion": 16,
-  "scenarioCards": 72,
+  "baseCards": 2959,
+  "curriculumVersion": 17,
+  "scenarioCards": 144,
   "retiredRetrievalCards": 10810,
   "baseAdaptedCards": 1991,
-  "guidedLessons": 552,
+  "guidedLessons": 712,
   "retiredLibraryPrefixes": [
     "a3000000-",
     "a4000000-"
-  ]
+  ],
+  "appliedCards": 160,
+  "appliedLessons": 80
 }

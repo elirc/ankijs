@@ -8,6 +8,7 @@ import {
   Code2,
   Hammer,
   Inbox,
+  Layers,
   Play,
   Plus,
   Target,
@@ -26,7 +27,31 @@ import { CreateDeckDialog } from "../decks/CreateDeckDialog";
 const startHereCount = curriculum.filter((deck) => deck.track === "Start here").length;
 const keepGoingCount = curriculum.filter((deck) => deck.track === "Keep going").length;
 
-const paths = [
+const BUILD_TRACK = "Build real apps";
+
+interface Pathway {
+  to: string;
+  icon: typeof BookOpen;
+  label: string;
+  text: string;
+  isNew?: boolean;
+}
+
+/** Computed at render so the entry appears once the track's decks are integrated. */
+function buildRealAppsPath(): Pathway | null {
+  const decks = curriculum.filter((deck) => deck.track === BUILD_TRACK);
+  if (decks.length === 0) return null;
+  const cards = decks.reduce((total, deck) => total + deck.cardCount, 0);
+  return {
+    to: `/decks?track=${encodeURIComponent(BUILD_TRACK)}`,
+    icon: Layers,
+    label: BUILD_TRACK,
+    text: `${decks.length} ${decks.length === 1 ? "deck" : "decks"} · ${cards} ${cards === 1 ? "card" : "cards"}. Apply what you learned by building small, working apps end to end.`,
+    isNew: true,
+  };
+}
+
+const basePaths: Pathway[] = [
   {
     to: "/decks?track=Start+here",
     icon: BookOpen,
@@ -72,6 +97,11 @@ export function HomeScreen() {
         Loading your decks
       </div>
     );
+  const buildPath = buildRealAppsPath();
+  // Insert after "Keep going" to mirror the Track order.
+  const paths = buildPath
+    ? [...basePaths.slice(0, 2), buildPath, ...basePaths.slice(2)]
+    : basePaths;
   const progress = Math.min(100, (data.todayCount / data.goal) * 100);
   const rows = data.summaries.filter(
     (item) =>
@@ -214,7 +244,14 @@ export function HomeScreen() {
                 <path.icon size={18} aria-hidden="true" />
               </span>
               <span>
-                <strong>{path.label}</strong>
+                <strong>
+                  {path.label}
+                  {path.isNew && (
+                    <span className="count-pill" style={{ marginLeft: 8 }}>
+                      New
+                    </span>
+                  )}
+                </strong>
                 <small>{path.text}</small>
               </span>
               <ArrowRight size={16} aria-hidden="true" />

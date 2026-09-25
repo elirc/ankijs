@@ -485,5 +485,502 @@
         "kind": "scenario"
       }
     ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000003005",
+    "cards": [
+      {
+        "id": "a2000000-5a83-4312-87ce-0345bfcd994d",
+        "front": "A `Task` type has `id`, `title`, `done` and `createdAt`. `createTask(input: Task)` forces the New Task form to invent an `id` and `createdAt`. What type should `input` have?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nDerive a create type that leaves out the server-owned fields:\n\n```ts\ntype Task = { id: number; title: string; done: boolean; createdAt: string };\ntype NewTask = Omit<Task, 'id' | 'createdAt'>;\n\nfunction createTask(input: NewTask) { /* POST /api/tasks */ }\ncreateTask({ title: 'Buy milk', done: false }); // OK\n```\n\nThe server assigns `id` and `createdAt` and returns the full `Task`.\n\n## Why it works\n\n`Omit<T, K>` builds a new object type with every property of `T` except the keys in `K`, so `NewTask` stays in sync when you add a field to `Task`. Watch one trap: `Omit` does not check that `K` names real keys. `Omit<Task, 'Id'>` (capital I) compiles and silently keeps `id` required. `Pick<Task, 'Id'>` would fail with \"Type '\"Id\"' does not satisfy the constraint 'keyof Task'\".\n\n## Verify it\n\nCall `createTask({ title: 'x', done: false })` and confirm it compiles; add `id: 0` and confirm `tsc` now reports an excess-property error. If the form still complains about `id`, look for a misspelled key in the `Omit`.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-c7d3-4ea0-8f87-aa8ba89c60dd",
+        "front": "GET /api/tasks returns only `id`, `title` and `done` per row, but `TaskRow` takes a full `task: Task`. A teammate renders `task.description` and gets blank text. How should `TaskRow`'s prop be typed?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nType the prop as exactly what the list endpoint returns:\n\n```ts\ntype TaskSummary = Pick<Task, 'id' | 'title' | 'done'>;\n\nfunction TaskRow({ task }: { task: TaskSummary }) {\n  return <li>{task.title}</li>;\n}\n```\n\nNow `task.description` is a compile error instead of blank text at runtime.\n\n## Why it works\n\nTyping the prop as `Task` promises fields the response never contains, so reading `task.description` type-checks and yields `undefined` at runtime. `Pick<T, K>` copies only the listed properties, and unlike `Omit` it checks that each key exists on `T`. The type then documents the real contract of the list endpoint, and the detail screen can keep using the full `Task` from GET /api/tasks/:id.\n\n## Verify it\n\nAdd `task.description` inside `TaskRow` and run `npx tsc --noEmit`: expect \"Property 'description' does not exist on type 'TaskSummary'\". In DevTools, open the Network panel and confirm the list response rows really have only those three fields.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-5295-4ad7-8c50-f071006ace6f",
+        "front": "`const endpoints: Record<string, string> = { tasks: '/api/tasks', users: '/api/users' }`. Code calls `fetch(endpoints.task)` (typo) and TypeScript says nothing. Why, and what declaration catches the typo?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nUse `satisfies` instead of the annotation:\n\n```ts\nconst endpoints = {\n  tasks: '/api/tasks',\n  users: '/api/users',\n} satisfies Record<string, string>;\n\nfetch(endpoints.task);\n// error: Property 'task' does not exist ... Did you mean 'tasks'?\n```\n\n## Why it works\n\nThe annotation `Record<string, string>` tells TypeScript that any string key exists, so `endpoints.task` has type `string` and compiles; at runtime it is `undefined`, and `fetch(undefined)` requests a URL ending in `/undefined`. `satisfies` checks the object against `Record<string, string>` (a number value would still be an error) but keeps the inferred type `{ tasks: string; users: string }`, so only the real keys can be read.\n\n## Verify it\n\nRun `npx tsc --noEmit` after the change and look for TS2551 on the typo. Before the fix, the Network panel shows a request to `/undefined` (usually a 404) when the code runs.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-8dd2-4537-88af-2b2b36b129b2",
+        "front": "`const tasks: Task[] = await res.json()` compiles. When the API returns 500 with `{\"error\":\"Database unavailable\"}`, the page crashes with `data.map is not a function`. What should the fetch code do?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nCheck the status first, then treat the body as `unknown` until it is checked:\n\n```ts\nconst res = await fetch('/api/tasks');\nif (!res.ok) throw new Error(`GET /api/tasks failed: ${res.status}`);\nconst data: unknown = await res.json();\nif (!Array.isArray(data) || !data.every(isTask)) {\n  throw new Error('Unexpected response shape');\n}\nreturn data; // Task[]\n```\n\n## Why it works\n\n`res.json()` returns `Promise<any>`, and `any` can be assigned to `Task[]` without any check, so the annotation proves nothing. `fetch` also resolves normally for a 500, so the error object flows into `.map`. Checking `res.ok` handles failed requests, and typing the body as `unknown` forces a runtime check (`Array.isArray` plus a type guard like `isTask`) before TypeScript lets you use it as `Task[]`.\n\n## Verify it\n\nMake the API return 500 (stop the database or mock `fetch`) and confirm the UI shows an error message instead of crashing. Also try assigning `data` to `Task[]` before the checks: `tsc` should reject it because `unknown` is not assignable.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-e447-48b0-86c1-3c4a9853e4a2",
+        "front": "`saveTask` returns `{ ok: true; task: Task } | { ok: false; error: string }`. Writing `if (result.error)` fails to compile with \"Property 'error' does not exist\". How should the caller check the result?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nBranch on the tag that every member has:\n\n```ts\nconst result = await saveTask(draft);\nif (!result.ok) {\n  showError(result.error); // narrowed to the failure shape\n} else {\n  showSaved(result.task);  // narrowed to the success shape\n}\n```\n\n`if ('error' in result)` also narrows, but checking `ok` is clearer.\n\n## Why it works\n\nOn a union, TypeScript only lets you read properties that exist on every member. `error` exists only on the failure shape, so `result.error` is rejected before any narrowing. Checking the literal field `ok` (a discriminant) tells TypeScript which member you have in each branch. It is also more correct at runtime: `if (result.error)` would treat a failure with an empty message `''` as success.\n\n## Verify it\n\nRun `npx tsc --noEmit`: the `result.ok` version compiles with no casts. In a unit test, make `saveTask` resolve to `{ ok: false, error: '' }` and assert that the error branch still runs.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-187d-4d21-8265-d4fd6b19a1e8",
+        "front": "A `Task` type declares `dueAt: Date`. After `const task: Task = await res.json()`, calling `task.dueAt.getTime()` throws `TypeError: task.dueAt.getTime is not a function`. Why, and where should this be fixed?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nJSON has no date type: `dueAt` arrives as an ISO string. Type the wire format honestly and convert once, where the response is read:\n\n```ts\ntype TaskJson = { id: number; dueAt: string };\ntype Task = { id: number; dueAt: Date };\n\nfunction fromJson(json: TaskJson): Task {\n  return { ...json, dueAt: new Date(json.dueAt) };\n}\n```\n\n## Why it works\n\n`JSON.stringify` turns a `Date` into a string like `\"2026-10-01T09:00:00.000Z\"`, and `JSON.parse` never turns it back. Because `res.json()` returns `any`, TypeScript accepts the claim that `dueAt` is a `Date`, and the error only appears when a `Date` method is called. Converting in one function at the API boundary means every component receives real `Date` objects.\n\n## Verify it\n\nIn the browser console run `typeof (await (await fetch('/api/tasks/1')).json()).dueAt` and expect `'string'`. After adding `fromJson`, write a test that `fromJson({ id: 1, dueAt: '2026-10-01T09:00:00.000Z' }).dueAt instanceof Date` is `true`.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000002000",
+    "cards": [
+      {
+        "id": "a2000000-4ad8-44c0-895c-638a2dcf946d",
+        "front": "You made two commits on your local `main` that belong on a feature branch. Nothing is pushed yet. How do you move them to a new branch and put `main` back to match the remote?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nCreate the branch where you are, then move `main` back:\n\n```bash\ngit switch -c feature/tags        # new branch keeps both commits\ngit branch -f main origin/main    # point main back at the remote\n```\n\nYou are now on `feature/tags` with your two commits; `main` matches `origin/main`.\n\n## Why it works\n\nA branch is just a name pointing at a commit. `git switch -c` adds a second name for your current commit, so the work is safe on the new branch. `git branch -f main origin/main` then moves the `main` name back to where the remote is; it works because you are no longer on `main`. No commits are copied or lost, only names moved. Run `git fetch` first if `origin/main` may be out of date.\n\n## Verify it\n\nRun `git log --oneline main` and `git log --oneline feature/tags`: `main` should end at the remote commit and the feature branch should show your two commits on top. `git status -sb` should show `## feature/tags`.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-58dc-4ffb-8a8b-ba694933eaab",
+        "front": "`git pull` stops with \"Your local changes to the following files would be overwritten by merge\" and lists `app.js`, which you edited but did not commit. How do you get the new commits and keep your edits?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nPut your edits aside, pull, then bring them back:\n\n```bash\ngit stash          # save uncommitted edits\ngit pull\ngit stash pop      # re-apply them on top\n```\n\n`git pull --autostash` does the same three steps in one command. Committing your work first is also fine.\n\n## Why it works\n\nGit refuses to update a file whose uncommitted changes the incoming commits would overwrite, so nothing is lost and the pull is aborted. `git stash` saves your edits and restores a clean working tree, so the pull can update the file. `git stash pop` merges your saved edits into the new version. If the same lines changed on both sides, `pop` reports a conflict and keeps the stash, so you can resolve it and then run `git stash drop`.\n\n## Verify it\n\nAfter `git stash pop`, run `git status` and `git diff`: your edits should appear as unstaged changes on top of the pulled commits. `git stash list` should be empty unless `pop` hit a conflict.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-a7c4-4455-8adb-fcec0a5b99a2",
+        "front": "To test an old version you ran `git checkout 3050fc0`, fixed a bug, committed, then ran `git switch main`. The fix commit is not on any branch now. How do you get it back?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nGive the commit a branch name. Git printed its hash when you switched away (or find it with `git reflog`):\n\n```bash\ngit reflog                       # find \"hotfix\" commit, e.g. 14e226a\ngit branch rescue-fix 14e226a\ngit switch rescue-fix            # or: git cherry-pick 14e226a onto main\n```\n\n## Why it works\n\nChecking out a commit hash puts you in detached HEAD: new commits are made, but no branch name moves forward to hold them. When you switch away, the commit is unreferenced, and Git warns \"you are leaving 1 commit behind\" with a suggested `git branch <new-branch-name> <hash>`. The commit still exists and `git reflog` records it, until garbage collection prunes unreachable commits (by default after weeks). Next time, run `git switch -c fix-old-bug` before committing.\n\n## Verify it\n\nRun `git log --oneline -1 rescue-fix` and confirm it shows your fix message. `git branch --contains <hash>` should now list `rescue-fix`.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-e464-442a-8cd3-c41c19786786",
+        "front": "During `git rebase main`, a conflict appears in `shared.txt`. You run `git checkout --ours shared.txt` to keep your branch's version, but the file now has main's content. Why, and what should you run?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nDuring a rebase, `--ours` and `--theirs` are swapped compared with a merge. Use `--theirs` to keep your branch's change:\n\n```bash\ngit checkout --theirs shared.txt   # your commit's version\ngit add shared.txt\ngit rebase --continue\n```\n\n## Why it works\n\nA rebase replays your commits one by one on top of `main`. While it does that, HEAD is the rebuilt branch based on `main`, so \"ours\" means main's side and \"theirs\" means the commit of yours being replayed. In a normal `git merge`, \"ours\" is your current branch. When unsure, open the file and edit the conflict markers by hand, or check with `git diff` before `git add`.\n\n## Verify it\n\nBefore `git add`, run `cat shared.txt` (or open it) and confirm it has your change. After `git rebase --continue`, `git log --oneline -3` should show your commit on top of main's latest commit.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-86dc-4325-8e1a-5dd415750229",
+        "front": "You committed locally and a teammate pushed to the same branch. `git pull` now fails with \"fatal: Need to specify how to reconcile divergent branches.\" What do you run, and how do you stop seeing this?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nTell Git how to combine the two histories. Rebasing your unpushed commits on top of theirs is the usual choice:\n\n```bash\ngit pull --rebase           # replay your commit after theirs\ngit config --global pull.rebase true   # make it the default\n```\n\n`git pull --no-rebase` (merge) or `--ff-only` are the other choices.\n\n## Why it works\n\n\"Divergent\" means both sides have commits the other lacks, so Git cannot just move your branch forward. When neither `pull.rebase` nor `pull.ff` is set, current Git (checked with 2.51) stops `git pull` and asks instead of silently creating a merge commit. Note: the Git for Windows installer sets `pull.rebase=false` system-wide, so on Windows you may get a merge commit instead of this error.\n\n## Verify it\n\nAfter `git pull --rebase`, `git log --oneline -3` should show your commit on top of the teammate's commit with no \"Merge branch\" commit. `git config --show-origin pull.rebase` shows which config file sets the default.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-6aab-4afa-8515-323e836dc933",
+        "front": "You add `dist/` to `.gitignore`, but `git status` still shows `modified: dist/app.js` after every build. Why does the ignore rule not work, and how do you fix it?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\n`.gitignore` only affects untracked files, and `dist/` was committed before. Stop tracking it while keeping the files on disk:\n\n```bash\ngit rm -r --cached dist\ngit commit -m \"Stop tracking dist\"\n```\n\nFrom now on, new builds do not show up in `git status`.\n\n## Why it works\n\nOnce a file is tracked, Git keeps comparing it with the last commit, whatever `.gitignore` says. `git rm --cached` removes it from the index (the next commit) but not from your working folder, so the ignore rule then applies. Teammates who pull the commit will have `dist/` deleted from their working folders, which is fine for build output that is regenerated.\n\n## Verify it\n\nRebuild, then run `git status --short`: nothing under `dist/` should appear. `git check-ignore -v dist/app.js` should print the matching rule, such as `.gitignore:1:dist/`.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000001700",
+    "cards": [
+      {
+        "id": "a2000000-8dc9-4861-815d-9519c825e998",
+        "front": "An API handler returns `json.dumps(row)` for a task row read from the database. It fails with `TypeError: Object of type datetime is not JSON serializable`. How do you fix it?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nConvert `datetime` values to ISO 8601 strings, either by hand or with a `default` function:\n\n```python\nimport json\nfrom datetime import date, datetime\n\ndef to_json(value):\n    if isinstance(value, (datetime, date)):\n        return value.isoformat()\n    raise TypeError(f\"Cannot serialize {type(value).__name__}\")\n\njson.dumps(row, default=to_json)\n# {\"id\": 7, \"title\": \"Ship v2\", \"created_at\": \"2026-09-24T14:30:00\"}\n```\n\n## Why it works\n\nJSON only has strings, numbers, booleans, null, arrays and objects, so `json` refuses types it cannot represent. `default` is called for any object `json` cannot encode, and whatever it returns is encoded instead. ISO strings sort correctly and JavaScript's `new Date()` parses them. Avoid `default=str` as a blanket fix: it hides mistakes by turning any object into text.\n\n## Verify it\n\nCall the endpoint and check the JSON: `created_at` should be a string like `\"2026-09-24T14:30:00\"`. Add a test that `json.loads(json.dumps(row, default=to_json))[\"created_at\"]` equals `row[\"created_at\"].isoformat()`.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-fd81-428c-8170-e76653f9308f",
+        "front": "A Flask list endpoint uses `page = request.args.get(\"page\", 1)` and computes `(page - 1) * 20`. It works without `?page`, but `?page=2` gives a 500 error. Why, and how do you fix it?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nQuery-string values are always strings; only your default is an int. Convert with `type=int`:\n\n```python\npage = request.args.get(\"page\", 1, type=int)\nif page < 1:\n    return {\"error\": \"page must be 1 or more\"}, 400\noffset = (page - 1) * 20\n```\n\nWith `type=int`, a non-number like `?page=abc` also falls back to the default instead of crashing.\n\n## Why it works\n\n`request.args` holds the raw text of the URL, so `?page=2` gives `\"2\"`, and `\"2\" - 1` raises `TypeError: unsupported operand type(s) for -: 'str' and 'int'`. Without the parameter, the default `1` is an int, which is why that case works. Werkzeug's `get(..., type=int)` calls `int()` and returns the default if it raises `ValueError`. Without Flask, wrap `int(value)` in `try`/`except ValueError` and return 400.\n\n## Verify it\n\nRequest `/tasks`, `/tasks?page=2` and `/tasks?page=abc` and confirm all return 200 with the right page. Add a test for `?page=0` expecting 400.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-c6eb-40d9-81ff-2d529f9ca680",
+        "front": "A cleanup job loops `for sid, status in sessions.items():` and runs `del sessions[sid]` for expired sessions. It crashes with `RuntimeError: dictionary changed size during iteration`. What is the fix?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nLoop over a snapshot, or build a new dict:\n\n```python\nfor sid, status in list(sessions.items()):\n    if status == \"expired\":\n        del sessions[sid]\n\n# or keep only what you want\nsessions = {sid: s for sid, s in sessions.items() if s != \"expired\"}\n```\n\n## Why it works\n\n`sessions.items()` is a live view of the dict, and Python raises `RuntimeError` when the dict's size changes while you iterate it, because the iteration position would no longer be reliable. `list(...)` copies the pairs first, so deleting from the real dict is safe. The comprehension creates a new dict instead of mutating the old one, which is often clearer.\n\n## Verify it\n\nRun the job on `{\"a\": \"expired\", \"b\": \"active\", \"c\": \"expired\"}` and assert the result is `{\"b\": \"active\"}`. Include two expired entries so the test would have crashed before the fix.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-b456-489f-8358-c245d6a4549a",
+        "front": "A script inserts users with `conn.execute(f\"INSERT INTO users (last_name) VALUES ('{name}')\")`. It fails for O'Brien with `sqlite3.OperationalError: near \"Brien\": syntax error`. What is the fix?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nPass values as parameters with `?` placeholders, never inside the SQL text:\n\n```python\nconn.execute(\n    \"INSERT INTO users (last_name) VALUES (?)\",\n    (name,),   # a one-item tuple: note the comma\n)\n```\n\nO'Brien is stored unchanged, and the same code blocks SQL injection.\n\n## Why it works\n\nWith the f-string, the apostrophe in `O'Brien` ends the SQL string literal early, so SQLite sees `'O'` followed by stray text `Brien'`. With a placeholder, the value is sent separately from the SQL, so no character in it can change the statement. The parameters must be a sequence: `(name)` without the comma is just a string, and sqlite3 treats each character as a parameter (\"Incorrect number of bindings supplied ... there are 7 supplied\").\n\n## Verify it\n\nInsert `O'Brien`, then run `SELECT last_name FROM users WHERE last_name = ?` with the same value and expect `[(\"O'Brien\",)]`. Search the codebase for `execute(f\"` to find other queries built from strings.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-9ee2-4f36-8d8c-371983c2da5a",
+        "front": "A Python script inserts a task with sqlite3 and a SELECT on the same connection finds it. After the script exits and runs again, the table is empty. What is missing?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nA commit. sqlite3 opened a transaction for the INSERT, and closing without committing discards it. Use the connection as a context manager, which commits on success:\n\n```python\nconn = sqlite3.connect(\"tasks.db\")\nwith conn:  # commits if the block succeeds, rolls back on an exception\n    conn.execute(\"INSERT INTO tasks (title) VALUES (?)\", (\"Buy milk\",))\nconn.close()\n```\n\nCalling `conn.commit()` after the insert also works.\n\n## Why it works\n\nBy default (Python 3.12+ calls this legacy transaction control), the sqlite3 module starts a transaction before INSERT, UPDATE or DELETE. Your own connection sees uncommitted rows, which is why the SELECT looked fine; other connections and later runs do not. `conn.close()` does not commit. Note that `with conn:` commits but does not close the connection.\n\n## Verify it\n\nAfter inserting, check `conn.in_transaction`: `True` means work is still uncommitted. Then open a second `sqlite3.connect(\"tasks.db\")` and count the rows; it should see the new task only after the commit.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-821c-4248-8e35-13ebc1271e90",
+        "front": "A function runs `tasks = tasks.sort(key=lambda t: t[\"due\"])` and then loops over `tasks`. It crashes with `TypeError: 'NoneType' object is not iterable`. What went wrong?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\n`list.sort()` sorts in place and returns `None`, so the assignment replaced the list with `None`. Either sort in place without assigning, or use `sorted()` for a new list:\n\n```python\ntasks.sort(key=lambda t: t[\"due\"])            # changes tasks\nby_due = sorted(tasks, key=lambda t: t[\"due\"])  # new list, tasks unchanged\n```\n\n## Why it works\n\nPython methods that change an object in place (`sort`, `append`, `reverse`) return `None` on purpose, so you notice they did not create anything new. `sorted()` works on any iterable and returns a new list. Prefer `sorted()` when the list came from a caller or a cache, so you do not reorder data someone else is still using.\n\n## Verify it\n\nAdd a test that calls the function with two tasks out of order and asserts the returned titles are in due-date order, and that the input list is unchanged if you used `sorted()`.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000001800",
+    "cards": [
+      {
+        "id": "a2000000-9843-46c7-8c01-d9edaf36b0bc",
+        "front": "A flex row holds an avatar and an `.info` div. The email in `.info` has `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`, yet a long email still makes the row wider than the phone. Why?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nLet the flex item shrink below its content width:\n\n```css\n.info {\n  flex: 1;\n  min-width: 0; /* allow shrinking; the ellipsis can now appear */\n}\n```\n\nThe ellipsis rules on the email then take effect.\n\n## Why it works\n\nFlex items start with `min-width: auto`, which for a flex item means \"no narrower than my content\" (its min-content size). A no-wrap email makes that minimum very wide, so `.info` refuses to shrink and the row overflows; the text never gets cut, so no ellipsis appears. `min-width: 0` (or `overflow: hidden` on `.info`, which also sets the automatic minimum to 0) lets it shrink to the space left.\n\n## Verify it\n\nIn DevTools device mode at 320px wide, check that the row fits and the email ends with \"…\". In the Computed pane for `.info`, `min-width` should show `0px` instead of `auto`.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-e7ae-45ac-8a52-fd138dabc0cf",
+        "front": "Each task card has `transform: translateY(0)` for a hover lift. A card's dropdown menu has `position: absolute; z-index: 1000`, yet the next card is drawn on top of the menu. Why, and what is a fix?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe `transform` makes each card its own stacking context, so the menu's `z-index: 1000` only counts inside its own card. Raise the card that has the open menu:\n\n```css\n.card { position: relative; }\n.card.menu-open { z-index: 1; } /* whole card, menu included, goes on top */\n```\n\nOr drop the `transform` when the card is not hovered.\n\n## Why it works\n\nA stacking context is a group that is painted as one unit; `z-index` values inside it are never compared with elements outside it. `transform` (other than `none`), `opacity` below 1, and positioned elements with a `z-index` all create one. Both cards sit at the same level, so the later card in the HTML paints over the earlier card, menu and all. `z-index` needs `position` (or a flex/grid item) to apply, hence `position: relative`.\n\n## Verify it\n\nOpen a menu on the first card and confirm it covers the second card. In the DevTools Elements panel, walk up from the menu and check each ancestor's Computed `transform`, `opacity` and `z-index` to find the one that creates the stacking context.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-d297-4d4b-8a20-89f89cbab531",
+        "front": "A phone-only checkout panel uses `height: 100vh` with the Pay button pinned at the bottom. On mobile browsers, the button is hidden behind the browser toolbar until the user scrolls. What should the height be?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nUse the dynamic or small viewport unit instead of `vh`:\n\n```css\n.checkout {\n  height: 100vh;   /* fallback for old browsers */\n  height: 100dvh;  /* follows the toolbar as it shows and hides */\n}\n```\n\n`100svh` (small viewport) also keeps the button visible, and does not resize while scrolling.\n\n## Why it works\n\nOn mobile, `vh` is measured against the large viewport, the size when the address bar and toolbars are hidden. While they are visible the real visible area is shorter, so the bottom of a `100vh` box sits under them. `dvh` tracks the current visible height; `svh` uses the smallest (toolbars shown). The second `height` line overrides the first only in browsers that understand `dvh`.\n\n## Verify it\n\nTest on a real phone or a mobile emulator: load the page without scrolling and confirm the Pay button is fully visible. Scroll down and up and watch that it stays visible.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000001900",
+    "cards": [
+      {
+        "id": "a2000000-1935-4512-8737-a61e8fa6d263",
+        "front": "A signup form has `<label for=\"email\">Email</label>` and `<input name=\"email\" type=\"email\">`. Tapping the label does not focus the field, and a screen reader announces the input with no name. What is wrong?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\n`for` must match the input's `id`, not its `name`. Add the id:\n\n```html\n<label for=\"email\">Email</label>\n<input id=\"email\" name=\"email\" type=\"email\" autocomplete=\"email\">\n```\n\nOr wrap the input inside the `<label>`, which needs no `for`/`id`.\n\n## Why it works\n\n`name` is the key sent to the server when the form submits; `id` identifies the element in the page. The label association uses `id`, and it gives the input its accessible name and makes a tap on the label focus the input, a bigger touch target on phones. With no matching id, the label is just nearby text.\n\n## Verify it\n\nTap the label text and confirm the cursor moves into the field. In the console, `document.querySelector('label[for=email]').control` should return the input, not `null`. In DevTools, the Accessibility pane should show the input's name as \"Email\".",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-ceac-4047-82e0-2130aaa43d0d",
+        "front": "An edit form shows the record's ID in `<input name=\"id\" value=\"42\" disabled>` so users cannot change it. The server says `id` is missing from the submitted form. Why, and what should you use instead?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nDisabled controls are not submitted. Use `readonly` if the user should see the value:\n\n```html\n<input name=\"id\" value=\"42\" readonly>\n```\n\nIf they need not see it, use `<input type=\"hidden\" name=\"id\" value=\"42\">`. Better still, put the ID in the URL (`POST /tasks/42`) and have the server check the user may edit that record.\n\n## Why it works\n\nThe HTML form rules skip disabled controls when building the submitted data, so `disabled` means \"not part of this form right now\". `readonly` blocks editing but the value is still submitted and the field can still be focused. Either way, the value is not trustworthy: anyone can change it with DevTools, so the server must authorize the ID it receives.\n\n## Verify it\n\nSubmit the form and look at the request in the DevTools Network panel (Payload tab): `id=42` should be present. In the console, `[...new FormData(form)]` lists exactly what will be sent.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-28ce-4683-885d-5bfd5345c02c",
+        "front": "A task form has `<input type=\"checkbox\" name=\"done\">`. Unchecking it and saving never marks the task as not done: the server keeps the old value. What does the browser send, and how should the server handle it?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nAn unchecked checkbox sends nothing at all, and a checked one sends `done=on`. The server must treat a missing field as `false`:\n\n```python\ndone = \"done\" in request.form   # True if checked, False if absent\n```\n\nDon't write `if \"done\" in form: task.done = True`; that has no way to turn it off.\n\n## Why it works\n\nHTML submits a checkbox only when it is checked, with its `value` (default `\"on\"`). There is no \"unchecked\" value, so an update handler that only changes fields present in the request never sees the uncheck. For a full edit form, the checkbox's absence is the answer \"false\". A JavaScript client can instead send JSON with `done: checkbox.checked`, which is always a boolean.\n\n## Verify it\n\nCheck and uncheck the box and compare the request payloads in the Network panel: `done=on` in one, no `done` key in the other. Write a server test that posts the form without `done` and asserts the task is saved as not done.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007001",
+    "cards": [
+      {
+        "id": "a2000000-743a-4f85-851c-a94f66b680b0",
+        "front": "An SPA's fetch wrapper sends users to /login on any 401 or 403. A signed-in viewer clicks Edit, gets 403, and is sent to the login page again and again. What should change?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nHandle the two codes differently. On **401** (no valid credentials, such as an expired session) send the user to login and return them afterwards. On **403** (known user, action not allowed) keep them on the page and show \"You don't have permission to edit this task\", and hide or disable Edit for viewers. The server should keep answering 403 here, not 401.\n\n## Why it works\n\n401 means \"I don't know who you are\": signing in can fix it, and the response must carry a `WWW-Authenticate` header naming the scheme. 403 means \"I know who you are, and no\": signing in again produces the same identity and the same 403, which is why the user loops. Some APIs answer 404 instead of 403 to hide that a private record exists; then the client simply shows \"not found\".\n\n## Verify it\n\nWith curl, `curl -i -X PUT localhost:3000/tasks/7` without a token should print `401 Unauthorized` and `WWW-Authenticate: Bearer`; with a viewer's token it should print `403 Forbidden`. In the app, sign in as a viewer and force the edit: the page should show the permission message and the URL should not change to /login.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-73f1-4a9d-8b6c-74f96d3fa414",
+        "front": "A checkout endpoint answers form POSTs with `303 See Other` and `Location: /orders/81`. A new React page calls it with fetch, and `await res.json()` throws \"Unexpected token '<'\". Why?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nfetch followed the redirect by itself: it sent `GET /orders/81` and resolved with that HTML confirmation page (status 200, `res.redirected` true), so `res.json()` tried to parse HTML. The order was saved. Give script callers an API response instead, such as `POST /api/orders` returning `201 Created`, `Location: /orders/81` and the order as JSON, and keep the 303 for the plain HTML form.\n\n## Why it works\n\nfetch follows 3xx redirects automatically (the default `redirect: 'follow'`), and after a 303 the follow-up is a GET with no body. Your code only sees the final response, so it gets 200 from /orders/81, not the 303, and a body meant for a browser tab. Post/redirect/get fits full-page form submissions, where the browser should show the next page; a script needs data it can read.\n\n## Verify it\n\nLog `res.status, res.redirected, res.url` before parsing: before the fix it prints `200 true …/orders/81`, after it prints `201 false …/api/orders` and `res.json()` returns the order. In the DevTools Network panel the old flow shows the POST answered with 303, then a GET for /orders/81 returning HTML.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-8c36-4547-887e-fcfb52d30ee1",
+        "front": "Users rename a task, the PATCH returns 200, but reopening the list shows the old title for about an hour. `GET /api/tasks` sends `Cache-Control: max-age=3600`. Why, and what should it send?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe browser is reusing its stored copy of `GET /api/tasks` for up to an hour without asking the server, which `max-age=3600` allows. Send `Cache-Control: private, no-cache` with an `ETag`, or `no-store` if revalidating is not worth it. The browser then checks with the server on every load and gets a cheap 304 when nothing changed.\n\n## Why it works\n\nWhile a stored response is fresh (younger than max-age), a cache serves it with no network request at all. A successful unsafe request such as a PATCH does invalidate stored responses for its own URL, but this edit went to `/api/tasks/7`, a different URL, so the list copy stays. `private` keeps shared caches such as a CDN from serving one user's list to another.\n\n## Verify it\n\nIn the DevTools Network panel, reload the list: before the fix the tasks request shows \"(disk cache)\" or \"(memory cache)\" in the Size column and nothing reaches the server log. After the fix a request appears every time — 304 when unchanged, 200 right after an edit. `curl -i` on the endpoint should show the new Cache-Control and an ETag.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-0176-412e-8f69-e030c1dd7b25",
+        "front": "A React app on localhost:5173 fetches an API on localhost:3000 with `credentials: 'include'`. The API sends `Access-Control-Allow-Origin: *`; the console shows a CORS error, yet the server logged 200. What must it send?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nCredentialed requests refuse the wildcard. Send the exact origin, `Access-Control-Allow-Origin: http://localhost:5173`, together with `Access-Control-Allow-Credentials: true`, and add `Vary: Origin` because the value depends on the request. Take allowed origins from an allowlist in config; never echo back any Origin with credentials enabled.\n\n## Why it works\n\nThe server did handle the request, hence the 200 in its log. CORS is enforced by the browser, which then refuses to hand the response to JavaScript. When cookies or HTTP authentication are included, the rules require the allowed origin to match exactly and the credentials header to be `true`, so `*` fails. `Vary: Origin` stops a cache from serving one origin's header to another.\n\n## Verify it\n\n`curl -i -H 'Origin: http://localhost:5173' localhost:3000/api/tasks` should show both headers with the exact origin, and the same request with an unlisted Origin should get no Access-Control-Allow-Origin header. In the browser, the console error disappears and the response headers in the Network panel list both values.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-8565-4cc0-8d3e-d36bce083f81",
+        "front": "A fetch wrapper saves each response's ETag and sends it back as `If-None-Match` on the next GET. Now it throws \"Request failed: 304\" and the list is blank. Why, and how should it handle this?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nA 304 has no body, and `response.ok` is false because it only covers 200–299, so `if (!res.ok) throw` fires. Once you send If-None-Match yourself you own the cache: on 304, return the data you saved with that ETag. The simpler option is to drop the manual header and let the browser's HTTP cache revalidate; fetch then hands you the stored 200 transparently.\n\n## Why it works\n\nWhen a browser revalidates its own cached copy, it adds If-None-Match itself and turns the 304 into the stored 200 before your code sees it. When your code adds a conditional header, fetch skips the HTTP cache for that request and passes the raw 304 through, because only your code knows which saved copy the tag refers to.\n\n## Verify it\n\nUnit-test the wrapper against a small node:http server that returns 200 with an ETag, then 304 when If-None-Match matches: assert both calls return the same data and nothing throws. In the DevTools Network panel the second request shows status 304 and a tiny transfer size.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-fc6c-4f35-8b9e-10910f0e9831",
+        "front": "A mobile client retries `DELETE /tasks/7` after a timeout. The retry gets 404, and the app shows \"Delete failed\" even though the task is gone. How should the client treat this?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nWhen a DELETE is a retry, treat 404 as \"already deleted\": remove the row and show no error. The first attempt most likely succeeded and only its response was lost. Some APIs instead answer 204 for a record the caller already deleted, for example a soft-deleted row; either way, write the rule into the API contract so clients agree.\n\n## Why it works\n\nDELETE is idempotent: repeating it leaves the same server state — no task 7 — but the response can differ. The first attempt probably returned 204 before the network dropped it, and the repeat finds nothing to delete. Idempotency promises the same effect, not the same status code, so the client must read the second response in light of the retry.\n\n## Verify it\n\nAgainst a local server, run `curl -i -X DELETE localhost:3000/tasks/7` twice: the first prints `204 No Content`, the second `404 Not Found`. In a client test, make the first call time out and the second return 404, then assert that the row is removed and no error message appears.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007002",
+    "cards": [
+      {
+        "id": "a2000000-aefd-466d-8c63-3795b91eaf44",
+        "front": "POST /tasks with a blank title returns 400 as expected, yet a blank task appears in the list and the server log shows \"Cannot set headers after they are sent to the client\". What is the bug?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe validation branch sends the 400 but does not stop the handler. Change `res.status(400).json(…)` to `return res.status(400).json(…)`. Execution then ends at the error response instead of falling through to the insert and the second `res.status(201).json(task)`.\n\n## Why it works\n\nSending a response does not exit the function. The code after the `if` still runs: it saves the task, then tries to set a 201 status and headers on a response that has already been sent, so Node throws `ERR_HTTP_HEADERS_SENT`. The client already has the 400, which is why the bug looks like \"validation works\" while bad data is stored.\n\n## Verify it\n\nSend `curl -i -X POST localhost:3000/tasks -H \"Content-Type: application/json\" -d '{\"title\":\"   \"}'`, then GET /tasks: no new task should exist and the log should have no ERR_HTTP_HEADERS_SENT. Add a test that posts a blank title and asserts both the 400 and an unchanged task count.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-d074-4d10-8cc5-56dbd0f528eb",
+        "front": "A React form POSTs with fetch and body: JSON.stringify({ title }), but sets no headers. The Express 5 API uses express.json(), yet every create fails with a 500 \"Cannot destructure property 'title' of 'req.body'\". Why?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe request has no `Content-Type: application/json` header, so `express.json()` ignores it and `req.body` stays `undefined`. Add `headers: { 'Content-Type': 'application/json' }` to the `fetch` call. On the server, also check that the body is an object and return a 400 instead of crashing.\n\n## Why it works\n\nWhen `fetch` gets a string body and no content type, it sends `text/plain;charset=UTF-8`. `express.json()` parses only requests whose content type matches JSON; anything else passes through untouched. In Express 5 the untouched `req.body` is `undefined`, so `const { title } = req.body` throws, and Express turns the thrown error into a 500.\n\n## Verify it\n\nIn DevTools, Network, select the request and look at Request Headers: `Content-Type` should read `application/json` after the fix. Repeat the create and confirm a 201 with the task in the response body.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-3b55-4861-8a25-8c674b6df0f8",
+        "front": "After adding a requireUser middleware, signed-out requests to GET /tasks get a 401 immediately, but signed-in requests spin forever with no error logged. What is likely missing?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe middleware never calls `next()` on the success path. After it sets `req.user`, add `next()` so Express moves on to the route handler. Keep `return res.status(401).json(…)` for the signed-out branch.\n\n## Why it works\n\nExpress moves to the next function only when the current one calls `next()` (or `next(err)`). A middleware that neither responds nor calls `next` leaves the request open. Nothing throws, so no error handler or log fires; the request simply stays pending until the client times out.\n\n## Verify it\n\nRun `curl -i -m 5 -H \"Authorization: Bearer <token>\" localhost:3000/tasks`: before the fix it times out after 5 seconds, after the fix it returns 200. In DevTools the request should no longer show as \"pending\".",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-6036-4642-8201-e45d69722ca4",
+        "front": "After upgrading an app to Express 5, the server crashes at startup with \"PathError: Missing parameter name at index 1: *\" pointing at app.get('*', sendIndexHtml). What changed, and what is the fix?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nExpress 5 uses a newer path matcher where a bare `*` is not valid; a wildcard must be named. Use `app.get('/{*splat}', sendIndexHtml)` to match every path including `/`, or `'/*splat'` to match everything except the root. Optional params changed too: `/tasks/:id?` becomes `/tasks{/:id}`.\n\n## Why it works\n\nExpress 5 moved to path-to-regexp v8, which rejects unnamed wildcards and the `?` suffix at the moment the route is registered, so the error appears at startup rather than on a request. The matched segments arrive as an array in `req.params.splat`, for example `['tasks', '5']` for /tasks/5.\n\n## Verify it\n\nStart the server and confirm it boots. Then request `/` and a deep URL such as `/tasks/5` and check both return the SPA HTML with 200, while API routes registered earlier still return JSON.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-1155-445b-89b1-74c94d00d6bf",
+        "front": "A developer sets SEND_EMAILS=false in .env to stop emails locally, runs node --env-file=.env server.js, and the code checks if (process.env.SEND_EMAILS). Emails still send. Why?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nEnvironment values are strings, and `\"false\"` is a non-empty string, so it is truthy. Compare explicitly: `const sendEmails = process.env.SEND_EMAILS === 'true'`. Parse the flag once in a config module so every caller gets a real boolean.\n\n## Why it works\n\n`--env-file` copies the text after `=` into `process.env` without type conversion. JavaScript treats every non-empty string as truthy, including `\"false\"` and `\"0\"`. Only a missing variable (`undefined`) or an empty value would be falsy, which is fragile to rely on.\n\n## Verify it\n\nRun `node --env-file=.env -e \"console.log(JSON.stringify(process.env.SEND_EMAILS))\"` to see `\"false\"`. After the fix, log the parsed `sendEmails` at startup and confirm it prints `false`, then trigger a flow that sends email and check nothing goes out.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-af9a-44d3-8659-9d33d2063e53",
+        "front": "An Express 5 API has a custom JSON error handler, yet a failing GET /tasks/1 returns an HTML page showing the stack trace. The handler is registered right after express.json(), above the routes. Why?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nError handlers only receive errors raised earlier in the stack, so one registered above the routes never sees their errors. Move the four-argument handler to the very end, after all routes and the 404 catch-all. Failures then return your JSON body with a 500.\n\n## Why it works\n\nExpress passes an error forward from the point where it happened, skipping ordinary middleware and looking for the next error handler below it. With none below the routes, the built-in handler replies with an HTML page; in development it includes the stack trace, and in production (`NODE_ENV=production`) it shows only \"Internal Server Error\".\n\n## Verify it\n\nMake a route throw on purpose and run `curl -i localhost:3000/tasks/1`: the response should be `Content-Type: application/json` with your error body, not HTML. Remove the test throw afterwards.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007003",
+    "cards": [
+      {
+        "id": "a2000000-07b6-4a57-8cbe-e0e0bfa174c2",
+        "front": "A session expires while a user edits /notes/7. Their next save gets 401, the SPA sends them to /login, and after signing in they land on the home page. How should the app return them to /notes/7 safely?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nOn 401, navigate to `/login?returnTo=` plus `encodeURIComponent(location.pathname + location.search)`. After a successful login, parse `returnTo` with `new URL(value, location.origin)` and redirect to `url.pathname + url.search + url.hash` only when `url.origin === location.origin`; otherwise go to `/`. Keep the unsaved draft (for example in sessionStorage) so the edit survives the round trip.\n\n## Why it works\n\nThe query parameter carries the destination through the login page, and encoding stops `?tab=edit` being read as the login page's own query. Validation matters because `returnTo` is attacker-controlled: `/login?returnTo=//evil.example` would make your real login page forward a freshly signed-in user to a phishing site (an open redirect). A plain `startsWith('/')` check is not enough: `//evil.example` starts with `/` but resolves to the host evil.example, as Node 22's URL parser confirmed.\n\n## Verify it\n\nUnit-test the validator: `/notes/7?tab=edit` is kept, while `https://evil.example/login`, `//evil.example`, `/\\evil.example`, and `javascript:alert(1)` all become `/`. Then delete the session cookie in DevTools, save a note, sign in, and confirm the address bar returns to /notes/7.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-ec11-438f-8e98-b16d0dee019a",
+        "front": "In development the React app runs on localhost:5173 and the Express API on localhost:3000. POST /login returns 204 with a Set-Cookie header, but the next GET /me still returns 401. What is wrong?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe calls are cross-origin (different port), and fetch's default `credentials: 'same-origin'` neither stores the login cookie nor sends it. Simplest fix: proxy `/api` through the Vite dev server (`server.proxy`) so the browser sees one origin. Otherwise pass `credentials: 'include'` on every call and have the API reply with `Access-Control-Allow-Origin: http://localhost:5173` (not `*`) and `Access-Control-Allow-Credentials: true`.\n\n## Why it works\n\nAn origin is scheme + host + port, so the two ports are different origins. Per MDN, `credentials` controls both whether cookies are sent and whether `Set-Cookie` in the response is respected, and a cross-origin request with `include` only succeeds if the server opts in with Allow-Credentials and an exact origin. SameSite is not the culprit: ports don't change the site, so both are same-site. A proxy avoids CORS entirely and matches production, where app and API usually share a domain.\n\n## Verify it\n\nIn the DevTools Network panel, confirm the failing GET /me request has no `Cookie` request header. After the fix, the same request carries `Cookie: sid=…` and returns 200, and a page reload keeps you signed in.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-695c-47ce-85d3-b102ab711f7a",
+        "front": "Login returns the same 'Invalid email or password' text and status for every failure, yet a tester can tell which emails have accounts by timing the responses. What leaks, and how do you fix it?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe handler returns immediately when the email is unknown but runs the slow password hash when it exists, so response time reveals which accounts exist. Make both paths do the same work: when no user matches, verify the submitted password against a fixed dummy hash, then return the same 401 and message. Add per-account and per-IP throttling so probing cannot scale.\n\n## Why it works\n\nPassword hashing is deliberately slow; that is its job. OWASP's Authentication Cheat Sheet describes this exact discrepancy: an early return for unknown users is much faster than the hash-and-compare path, even with identical text and status. On the test machine (Node 22, scrypt), the leaky handler averaged about 819 ms for a real account and 0.01 ms for an unknown one; with a dummy hash both took over 500 ms. Headers and redirects must match too.\n\n## Verify it\n\nWrite a script that times 20 failed logins for a known email and 20 for an unknown one and compares the averages; they should be close. Also diff the two responses' status, headers, and body: nothing but timing noise should differ.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-b931-40c7-8d8c-7aa9548d962f",
+        "front": "After each deploy every user is logged out, and on the two-instance production setup users are randomly bounced to /login between clicks. The app uses express-session with default settings. What is wrong?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nexpress-session's default MemoryStore keeps sessions in one process's memory. A restart wipes them, and each instance has its own copy, so a request routed to the other instance finds no session. Configure a shared, persistent store (a Redis or PostgreSQL session store package) used by every instance, and give all instances the same `secret`.\n\n## Why it works\n\nThe cookie holds only the session ID; the data lives in the store. With MemoryStore, instance A creates the session and instance B has never seen that ID, so the user looks anonymous. express-session warns about this: with `NODE_ENV=production` it printed \"MemoryStore is not designed for a production environment, as it will leak memory, and will not scale past a single process.\" Sticky load balancing hides the random bounces but still loses every session on restart.\n\n## Verify it\n\nLog in, restart the server (or route the next request to the other instance), and call `GET /me`: it should still return 200. Check startup logs for the MemoryStore warning, and look in the store for the session record (with connect-redis, keys start with `sess:`).",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-f7ad-4c69-820a-24096c43cf94",
+        "front": "Login works locally, but in production behind an HTTPS load balancer the POST /login response has no Set-Cookie header at all. The app uses express-session with `cookie: { secure: true }`. Why?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nTLS ends at the load balancer, so the Node app receives plain HTTP, and express-session refuses to set a `secure` cookie on what looks like an insecure request. Add `app.set('trust proxy', 1)` (one proxy hop) so Express trusts the load balancer's `X-Forwarded-Proto: https` and `req.secure` becomes true.\n\n## Why it works\n\nexpress-session only sends a Secure cookie when `req.secure` is true. Without trust proxy, Express ignores `X-Forwarded-*` headers, because clients could forge them. In an Express 5.2 and express-session 1.19 test, a login request with `X-Forwarded-Proto: https` got no Set-Cookie without trust proxy, and `sid=…; Path=/; HttpOnly; Secure; SameSite=Lax` with it. Use the real hop count rather than `true`, which trusts every forwarded value a client sends.\n\n## Verify it\n\nLog `req.secure` and `req.protocol` for one request in production; they should be `true` and `https`. Then check the login response in the DevTools Network panel: it should include a Set-Cookie with `Secure`, and `GET /me` should return 200.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-d90f-482f-830b-c96cbcfcc9f8",
+        "front": "The server keeps sessions for 30 days, yet desktop users must log in again every time they reopen the browser. The login Set-Cookie header has no Expires or Max-Age. What is happening?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nWithout Expires or Max-Age the cookie is a session cookie, which the browser may delete when it closes, orphaning the server's 30-day record. For a \"Remember me\" checkbox, give the cookie a lifetime only when it is ticked: in express-session, set `req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000` after regenerating the session at login, and keep the store's expiry in line.\n\n## Why it works\n\nexpress-session sends no Expires by default. Setting maxAge in the test changed the header to `sid=…; Path=/; Expires=Sat, 24 Oct 2026 …; HttpOnly; SameSite=Lax`, 30 days out. MDN notes that browser session-restore can keep session cookies alive, which is why some users never notice. OWASP prefers non-persistent session cookies, so make persistence an explicit user choice and still enforce expiry on the server.\n\n## Verify it\n\nLog in with and without \"Remember me\" and compare the Set-Cookie headers in the DevTools Network panel: only the remembered login carries Expires, and the Application panel's cookie list shows \"Session\" for the other. Fully quit and reopen the browser to confirm.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007004",
+    "cards": [
+      {
+        "id": "a2000000-c2d4-4b06-85c0-c4a6eb667247",
+        "front": "A spending report runs SELECT DISTINCT customer_id, total_cents FROM orders, expecting one row per customer, but customer 1 appears twice. Why, and what query gives one row per customer with a total?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nGroup and aggregate instead: `SELECT customer_id, SUM(total_cents) AS spent_cents, COUNT(*) AS orders FROM orders GROUP BY customer_id;` It returns exactly one row per customer; in the test data, customer 1 got 3500 over 2 orders and customer 2 got 1400 over 2 orders.\n\n## Why it works\n\nDISTINCT removes rows that are identical in every selected column. Customer 1's orders total 1000 and 2500, so (1, 1000) and (1, 2500) are different rows and both stay. Customer 2's two orders were both 700, so DISTINCT merged them into one row, and any sum over that result would undercount. GROUP BY makes one group per customer_id and lets SUM and COUNT combine the rows inside each group. Use DISTINCT to de-duplicate a list; use GROUP BY when you need one row per something plus a calculation.\n\n## Verify it\n\nSeed a customer with two orders of the same amount and run both queries: DISTINCT shows one row for them, while GROUP BY shows the doubled total and a count of 2. Then check the report has as many rows as SELECT COUNT(DISTINCT customer_id) FROM orders returns.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-dca8-4c6d-8ef3-3b4630f3951d",
+        "front": "A migration runs ALTER TABLE users ADD COLUMN plan text NOT NULL on a production table that already has rows, and PostgreSQL rejects it. What should the migration do instead?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nIf every existing user should get the same value, add a default in the same statement: `ALTER TABLE users ADD COLUMN plan text NOT NULL DEFAULT 'free';`. If the value depends on other data, add the column as nullable, backfill it with an UPDATE, and then run `ALTER TABLE users ALTER COLUMN plan SET NOT NULL` (PostgreSQL syntax; SQLite cannot alter a column's constraints this way).\n\n## Why it works\n\nExisting rows have no value for the new column, so they would hold NULL, which breaks NOT NULL, and the whole statement fails. With a constant DEFAULT, PostgreSQL stores that value in the table's metadata instead of rewriting every row, so the change stays quick on a large table, and later inserts that omit plan get it too. SET NOT NULL succeeds only when no row holds NULL, and PostgreSQL scans the table to check, so run it after the backfill and after the app writes the column on every insert.\n\n## Verify it\n\nOn a staging copy, run the migration and confirm SELECT count(*) FROM users WHERE plan IS NULL returns 0. Insert a user without a plan and confirm it reads back 'free'. For the backfill route, compare the UPDATE's affected-row count with the number of existing rows before running SET NOT NULL.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-3826-43c4-87ff-27fc46ff6f5f",
+        "front": "A newsletter signup runs INSERT ... ON CONFLICT (email, list) DO NOTHING, but PostgreSQL rejects it on every call. The subscriptions table has only an id primary key. What is missing?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nA unique constraint (or unique index) on exactly those columns: `ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_email_list_key UNIQUE (email, list);`. After that, the same INSERT runs, and repeating it for the same email and list inserts nothing.\n\n## Why it works\n\nON CONFLICT (email, list) does not search for duplicates by itself. PostgreSQL uses the column list to infer which unique index defines a conflict, and when no unique index matches, inference fails and the statement raises an error instead of running. SQLite behaves the same way, reporting that the ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint. Creating the constraint fails if duplicate pairs already exist, so find and clean those up first.\n\n## Verify it\n\nBefore adding the constraint, find existing duplicates with SELECT email, list, COUNT(*) FROM subscriptions GROUP BY email, list HAVING COUNT(*) > 1. Then, on staging, add it, run the signup INSERT twice for the same pair, and confirm neither call errors and SELECT count(*) for that pair returns 1.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-b614-44a6-8eb6-27d28b2da08d",
+        "front": "A task list filters by tag with JOIN task_tags, JOIN tags, and WHERE tags.name IN ('bug', 'urgent'). A task that has both tags appears twice. How should the query be written?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nKeep tasks as the only table in the outer FROM and move the tag test into EXISTS: `SELECT t.id, t.title FROM tasks t WHERE EXISTS (SELECT 1 FROM task_tags tt JOIN tags g ON g.id = tt.tag_id WHERE tt.task_id = t.id AND g.name IN ('bug', 'urgent'));` Each task now appears once, however many of the chosen tags it has.\n\n## Why it works\n\nThe JOIN produces one row per matching (task, tag) pair. A task tagged both 'bug' and 'urgent' yields two rows, and LIMIT/OFFSET pagination counts it twice as well, so pages show fewer distinct tasks than expected. EXISTS only asks whether at least one matching tag row exists, so it cannot multiply the task. DISTINCT would also hide the duplicates, but EXISTS states the intent and keeps working when you select more columns.\n\n## Verify it\n\nSeed one task with both tags and one with a single tag, then assert that the endpoint returns 2 tasks. In a SQLite run of this data, the JOIN version returned task ids 1, 1, 3 and the EXISTS version returned 1, 3.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-aa8a-426b-81b8-b9de41ac76b0",
+        "front": "Search passes local tests on SQLite, but in production PostgreSQL typing 'invoice' no longer finds 'Invoice March'. The query is title LIKE '%' || $1 || '%'. What changed, and how do you fix it?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nIn PostgreSQL, LIKE is case-sensitive, while SQLite's LIKE ignores case for ASCII letters by default. For a case-insensitive search in PostgreSQL, use `title ILIKE '%' || $1 || '%'` (ILIKE is a PostgreSQL extension, not standard SQL), or `lower(title) LIKE '%' || lower($1) || '%'`, which behaves the same in both databases for ASCII text (SQLite's `lower()` folds only ASCII letters).\n\n## Why it works\n\nThe same SQL text behaved differently because the two databases define LIKE differently. PostgreSQL's docs describe ILIKE as matching case-insensitively according to the active locale. Turning on SQLite's PRAGMA case_sensitive_like, which mimics PostgreSQL, made the local query stop finding 'Invoice March' too, reproducing the production bug. On a large table, a plain index on title does not speed up a '%term%' search in either form.\n\n## Verify it\n\nAdd a test with mixed-case data ('Invoice March') and a lowercase search term, and run it against PostgreSQL, the database production uses, not only SQLite. Confirm the fixed query returns the row, and that an unrelated title such as 'Receipt' is still excluded.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-986d-4a32-8b5d-19072d12611b",
+        "front": "A one-off script meant to close task 42 ran UPDATE tasks SET done = true with its WHERE clause missing, and every task is now done. How could the script have caught this before it became permanent?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nRun manual data fixes inside a transaction and check the affected-row count before committing: `BEGIN;` then `UPDATE tasks SET done = true WHERE id = 42;`, which psql reports as `UPDATE 1`, then `COMMIT` only if the count is what you expected, otherwise `ROLLBACK`. In a script, read rowCount and roll back automatically when it differs.\n\n## Why it works\n\nUntil COMMIT, a transaction's changes are not permanent and ROLLBACK discards them. The affected-row count is the cheapest sanity check: in a test run on a 500-row table, the statement without WHERE reported 500 rows, the rollback left 0 tasks done, and the corrected statement reported 1. Adding `RETURNING id` shows exactly which rows changed. After COMMIT, recovery means restoring a backup or writing a reverse UPDATE by hand.\n\n## Verify it\n\nRehearse on a staging copy: run the script with the WHERE clause deliberately removed and confirm it prints the unexpected count, rolls back, and SELECT count(*) FROM tasks WHERE done shows no change. Then run the correct version and confirm it reports exactly 1 row.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007005",
+    "cards": [
+      {
+        "id": "a2000000-de02-4dc3-8b4b-c9b89e3e9c5b",
+        "front": "A React 19 create form uses `useActionState`, and its Add button is never disabled. A user double-clicks Add during a slow save, and two identical tasks appear. Why, and what is the fix?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nDisable the button while the action runs: `<button disabled={isPending}>` using the third value from `useActionState` (or `pending` from `useFormStatus` in a child button component). For creates that must happen only once even across network retries, also send an idempotency key that the server checks.\n\n## Why it works\n\nReact does not drop the second submit. Calls to a `useActionState` action are queued and run one after another: the second waits for the first to finish, receives its returned state as `previousState`, and then runs with its own FormData, which still holds the same title. The server therefore receives two POSTs. A disabled submit button cannot start another submission, so only one action is queued.\n\n## Verify it\n\nIn a component test, click Add twice before the mocked API resolves and assert the mock was called once. In the browser, throttle the network in DevTools, double-click Add, and confirm the Network panel shows a single `POST /api/tasks`.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-3616-4ab4-8cf3-e7244339d43f",
+        "front": "A signup form moved to React 19 `<form action={formAction}>` with `useActionState`. Now a server validation error (\"Email already used\") also wipes every field the user typed. Why, and how do you keep the values?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nReturn the submitted values in the action's state and feed them back as default values: `return { error: 'Email already used', values: { email } }` and `<input name=\"email\" defaultValue={state.values?.email} />`. Alternatively, keep `onSubmit` with `e.preventDefault()` for this form, which never triggers the automatic reset.\n\n## Why it works\n\nWhen a function passed to a form's `action` finishes without throwing, React resets the form's uncontrolled fields. Returning an error object is still a normal finish, so the reset happens. Reset puts each field back to its default value; pointing `defaultValue` at the last submitted value makes the reset restore what the user typed, while a successful save returns empty values and clears the form.\n\n## Verify it\n\nSubmit an invalid value and confirm the error appears and the field still shows the value; then submit a valid value and confirm the form clears. A Testing Library test can assert on `input.value` after the action resolves.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-35a5-408d-8efc-27b3ab8981cc",
+        "front": "A checkout confirmation step sends `POST /api/orders` from a `useEffect` when it mounts. In local development every checkout creates two orders; production creates one. What is happening, and where should the POST live?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nMove the POST into the handler of the user action that causes it, the Place order button's submit or click handler, and let the effect only read data. Do not remove StrictMode or add a \"ran once\" ref to hide the duplicate.\n\n## Why it works\n\nStrictMode in development mounts the component, runs its effects, cleans them up, and runs them again, to check that effects are safe to repeat. Effects are for keeping a component in sync with something outside React while it is shown; creating an order is a one-time consequence of a click and cannot be undone by a cleanup. The development double run exposes the same bug users would hit in production whenever the step remounts, for example after navigating back.\n\n## Verify it\n\nWith StrictMode on in development, open the confirmation step and confirm the Network panel shows no `POST /api/orders` until you click. One click should produce exactly one POST and one new row in the orders table.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-0606-4da9-8259-080d54e98405",
+        "front": "After a successful save on `/tasks/new`, the app calls `navigate('/tasks/' + created.id)`. Pressing Back shows the create form again, and users save duplicates. Which React Router option fixes the history?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nNavigate with `replace`: `navigate('/tasks/' + created.id, { replace: true })`. The new task page replaces the `/tasks/new` history entry, so Back returns to the task list instead of the create form.\n\n## Why it works\n\n`navigate(to)` pushes a new history entry by default, so the stack becomes `/tasks`, `/tasks/new`, `/tasks/42` and Back lands on the form. With `{ replace: true }` React Router swaps the current entry, leaving `/tasks`, `/tasks/42`. It is the client-side version of redirecting after a successful form post, which keeps a finished form out of the back history.\n\n## Verify it\n\nIn a test, render a `MemoryRouter` with `initialEntries={['/tasks', '/tasks/new']}` and `initialIndex={1}`, save, then call `navigate(-1)` and assert the location is `/tasks`. By hand: save a task, press Back, and confirm you see the list.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-737f-4db7-8e23-e49625cea5e0",
+        "front": "An edit-task form saves `done: formData.get('done') === 'true'` from `<input type=\"checkbox\" name=\"done\" />`. Checking the box and saving always stores `done: false`. Why, and what is the correct read?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nRead presence instead of a made-up value: `done: formData.has('done')`, or compare with `'on'`, the value a checkbox without a `value` attribute submits. If the input sets `value=\"true\"`, comparing with `'true'` would also work.\n\n## Why it works\n\nFormData follows HTML form submission rules. A checked checkbox contributes its `value`, which defaults to the string `'on'`; an unchecked checkbox is left out, so `get('done')` returns `null`. Every FormData value is a string (or a File), never a boolean, so the code must compare against what the browser actually sends.\n\n## Verify it\n\nLog `Object.fromEntries(new FormData(form))` with the box checked and unchecked: you will see `{ done: 'on', … }` and no `done` key at all. Add a test that saves both states and asserts `true` and `false` reach the API.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-695c-43e2-866b-6c41b57f3298",
+        "front": "A task list builds `const filters = { status }` in render and runs `useEffect(() => { fetchTasks(filters).then(setTasks); }, [filters])`. `/api/tasks` is requested over and over. Why, and what should it depend on?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nDepend on the primitive value, not on an object rebuilt every render: create the filters inside the effect and list `[status]` as the dependency. If the object must be shared with other code, memoize it with `useMemo(() => ({ status }), [status])`.\n\n## Why it works\n\nReact compares each dependency with `Object.is`. A new `{ status }` object is created on every render, so it never equals the previous one and the effect runs after every render. Each response calls `setTasks` with a new array, which re-renders, which creates another object, which runs the effect again: a request loop. The string `'open'` is equal from one render to the next, so the effect runs only when the status changes.\n\n## Verify it\n\nAfter the fix, loading the page sends one request and changing the status filter sends one more. In a test, mock `fetch`, render the list, wait for it to settle, and assert the mock was called once.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007006",
+    "cards": [
+      {
+        "id": "a2000000-2af1-4ca5-8bcb-b6cc99d5e606",
+        "front": "An API test file has 'lists tasks' expecting 2 rows. It passes with it.only, but in the full file it sees 3, because an earlier test inserted a task. How do you fix it?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nGive every test a clean database. In `beforeEach`, either create a fresh test database (for example an in-memory SQLite one), delete all rows from the tables, or start a transaction and roll it back in `afterEach`. Then each test inserts exactly the rows it asserts on. Never point tests at your development database.\n\n## Why it works\n\nTests in one file share whatever the database holds, and Vitest runs them in order by default. Rows left by one test become hidden input to the next, so results depend on which tests ran first. `it.only` hides the problem because the earlier test never runs. A rolled-back transaction is fast because nothing is committed, but it only works when the code under test uses that same connection.\n\n## Verify it\n\nRun the file with `npx vitest run --sequence.shuffle` a few times; order-dependent tests fail at random until the reset is in place. Also run each test alone with `-t \"lists tasks\"` and confirm the result matches the full run.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-97b3-43e5-8230-aabbe913d63d",
+        "front": "The Task type gains a required priority field, and tsc now reports errors in 40 tests that build task objects by hand. How can test data be set up so the next new field is a one-line change?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nAdd a test data builder and use it in every test:\n\n```ts\nlet nextId = 1\nexport function buildTask(overrides: Partial<Task> = {}): Task {\n  return { id: nextId++, title: 'Buy milk', done: false, priority: 'normal', ...overrides }\n}\n```\n\nTests pass only the fields they care about, such as `buildTask({ done: true })`. The next required field is added once, in the builder.\n\n## Why it works\n\nHand-written objects repeat every field in every test, so each schema change touches all of them. The builder keeps valid defaults in one place, and the spread lets each test override only what matters, which also makes the test's intent obvious. A counter for `id` keeps built records distinct, so tests that insert several rows do not collide on the key.\n\n## Verify it\n\nAdd a new required field to `Task`, update only `buildTask`, and run `npx tsc --noEmit`: it should report no errors in the tests. Read one test and confirm the fields it passes are exactly the ones its assertions depend on.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-4e2c-4ed8-8c3a-c71a66108e62",
+        "front": "A validateTitle test file has six near-identical tests for an empty title, a blank title, 81 characters, and so on. A reviewer asks you to collapse them and keep readable failure names. What do you write?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nPut the cases in a table and let `it.each` generate one test per row:\n\n```ts\nit.each([\n  { case: 'empty', title: '', error: 'Title is required' },\n  { case: 'blank', title: '   ', error: 'Title is required' },\n  { case: '81-char', title: 'x'.repeat(81), error: 'Title is too long' },\n])('rejects $case title', ({ title, error }) => {\n  expect(validateTitle(title)).toBe(error)\n})\n```\n\nKeep the accepted values (1 and 80 characters) in a second table.\n\n## Why it works\n\n`it.each` generates one test per row, so each case still passes or fails on its own. With object rows, `$case` in the name is replaced by that row's value, giving names such as `rejects 'blank' title`. A short `case` label reads better than printing the 81-character title itself. Splitting rejected and accepted cases keeps each assertion simple instead of branching inside the test.\n\n## Verify it\n\nRun `npx vitest run validateTitle` and confirm the report lists one named test per row. Break one expected message on purpose and check that only that row fails, with its label in the failure name.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-ab37-4ae4-8f0b-682cc4627c01",
+        "front": "A test file defines const sendEmail = vi.fn() at the top. The second test asserts toHaveBeenCalledTimes(1) but gets 2, because the first test also called it. What should the file do?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nClear mock history before each test: `beforeEach(() => vi.clearAllMocks())`, or set `clearMocks: true` in the Vitest config. Alternatively, create the mock inside each test so nothing is shared.\n\n## Why it works\n\nA mock's `.mock.calls` list lives as long as the mock object. A file-level `vi.fn()` is shared by every test in the file, so calls pile up. `clearAllMocks` empties the recorded calls but keeps any `mockReturnValue` you set; `vi.resetAllMocks` also resets implementations. `vi.restoreAllMocks` only puts back methods replaced by `vi.spyOn`; since Vitest 3 it does not clear a `vi.fn()`'s calls. Pick the lightest one that makes each test start clean.\n\n## Verify it\n\nRun the file with `--sequence.shuffle` and then each test alone with `-t`. Both should pass. Temporarily delete the `beforeEach` and confirm the count assertion fails again, which proves the clearing is what fixed it.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-5da0-4723-8182-0f245f0d5705",
+        "front": "A task list test calls screen.getByRole('button', { name: 'Delete' }) and fails with 'Found multiple elements with the role \"button\" and name \"Delete\"'. How do you click the Delete for 'Pay rent'?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nScope the query to that row with `within`: `const row = screen.getByText('Pay rent').closest('li')!` then `await user.click(within(row).getByRole('button', { name: 'Delete' }))`. Even better, give each button a specific name, such as `aria-label={'Delete ' + task.title}`, and query `getByRole('button', { name: 'Delete Pay rent' })`.\n\n## Why it works\n\n`getBy…` queries require exactly one match; several matches throw, so a test cannot click the wrong row by accident. `within(element)` runs the same queries inside one part of the page. A per-row accessible name helps real users too: a screen reader user tabbing through the list otherwise hears \"Delete, Delete, Delete\" with no hint of which task each one removes.\n\n## Verify it\n\nAfter the click, assert `expect(screen.queryByText('Pay rent')).not.toBeInTheDocument()` and `expect(screen.getByText('Buy milk')).toBeInTheDocument()`, so the test proves the right row was removed and its neighbour survived.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-e6bb-4b85-83b2-ef15e3f2c8c5",
+        "front": "A test asserts create was called with { title: 'Buy milk' }, but the code also sends createdAt: new Date().toISOString(), so the assertion fails. How do you check the title without hard-coding a timestamp?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nUse asymmetric matchers: `expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: 'Buy milk', createdAt: expect.any(String) }))`. If the exact timestamp matters, pin the clock instead: `vi.useFakeTimers()` plus `vi.setSystemTime(new Date('2026-01-31T12:00:00Z'))`, then expect `createdAt: '2026-01-31T12:00:00.000Z'`.\n\n## Why it works\n\n`toHaveBeenCalledWith` compares arguments with deep equality, so an extra field makes it fail. `expect.objectContaining` matches when the listed fields are present and equal, and `expect.any(String)` accepts any string. That keeps the test about what it cares about, the title, while still checking that a timestamp was sent. Pinning the clock makes the value predictable when the format itself is the requirement.\n\n## Verify it\n\nTemporarily change the code to send `title: 'Buy mil'` and confirm the test fails; then remove `createdAt` from the payload and confirm `expect.any(String)` fails too. Restore the code and see it pass.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007007",
+    "cards": [
+      {
+        "id": "a2000000-1962-4a57-81af-5a806be039a8",
+        "front": "A page on localhost:5173 calls fetch('http://localhost:3000/api/tasks'). The catch block logs \"TypeError: Failed to fetch\", yet the API log shows the request arrived. What do you check?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nTreat it as a CORS failure, not a network outage. In the Network panel the row's Status shows CORS error, and the Console names the missing header. Fix the API to send Access-Control-Allow-Origin: http://localhost:5173 (and answer the OPTIONS preflight for JSON requests), or proxy /api through the Vite dev server so the page and API share one origin.\n\n## Why it works\n\nThe browser sent the request and the server answered, but the response did not grant this origin permission, so the browser refused to hand it to page JavaScript. fetch reports that as a generic TypeError and hides the status and body on purpose; only DevTools shows the real reason. That is why the server log and the error disagree.\n\n## Verify it\n\nReload with the Network panel open after the fix: the row should show 200 instead of CORS error, and its response headers should include Access-Control-Allow-Origin for your page's origin. For a JSON POST, an OPTIONS preflight row should appear just before it.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-e2eb-491a-8e46-5088b9729829",
+        "front": "Users on mobile data report duplicate tasks after tapping Save, but on localhost you never see it. How do you reproduce it with DevTools?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThrottle the Network panel to a slow preset such as Slow 4G or 3G, clear the request list, and tap Save twice quickly. Two POST /api/tasks rows confirm the bug. Then disable the button while the request is pending and make the server safe to retry, for example with an idempotency key.\n\n## Why it works\n\nOn localhost the POST finishes in milliseconds, so the first request is done before a second tap can land. Throttling stretches the request to phone-like timing, which opens the window between tap and response where a second tap sends a second POST. Duplicate taps are a timing bug, so you need slow timing to see it.\n\n## Verify it\n\nWith throttling still on, tap Save repeatedly: the Network panel should show exactly one POST, and the button should stay disabled until the response arrives. Turn throttling off afterwards; the Network tab shows a warning icon while it is enabled.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-ca27-4011-8660-9f512b1c9159",
+        "front": "A settings page shows only \"Something went wrong\", and the Console is empty because the code catches every error. How can DevTools stop at the real error?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nIn the Sources panel's Breakpoints pane, turn on pausing on caught exceptions and repeat the action. DevTools pauses on the line that throws, even though a try/catch handles it, so you can read the error, local values and the Call Stack. Then change the catch block to log or report the actual error instead of swallowing it.\n\n## Why it works\n\nA catch that only shows a generic message removes the error from the Console, so there is nothing to click. Exception breakpoints pause where the error is thrown, before the catch runs; caught and uncaught pausing are separate options and also cover rejected promises. Libraries sometimes throw and catch internally, so expect a few extra pauses you can skip.\n\n## Verify it\n\nWith caught-exception pausing on, repeat the action: DevTools should stop on the throwing line with the error shown. After the catch calls console.error(error), the next failure should appear in the Console with its stack trace, and you can turn caught-exception pausing off again.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-94e4-436e-86ae-a9996729ddef",
+        "front": "Login returns 200 and sets a session cookie, but the next GET /api/tasks returns 401. How do you find out why the cookie is not being sent?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nOpen the GET /api/tasks request's Cookies tab in the Network panel and the cookie table in the Application panel. If the cookie exists but is not sent, compare its Domain, Path, SameSite and Secure values with the request. A common cause is Path=/api/auth set by the login route, which limits the cookie to /api/auth/*. Set Path=/ when creating the session cookie.\n\n## Why it works\n\nThe browser attaches a cookie only when the request matches its domain, path prefix, Secure (HTTPS only) and SameSite rules. For example, a cookie set with Path=/api/auth is sent to /api/auth/me but not to /api/tasks. If the browser refused to store a cookie at all, the Network panel marks the blocked response cookie and gives the reason in a tooltip.\n\n## Verify it\n\nAfter changing the cookie to Path=/, delete the old cookie in the Application panel and log in again. The GET /api/tasks request's Cookies tab should list sid, its request headers should include a Cookie header, and the response should be 200.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-81e0-4a98-849f-ea4a8ae80061",
+        "front": "After you change your app's IndexedDB schema, the dev build crashes on startup while reading data saved by the old version. How do you reset only this site's storage?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nUse the Application panel's Storage view and clear site data for this origin. In one step it deletes IndexedDB, local storage, cookies and Cache Storage and unregisters the service worker, without touching other sites. Reload to start as a new user. Users will not do this for you, so still write an upgrade path for the old data.\n\n## Why it works\n\nThe stored records match the old schema, so the new code reads fields that do not exist. Deleting each store by hand is error-prone; clearing site data resets every storage layer and also removes a service worker that might keep serving code for the old schema. Clearing only hides the bug on your machine; the fix is a migration, such as an IndexedDB onupgradeneeded handler or a new Dexie version().\n\n## Verify it\n\nAfter clearing, the Application panel should list no IndexedDB databases and no service worker for the origin, and the app should start like a first visit. To test the real fix, create data with the previous build, load the new build, and confirm it upgrades without crashing.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-f47d-4ccd-8dcd-09cdd03f9cb9",
+        "front": "In development, the Network panel shows GET /api/tasks twice on every page load. How do you find which code sends each one, and is it a bug?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nHover the Initiator column of each row to see the stack trace that sent it, and compare the two. If both come from the same useEffect in a React app running under StrictMode, it is expected in development: React runs effects an extra time to expose missing cleanup. If they come from different components, you have a real duplicate fetch to remove.\n\n## Why it works\n\nThe Initiator column links a script-sent request to the line that sent it, and hovering shows the full call stack, so you can tell \"same code twice\" from \"two callers\". StrictMode's extra effect run happens only in development, so a production build should send one request. The effect should still abort or ignore the first request in its cleanup.\n\n## Verify it\n\nBuild and preview the production app, then reload with the Network panel filtered to Fetch/XHR: there should be one GET /api/tasks. In development, both rows should show the same Initiator line; if they do not, find and remove the second caller.",
+        "kind": "scenario"
+      }
+    ]
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007008",
+    "cards": [
+      {
+        "id": "a2000000-7a51-47c8-861e-b589033e56be",
+        "front": "You rebased your PR branch onto `main` and ran `git push --force-with-lease`. It is rejected with \"(stale info)\". A teammate pushed a fix to your branch earlier. What do you do?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nDo not switch to `--force`: that would delete your teammate's commit from the branch. Fetch, rebuild your branch from what is on GitHub (which includes their commit), rebase again, then push with the lease:\n\n```bash\ngit branch feature-backup      # keep your rebased copy, just in case\ngit fetch\ngit reset --hard origin/feature  # your pushed work + their fix\ngit rebase origin/main\ngit push --force-with-lease\n```\n\nIf you had commits you never pushed, cherry-pick them from `feature-backup`.\n\n## Why it works\n\n`--force-with-lease` only overwrites the remote branch if it still points where your remote-tracking ref `origin/feature` says. Your teammate's push moved it and you had not fetched since, so Git refused: exactly the protection you wanted. Plain `--force` skips that check. Careful: `git fetch` updates `origin/feature`, so after fetching, a lease push would succeed and overwrite their commit. Include their commit before pushing again.\n\n## Verify it\n\nBefore pushing, `git log --oneline -5` should show the teammate's commit on your branch. In a scratch repo with two clones, the first lease push was rejected with \"(stale info)\"; after reset + rebase the push went through as a forced update and kept the teammate's commit. On GitHub, the PR's commit list should still include it.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-dbd0-4e6f-8b5b-9e0ec5ea4bf6",
+        "front": "You changed `VITE_API_URL` in your static host's environment settings to point at the new API domain. The live Vite site still calls the old domain. Why?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nThe value was baked into the JavaScript when the site was built, so changing the setting afterwards does nothing. Trigger a new build and deploy with the new variable available to the build step. If the app is a PWA, the old service worker may keep serving cached files until the new version activates, so reload after it updates.\n\n## Why it works\n\nVite statically replaces `import.meta.env.VITE_*` at build time: the built file contains the literal string, not a lookup. Environment settings only matter while `vite build` runs. In a scratch Vite 8 build, a bundle built without the variable contained `void 0`, and one built with `VITE_API_URL=https://prod.example.com` contained that exact string.\n\n## Verify it\n\nFetch the deployed main bundle and search it for the domains, e.g. `curl -s https://app.example.com/assets/index-XXXX.js | grep -o \"new-api.example.com\"`. The new domain should appear and the old one should not. Then confirm in the DevTools Network panel that API requests go to the new host.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-f640-431e-8272-4d8f62e7caeb",
+        "front": "CI fails at `npm ci`: \"can only install packages when your package.json and package-lock.json … are in sync\". You bumped a version in package.json by hand. What is the fix?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nRun `npm install` locally so npm updates `package-lock.json` to match package.json, look at the lockfile diff, and commit it with package.json. Do not change CI to `npm install` to make the error go away.\n\n## Why it works\n\n`npm ci` installs only what the lockfile records, refuses to fix a mismatch, and never writes the lockfile. Your hand edit changed package.json but not the lock, so the lock is missing the new version. Local runs still worked because they used whatever was already in your `node_modules`; `npm ci` deletes `node_modules` and starts from the lockfile alone.\n\n## Verify it\n\nAfter `npm install`, `git status` should show `package-lock.json` modified along with package.json. Running `npm ci` locally should then finish without the sync error (in a scratch project, a hand-added `\"dayjs\": \"1.11.13\"` made it fail with \"Missing: dayjs@1.11.13 from lock file\"; after `npm install` it passed). The next CI run's install step should pass.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-2bad-4f75-8d92-bdfeca50da79",
+        "front": "Right after a deploy, some users of your Vite SPA get a blank screen and a console error saying a module script was served with MIME type \"text/html\". A reload fixes it. What happened?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nTheir open tab still asks for the previous build's hashed chunk (say `/assets/Settings-abc123.js`), which the new deploy removed. Your catch-all SPA rewrite answers that missing file with `index.html`, and the browser refuses to run HTML as a module. Keep the previous build's assets available for a while, make missing `/assets/*` return 404, and reload once when a lazy import fails (Vite fires a `vite:preloadError` event for this).\n\n## Why it works\n\nBuild tools put a content hash in chunk names, so every deploy creates new file names. A lazily loaded route fetches its chunk only when first opened, possibly long after the page loaded. A fallback meant for page URLs like `/notes/42` also catches missing JS files unless it is limited to page routes. Module scripts require a JavaScript MIME type, so the HTML reply fails instead of giving a clear 404.\n\n## Verify it\n\n`curl -I https://your-site/assets/does-not-exist.js` should return 404, not 200 with `text/html`. In a scratch Node server, a catch-all fallback returned 200 text/html for `/assets/index-OLD123.js`, while a fallback limited to extension-less paths returned 404. Then rehearse: open the site, deploy, and open a lazy route in the old tab.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-525a-4d2a-848f-3a1317044a0b",
+        "front": "Your PR from `feature/tasks` was squash-merged. You kept committing on the same branch and opened a new PR. It lists the old commits again and conflicts with `main`. What went wrong?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nSquash-merging put one new commit on `main`; your branch's original commits never became part of `main`'s history, so Git still treats them as unmerged. Start a new branch from the updated `main` and move only the new work:\n\n```bash\ngit switch main && git pull\ngit switch -c feature/tasks-2\ngit cherry-pick <new-commit-sha>\n```\n\n## Why it works\n\nA PR shows the commits reachable from its branch but not from `main`. After a squash merge the old commits are still in that set. If `main` changed the same lines afterwards, Git has to merge those old commits against newer code, which produces conflicts you already solved once. GitHub's merge docs warn about exactly this and suggest a merge commit or a rebase for branches you keep working on.\n\n## Verify it\n\n`git log --oneline main..feature/tasks-2` should list only your new commits. In a scratch repo, the reused branch listed the already-squashed \"validate title\" commit and conflicted when merged; the fresh branch listed only the new \"add extra\" commit. The new PR on GitHub should show just those commits.",
+        "kind": "scenario"
+      },
+      {
+        "id": "a2000000-b586-4524-8f78-c0e3a38eafa7",
+        "front": "The deploy job for your notes app just went green, and you are about to post \"shipped\" in the team channel. What should a two-minute smoke check on production cover?",
+        "back": "<!-- recall:teaching:v1 -->\n\n## The answer\n\nOn the real production URL: (1) the site loads and shows the new version (the changed screen, or a version or commit label if the app has one); (2) signing in works; (3) one real write succeeds: create a note, reload, it is still there, delete it; (4) the feature you shipped does what the PR says; (5) the console and Network panel show no new errors or failed requests. If a step fails, roll back first and debug second.\n\n## Why it works\n\nA green pipeline proves the build and tests passed in CI, not that production is set up correctly. Environment variables, migrations, rewrites, and third-party keys only exist in production. A smoke check is a short, fixed list that touches each of those layers once (shallow but broad), so a broken deploy is caught by you in minutes instead of by users.\n\n## Verify it\n\nKeep the list in the repo (for example `docs/smoke-check.md`) and paste the results into the PR or release note. Compare what is deployed with what was merged: the commit label or changed screen should match `git log --oneline -1 origin/main`. Run the list after every deploy, including rollbacks.",
+        "kind": "scenario"
+      }
+    ]
   }
 ]

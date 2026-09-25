@@ -1,8 +1,8 @@
 {
-  "version": 16,
-  "baseCards": 2799,
-  "addedCards": 72,
-  "totalCards": 2871,
+  "version": 17,
+  "baseCards": 2959,
+  "addedCards": 144,
+  "totalCards": 3103,
   "chunks": [
     "reviewed-01.json"
   ],
@@ -212,8 +212,8 @@
       "name": "Python · practical fluency · 1",
       "track": "Backend",
       "before": 114,
-      "added": 0,
-      "after": 114
+      "added": 6,
+      "after": 120
     },
     {
       "id": "a0000000-0000-4000-8000-000000001701",
@@ -228,8 +228,8 @@
       "name": "CSS · layout & interaction · 1",
       "track": "Frontend",
       "before": 120,
-      "added": 0,
-      "after": 120
+      "added": 3,
+      "after": 123
     },
     {
       "id": "a0000000-0000-4000-8000-000000001801",
@@ -244,16 +244,16 @@
       "name": "HTML · semantics & browser behavior",
       "track": "Frontend",
       "before": 33,
-      "added": 0,
-      "after": 33
+      "added": 3,
+      "after": 36
     },
     {
       "id": "a0000000-0000-4000-8000-000000002000",
       "name": "Git · everyday workflows · 1",
       "track": "Practice",
       "before": 120,
-      "added": 0,
-      "after": 120
+      "added": 6,
+      "after": 126
     },
     {
       "id": "a0000000-0000-4000-8000-000000002001",
@@ -316,8 +316,8 @@
       "name": "TypeScript · model the invariants",
       "track": "Foundations",
       "before": 16,
-      "added": 0,
-      "after": 16
+      "added": 6,
+      "after": 22
     },
     {
       "id": "a0000000-0000-4000-8000-000000003006",
@@ -606,10 +606,74 @@
       "before": 16,
       "added": 0,
       "after": 16
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007001",
+      "name": "21 · HTTP and REST in practice",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007002",
+      "name": "22 · Build a Node and Express API",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007003",
+      "name": "23 · Logins, sessions, and cookies",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007004",
+      "name": "24 · SQL for everyday CRUD",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007005",
+      "name": "25 · React forms and server data",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007006",
+      "name": "26 · Test a web app with Vitest",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007007",
+      "name": "27 · Debug with browser DevTools",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000007008",
+      "name": "28 · Review, merge, and deploy",
+      "track": "Build real apps",
+      "before": 20,
+      "added": 6,
+      "after": 26
     }
   ],
   "kinds": {
-    "scenario": 72
+    "scenario": 144
   },
   "retiredLibraryPrefixes": [
     "a3000000-",

@@ -1,9 +1,9 @@
 {
-  "version": 16,
-  "baseCards": 2799,
-  "scenarioCards": 72,
-  "activeCards": 2871,
-  "guidedLessons": 552,
+  "version": 17,
+  "baseCards": 2959,
+  "scenarioCards": 144,
+  "activeCards": 3103,
+  "guidedLessons": 712,
   "retiredRetrievalCards": 10810,
   "retiredKinds": {
     "code-recall": 3390,
@@ -11,7 +11,7 @@
     "output-recall": 640
   },
   "legacyPackBytes": 11992599,
-  "scenarioPackBytes": 68495,
+  "scenarioPackBytes": 168151,
   "retiredLibraryPrefixes": [
     "a3000000-",
     "a4000000-"

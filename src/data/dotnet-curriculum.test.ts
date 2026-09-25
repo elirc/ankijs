@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import lessons from "./dotnet-lessons.json";
 import practicalLessons from "./practical-lessons.json";
+import appliedLessons from "./applied-lessons.json";
 import report from "./content-report.json";
 import { loadStarterCards } from "./curriculum";
 import { DOTNET_TRACK, dotnetDecks, dotnetStages, dotnetStudyUrl } from "./dotnet-path";
@@ -11,7 +12,7 @@ describe("C# and .NET web curriculum", () => {
     expect(dotnetDecks).toHaveLength(12);
     expect(dotnetStages.flatMap((stage) => stage.decks)).toEqual(dotnetDecks);
     expect(lessons).toHaveLength(96);
-    expect(new Set([...teachingLessons, ...practicalLessons, ...lessons].map((lesson) => lesson.key)).size).toBe(report.teachingLessons);
+    expect(new Set([...teachingLessons, ...practicalLessons, ...appliedLessons, ...lessons].map((lesson) => lesson.key)).size).toBe(report.teachingLessons);
     const packs = await loadStarterCards();
     const cards = dotnetDecks.flatMap((deck) => packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)));
     expect(cards).toHaveLength(192);

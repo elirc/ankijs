@@ -1,0 +1,151 @@
+[
+  {
+    "id": "a0000000-0000-4000-8000-000000007001",
+    "name": "21 · HTTP and REST in practice",
+    "track": "Build real apps",
+    "icon": "network",
+    "color": "green",
+    "topics": [
+      "HTTP",
+      "REST",
+      "Status codes",
+      "Caching",
+      "CORS",
+      "curl"
+    ],
+    "description": "HTTP as a CRUD API really uses it: retries, status codes, Content-Type, caching and ETags, CORS preflight, redirects, query strings and curl.",
+    "resource": {
+      "label": "MDN · HTTP",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007002",
+    "name": "22 · Build a Node and Express API",
+    "track": "Build real apps",
+    "icon": "braces",
+    "color": "amber",
+    "topics": [
+      "Node.js",
+      "Express 5",
+      "Middleware",
+      "Error handling",
+      "Validation"
+    ],
+    "description": "Write a small JSON API with Express 5: routes and params, JSON bodies, middleware order, async errors, 404s, routers, and config.",
+    "resource": {
+      "label": "Express 5 guide (expressjs.com)",
+      "url": "https://expressjs.com/en/guide/routing.html"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007003",
+    "name": "23 · Logins, sessions, and cookies",
+    "track": "Build real apps",
+    "icon": "globe",
+    "color": "violet",
+    "topics": [
+      "Sessions",
+      "Cookies",
+      "JWT",
+      "OAuth",
+      "Login security"
+    ],
+    "description": "How a web app remembers who is logged in: session IDs, cookie attributes, login and logout, JWTs, OAuth sign-in, and limits on password guessing.",
+    "resource": {
+      "label": "OWASP · Session Management Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007004",
+    "name": "24 · SQL for everyday CRUD",
+    "track": "Build real apps",
+    "icon": "database",
+    "color": "blue",
+    "topics": [
+      "SQL",
+      "PostgreSQL",
+      "CRUD queries"
+    ],
+    "description": "Write the inserts, updates, upserts, join tables, searches, and date filters a CRUD API needs, in PostgreSQL 17 syntax.",
+    "resource": {
+      "label": "PostgreSQL documentation",
+      "url": "https://www.postgresql.org/docs/current/"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007005",
+    "name": "25 · React forms and server data",
+    "track": "Build real apps",
+    "icon": "react",
+    "color": "blue",
+    "topics": [
+      "React",
+      "Forms",
+      "Data fetching",
+      "React Router"
+    ],
+    "description": "Submit forms with FormData and React 19 actions, load and update server data safely, and read route params.",
+    "resource": {
+      "label": "react.dev · Reference",
+      "url": "https://react.dev/reference/react"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007006",
+    "name": "26 · Test a web app with Vitest",
+    "track": "Build real apps",
+    "icon": "bug",
+    "color": "amber",
+    "topics": [
+      "Vitest",
+      "Testing Library",
+      "Mocking",
+      "API tests"
+    ],
+    "description": "Write Vitest tests for real web code: matchers, async errors, mocks, fetch stubs, fake timers, Testing Library queries, and API tests.",
+    "resource": {
+      "label": "Vitest guide",
+      "url": "https://vitest.dev/guide/"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007007",
+    "name": "27 · Debug with browser DevTools",
+    "track": "Build real apps",
+    "icon": "bug",
+    "color": "violet",
+    "topics": [
+      "DevTools",
+      "Network panel",
+      "Breakpoints",
+      "Cookies",
+      "Service workers",
+      "CSS"
+    ],
+    "description": "Use Chrome DevTools to see the real request, cookie, style or error: Network, Sources, Application and Elements panels, plus device mode and remote debugging.",
+    "resource": {
+      "label": "Chrome DevTools documentation",
+      "url": "https://developer.chrome.com/docs/devtools"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007008",
+    "name": "28 · Review, merge, and deploy",
+    "track": "Build real apps",
+    "icon": "git",
+    "color": "green",
+    "topics": [
+      "Pull requests",
+      "Code review",
+      "Merging",
+      "Deploys"
+    ],
+    "description": "Get a pull request reviewed and merged cleanly, then ship it: lockfiles, build-time env vars, SPA hosting, migration order, and smoke checks.",
+    "resource": {
+      "label": "GitHub Docs · Pull requests",
+      "url": "https://docs.github.com/en/pull-requests"
+    }
+  }
+]

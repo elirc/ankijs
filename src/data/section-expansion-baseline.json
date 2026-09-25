@@ -523,5 +523,61 @@
     "track": "C# & .NET",
     "cardCount": 16,
     "contentHash": "3ee633c3d9cea2b09d8fe14879f95cbbf4e8bba56f1a2d014e4a82485f582861"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007001",
+    "name": "21 · HTTP and REST in practice",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "a3876ea03b2eb66622bb0b1abc0cdc7c3c8be7668abb2590044dd3c963bd772d"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007002",
+    "name": "22 · Build a Node and Express API",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "b32ba0fda80d2f45433da512fbb2c24e96d6af03538f5075f7d7872859db68a5"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007003",
+    "name": "23 · Logins, sessions, and cookies",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "50ad50732543c2d19f5e7a0d9bcf372a4eebee03757c086575cf5ae5a105910c"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007004",
+    "name": "24 · SQL for everyday CRUD",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "fee1f38e5bed13b2c9e344eb119648d970ff981f46095a978070331e01be05ba"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007005",
+    "name": "25 · React forms and server data",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "adb5f2cc69463e8ac788f68abd57c7e3578c012ff347cbbdca61695340fbe50e"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007006",
+    "name": "26 · Test a web app with Vitest",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "755ec5efbd7e8c992dfe6402e9dc5924b7139fd617218c5d1ea112c40951ccfa"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007007",
+    "name": "27 · Debug with browser DevTools",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "73be6cb49ce00acb6565ad12a36bc276a02df3a2804c5f0158b96a36b272cb9e"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007008",
+    "name": "28 · Review, merge, and deploy",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "91cd8835eb7e1f8e07cf2374544c1bdbd3075e0a4b11d8a40e84946074c18aae"
   }
 ]

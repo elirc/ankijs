@@ -12,6 +12,27 @@ new tests without touching product code. Keep defending that boundary.
 
 ---
 
+## Status (2026-09-24)
+
+| Item | Status |
+| --- | --- |
+| #1–#6, #8 | Fixed earlier. |
+| #7 `StudyScreen` key handler re-subscribes every render | Fixed (work package A1): the keydown listener is bound once and reads current state through a ref. |
+| #9 No linter / formatter / CI | Partial: CI exists, but there is still no linter or formatter. |
+| #10 Coverage gate | Open. |
+
+New issues found in the 2026-09-24 review, all in `src/features/study/StudyScreen.tsx`:
+
+- **N1** (fixed by A1): the background refresh (30 s timer or tab becoming visible) could swap the
+  card being read and hide its revealed answer. The displayed card now stays first.
+- **N2** (fixed by A1): the session timer counted time while the tab was hidden. It now counts
+  visible time only.
+- **N3** (fixed by A1): only the .NET track could be studied as a focused session. `?track=` now
+  accepts any curriculum track.
+- **N4** (open, measure first): `loadStudy` reads all cards and review logs on every rating.
+
+---
+
 ## High priority (correctness)
 
 ### 1. Sync pull can silently skip rows that share a `server_updated_at` boundary
