@@ -1,6 +1,6 @@
 # Recall — Engineering practice, in your pocket
 
-A local-first spaced-repetition web app with **3,103 practical web development flashcards across 83 decks** and 48 hands-on engineering missions. The card library includes 144 authored debugging scenarios and 712 guided lesson cards. No API key or account is required. The library focuses on forms, APIs, SQL, authentication, validation, testing, and shipping CRUD apps. LeetCode and DSA exercises are excluded.
+A local-first spaced-repetition web app with **3,179 practical web development flashcards across 90 decks** and 86 hands-on engineering missions. The card library includes 144 authored debugging scenarios and 712 guided lesson cards. No API key or account is required. The library focuses on forms, APIs, SQL, authentication, validation, testing, and shipping CRUD apps. LeetCode and DSA exercises are excluded.
 
 ## Start the app
 
@@ -32,9 +32,9 @@ The development server also prints your local network address for testing on the
 
 ## Included toolkit
 
-The library is **3,103 cards across 83 decks** (curriculum v17):
+The library is **3,179 cards across 90 decks** (curriculum v17):
 
-- **1,112 original cards:** core SWE foundations, realistic engineering scenarios, 144 authored debugging scenarios, 160 beginner cards, 200 follow-on cards, 192 C#/.NET cards, and 160 Build real apps cards.
+- **1,188 original cards:** core SWE foundations, realistic engineering scenarios, 144 authored debugging scenarios, 160 beginner cards, 200 follow-on cards, 192 C#/.NET cards, and 160 Build real apps cards.
 - **Start here:** ten numbered beginner decks covering your first program, control flow, collections, async and debugging, web pages, React, databases, Git, CRUD features, and reliable services.
 - **Keep going:** ten more guided decks covering TypeScript, Python, debugging, testing, accessible interfaces, HTTP APIs, SQL reasoning, security, delivery, and real CRUD app problems. Find them from the home page or [open the collection locally](http://localhost:4173/decks?track=Keep+going). Track filters persist in the URL for bookmarks.
 - **Build real apps:** eight decks (21–28) with 80 lessons and 48 scenarios on HTTP and REST, a Node and Express API, logins and sessions, everyday SQL writes, React forms and server data, testing with Vitest, browser DevTools, and review, merge, and deploy. Find it from the home page or [open the collection locally](http://localhost:4173/decks?track=Build+real+apps).
@@ -62,13 +62,13 @@ Keyboard: Space reveals, 1–4 rate, U undoes, E edits. Shortcuts ignore form in
 
 ## Hands-on engineering practice
 
-Open **Engineering practice** from the sidebar, Home, or Progress. The 48 missions cover feature delivery, reliability, and production ownership, with search and stage filters. New assignments include accessible dialogs, recoverable uploads, time-zone handling, conflicting edits, query plans, bounded retries, backup restoration, and measured loading improvements.
+Open **Engineering practice** from the sidebar, Home, or Progress. The 86 missions cover feature delivery, reliability, and production ownership, with search and stage filters. New assignments include accessible dialogs, recoverable uploads, time-zone handling, conflicting edits, query plans, bounded retries, backup restoration, and measured loading improvements.
 
 Each mission contains a concrete assignment, three acceptance checks, review guidance, and a stretch challenge. Use Recall or your own small app as the practice project. The 15-, 30-, and 60-minute session plans combine recall, implementation, and reflection; larger missions can span multiple sessions.
 
 The evidence journal saves as you type. Record what changed, how you verified it, and the tradeoff or next step, then complete the mission after checking every criterion. Completed entries can be reopened. Mission completion is self-reviewed evidence, separate from flashcard ratings and job-level certification.
 
-Practice entries work offline and travel in the normal JSON backup. Older backups without a journal still import, and older journal entries do not replace newer local edits. Automatic Supabase sync does not include the journal. **Export evidence** downloads a Markdown work-sample report; use the full JSON backup for restoration.
+Practice entries work offline and travel in the normal JSON backup. Older backups without a journal still import, and older journal entries do not replace newer local edits. Automatic Supabase sync includes the journal when server migration 0003 is installed. **Export evidence** downloads a Markdown work-sample report; use the full JSON backup for restoration.
 
 Related deck searches persist in the URL, including after reload.
 
@@ -76,19 +76,19 @@ Related deck searches persist in the URL, including after reload.
 
 Progress is local to a browser profile and device. Clearing site storage removes it. Export backups in Settings regularly and keep a copy separately. Importing a backup merges newer data and does not intentionally replace newer local edits. Backups are validated before any write; malformed records roll back the import.
 
-Starter content upgrades automatically and adds only missing cards, with stable IDs and old baseline timestamps so a fresh device does not replace newer synced progress. Rerunning installation does not overwrite edits or resurrect deleted decks. The included starter IDs are shared, so use a **dedicated personal Supabase project** for this build, not a multi-tenant shared service.
+Starter content upgrades automatically and adds only missing cards, with stable IDs and old baseline timestamps so a fresh device does not replace newer synced progress. Rerunning installation does not overwrite edits or resurrect deleted decks. Server migration 0003 gives remote rows a composite `(user_id, id)` primary key, so bundled identities can be reused safely by different accounts. Each local browser profile stays bound to its first sync account; use a separate profile for another account.
 
 ## Optional automatic sync
 
 The app is fully usable without a backend. To enable the existing Supabase integration for your own devices:
 
 1. Create your personal Supabase project.
-2. Run `supabase/migrations/0001_init.sql`, then `0002_learning_steps.sql`.
+2. Run `supabase/migrations/0001_init.sql`, then `0002_learning_steps.sql`, then `0003_owned_sync.sql`.
 3. Enable email magic links and allow your deployed HTTPS URL in Auth's redirect configuration.
 4. Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the public anon key, never a service-role secret).
 5. Rebuild and sign in with the same account on your devices.
 
-Local study is the source of truth; signed-out and offline use remain available. Live remote sync needs your own credentials and has not been verified against a configured backend in this workspace. The existing sync implementation treats remote review logs as immutable: undo is exact locally, but a review already uploaded is not deleted remotely. For reliable backup portability without a backend, use export/import.
+Local study is the source of truth; signed-out and offline use remain available. Live remote sync needs your own credentials and has not been verified against a configured backend in this workspace. Undo now publishes a permanent review-revocation record; updated devices remove the revoked review from active history. All devices must run this version and the server must have migration 0003. For reliable backup portability without a backend, use export/import.
 
 ## Development and verification
 
@@ -144,3 +144,28 @@ npm run content:check
 ```
 
 The manifest and listed scenario pack ship together. The legacy family index remains for existing review history and personally edited old cards. No network access or execution of lesson examples is needed for these commands.
+
+## Complete learning and workshop expansion
+
+Home and navigation remember your learning goal. Every track has an ordered path page with prerequisites and next steps. Global Find cards searches questions and answers, filters repeated lapses/personal/suspended/saved decks, and previews reversible bulk suspension. Progress separates first daily review-stage attempts from retries and shows scheduled workload and repeated difficulties. Settings offers reading size, code wrapping, theme, preferred explanations, backup status and persistent-storage requests. Code blocks support highlighting and copying.
+
+The **Guided workshop** adds **38 supplied units and 76 linked recall cards across seven decks**: two TypeScript/React and .NET capstones, plus six units each for debugging, code review, SQL concurrency, integrations, operations, and AI-assisted engineering. Units include evidence, prerequisites, runtime context, hints, reference reasoning, acceptance criteria and links to persistent evidence journals. Download the complete pack from /workshop; it works offline after installation. Written scratch attempts stay on this device; put lasting results in the journal for backup and sync.
+
+The capstone references are local teaching fixtures with test identities and memory storage. The production checkpoints explicitly guide verified sessions, database persistence, deployment and restoration; the test adapter must not be exposed publicly. The .NET and TypeScript APIs use the same executable contract. SQL exercises target a disposable PostgreSQL 16+ database and include two-session schedules and verification scripts.
+
+Build and check the pack:
+
+```sh
+npm run workshop:content
+npm run workshop:check
+python scripts/package-workshop.py
+npm run lint
+npm run format:check
+npm run typecheck
+npm test
+npm run build
+npx playwright install chromium webkit
+npm run test:e2e
+```
+
+Migrate the server before updating connected clients. The new schema adds owner-scoped remote identities and user_state for journals, learner preferences and review revocations. Exports remain backward-compatible version-1 JSON with optional new fields. Older clients cannot interpret new revocation records and should be updated before cross-device undo is relied on.

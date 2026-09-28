@@ -7,19 +7,35 @@ import { parseAnswerPages, teachingLessons } from "../teaching/answers";
 describe("practical follow-on curriculum", () => {
   it("delivers a concept and application card with five usable teaching views for every lesson", async () => {
     expect(lessons).toHaveLength(100);
-    expect(new Set([...teachingLessons, ...lessons].map((l) => l.key)).size)
-      .toBe(report.teachingLessons - report.dotnetLessons - report.appliedLessons);
+    expect(
+      new Set([...teachingLessons, ...lessons].map((l) => l.key)).size,
+    ).toBe(
+      report.teachingLessons - report.dotnetLessons - report.appliedLessons,
+    );
     const decks = curriculum.filter((deck) => deck.track === "Keep going");
     expect(decks).toHaveLength(10);
     const packs = await loadStarterCards();
-    const cards = decks.flatMap((deck) => packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)));
+    const cards = decks.flatMap((deck) =>
+      packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)),
+    );
     expect(cards).toHaveLength(report.practicalCards);
     expect(cards).toHaveLength(200);
-    for (const deck of decks) expect(packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id))).toHaveLength(20);
+    for (const deck of decks)
+      expect(
+        packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)),
+      ).toHaveLength(20);
     for (const lesson of lessons) {
       // Practice cards are reviewed separately from their related concept card.
-      expect(lesson.check).not.toMatch(/\b(?:code|function|example) (?:above|below)\b/i);
-      for (const field of [lesson.plain, lesson.example, lesson.analogy, lesson.mistake, lesson.answer]) {
+      expect(lesson.check).not.toMatch(
+        /\b(?:code|function|example) (?:above|below)\b/i,
+      );
+      for (const field of [
+        lesson.plain,
+        lesson.example,
+        lesson.analogy,
+        lesson.mistake,
+        lesson.answer,
+      ]) {
         expect(field.length, lesson.key).toBeGreaterThan(60);
         expect(field).not.toMatch(/TODO|lorem ipsum|Write an example/);
       }

@@ -1,0 +1,3 @@
++ test('rejects invalid data', () => {
++   expect(save('')).rejects.toThrow('invalid');
++ });

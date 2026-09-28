@@ -1,17 +1,24 @@
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowRight, Hammer } from "lucide-react";
-import { listPracticeEntries, type PracticeEntry } from "../../db/repos/practiceRepo";
+import {
+  listPracticeEntries,
+  type PracticeEntry,
+} from "../../db/repos/practiceRepo";
 import { engineeringMissions } from "../../data/engineering-missions";
 
 function nextMission(entries: PracticeEntry[]) {
   return (
     engineeringMissions.find((mission) =>
-      entries.some((entry) => entry.mission_id === mission.id && !entry.completed),
+      entries.some(
+        (entry) => entry.mission_id === mission.id && !entry.completed,
+      ),
     ) ??
     engineeringMissions.find(
       (mission) =>
-        !entries.some((entry) => entry.mission_id === mission.id && entry.completed),
+        !entries.some(
+          (entry) => entry.mission_id === mission.id && entry.completed,
+        ),
     )
   );
 }
@@ -32,9 +39,7 @@ export function PracticeSummary() {
         <small>
           {entries
             ? `${completed} of ${engineeringMissions.length} missions completed. ${
-                next
-                  ? `Next: ${next.title}.`
-                  : "All missions are complete."
+                next ? `Next: ${next.title}.` : "All missions are complete."
               }`
             : `${engineeringMissions.length} hands-on missions with a journal for your evidence.`}
         </small>

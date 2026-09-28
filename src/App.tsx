@@ -1,3 +1,10 @@
+import { useLiveQuery } from "dexie-react-hooks";
+import {
+  getLearningSettings,
+  learningDefaults,
+  studyLink,
+} from "./db/repos/learningRepo";
+import { ApplyReadingPreferences } from "./components/ReadingPreferences";
 import { useEffect, useState } from "react";
 import {
   BarChart3,
@@ -22,6 +29,9 @@ const studyNav = [
   { to: "/study", label: "Study", icon: BookOpen },
   { to: "/progress", label: "Progress", icon: BarChart3 },
   { to: "/dotnet", label: "C# & .NET", icon: Code2 },
+  { to: "/workshop", label: "Guided workshop", icon: Hammer },
+  { to: "/paths", label: "Learning paths", icon: Library },
+  { to: "/library", label: "Find cards", icon: BookOpen },
   { to: "/practice", label: "Engineering practice", icon: Hammer },
 ];
 const notesNav = [
@@ -34,18 +44,22 @@ const mobileNav = [
   studyNav[1],
   studyNav[2],
   studyNav[3],
-  notesNav[0],
+  { to: "/more", label: "More", icon: Plus },
 ];
 const allNav = [...studyNav, ...notesNav];
 
 export function App() {
   const location = useLocation();
+  const learning = useLiveQuery(getLearningSettings, [], learningDefaults);
   const studying = location.pathname.startsWith("/study");
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     const protectPendingWork = (event: BeforeUnloadEvent) => {
-      if (hasPendingPracticeWrites()) { event.preventDefault(); event.returnValue = ""; }
+      if (hasPendingPracticeWrites()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
     };
     window.addEventListener("beforeunload", protectPendingWork);
     window.addEventListener("online", update);
@@ -67,6 +81,7 @@ export function App() {
     )?.label ?? "Recall";
   return (
     <div className={`app-shell ${studying ? "is-studying" : ""}`}>
+      <ApplyReadingPreferences />
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
@@ -82,7 +97,7 @@ export function App() {
           {studyNav.map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={item.to === "/study" ? studyLink(learning.path) : item.to}
               end={item.to === "/"}
               className={({ isActive }) =>
                 `side-link ${isActive ? "active" : ""}`
@@ -98,7 +113,7 @@ export function App() {
           {notesNav.map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={item.to === "/study" ? studyLink(learning.path) : item.to}
               className={({ isActive }) =>
                 `side-link ${isActive ? "active" : ""}`
               }
@@ -143,7 +158,7 @@ export function App() {
           {mobileNav.map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={item.to === "/study" ? studyLink(learning.path) : item.to}
               end={item.to === "/"}
               className={({ isActive }) => (isActive ? "active" : "")}
             >

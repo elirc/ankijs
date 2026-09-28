@@ -14,7 +14,7 @@ export default defineConfig({
       ],
       workbox: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,txt}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,txt}", "workshop/**"],
         // Install-only data: fetched once while online, then it lives in IndexedDB.
         globIgnores: ["**/expanded-cards-*.js", "**/retired-retrieval-hashes-*.js", "**/content-corrections-*.js"],
         navigateFallback: "/index.html",
@@ -84,14 +84,15 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ["e2e/**", "node_modules/**", "dist/**"],
+    include: ["src/**/*.test.{ts,tsx}"],
+    exclude: ["e2e/**", "node_modules/**", "dist/**", "artifacts/**"],
     // happy-dom loads in seconds; jsdom took 30-100 s to load on Windows and tripped
     // Vitest's fixed 60 s worker-start timeout.
     environment: "happy-dom",
     setupFiles: "./src/test/setup.ts",
     globals: true,
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
     // A forked child starts faster than a worker_thread on this host.
     pool: "forks",
     maxWorkers: 1,

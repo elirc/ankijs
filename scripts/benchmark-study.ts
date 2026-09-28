@@ -1,0 +1,13 @@
+import 'fake-indexeddb/auto';
+import { performance } from 'node:perf_hooks';
+import { db, resetDatabaseForTests, type ReviewLog } from '../src/db/schema';
+import { createDeck } from '../src/db/repos/deckRepo';
+import { createCard } from '../src/db/repos/cardRepo';
+import { loadStudy } from '../src/db/repos/studyRepo';
+await resetDatabaseForTests();
+const deck=await createDeck('Benchmark');const card=await createCard({deck_id:deck.id,front:'Question',back:'Answer'});
+await db.cards.bulkPut(Array.from({length:3000},(_,i)=>({...card,id:'benchmark-card-'+i,back:'A realistic explanation. '.repeat(80)})));
+const now=new Date('2026-09-26T12:00:00Z');const rows:ReviewLog[]=Array.from({length:50000},(_,i)=>({id:'log-'+i,user_id:null,card_id:card.id,rating:3,state_before:i===0?'new':'review',due_before:'2025-01-01T00:00:00Z',stability_after:10,difficulty_after:5,scheduled_days_after:1,reviewed_at:'2025-01-01T00:00:00Z'}));await db.review_logs.bulkPut(rows);
+const start=performance.now();const all=await db.review_logs.toArray();const oldMs=performance.now()-start;
+const read=performance.now();const queue=await loadStudy(deck.id,now);const newMs=performance.now()-read;
+console.log(JSON.stringify({environment:'fake-indexeddb on Node, not a phone benchmark',history:all.length,oldFullLogReadMs:Math.round(oldMs),indexedStudyMs:Math.round(newMs),queue:queue.queue.length}));await db.delete();

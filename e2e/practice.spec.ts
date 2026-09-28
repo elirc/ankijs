@@ -37,11 +37,11 @@ test("engineering practice persists offline, exports evidence, and restores from
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `artifacts/${testInfo.project.name}-engineering-journal.png`, fullPage: true });
 
-  await page.getByRole("link", { name: "Review related decks" }).click();
-  await expect(page.getByLabel("Search decks")).toHaveValue("debugging");
+  await page.getByRole("link", { name: /^Review / }).first().click();
+  await expect(page).toHaveURL(/\/decks\/[a-f0-9-]+$/);
+  await expect(page.locator(".card-list-row").first()).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Search decks")).toHaveValue("debugging");
-  expect(await page.locator(".deck-card").count()).toBeGreaterThan(0);
+  await expect(page.locator(".card-list-row").first()).toBeVisible();
   await page.goto("/practice");
   await expect(page.locator(".practice-hero")).toContainText(`1 / ${engineeringMissions.length} completed with evidence`);
   const evidenceDownload = page.waitForEvent("download");

@@ -1,6 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
 import { getAnswerPages } from "../teaching/answers";
+import { useLiveQuery } from "dexie-react-hooks";
+import { getLearningSettings } from "../db/repos/learningRepo";
+import { readDraft, storeDraft } from "../lib/drafts";
 import { MarkdownView } from "./MarkdownView";
 
 export function AnswerExplorer({
@@ -22,10 +25,20 @@ function AnswerReader({ front, back }: { front: string; back: string }) {
     [front, back],
   );
   const [index, setIndex] = useState(0);
+  const settings = useLiveQuery(getLearningSettings);
+  const selected = useRef(false);
+  useEffect(() => {
+    if (settings && !selected.current) {
+      selected.current = true;
+      const found = pages.findIndex((p) => p.title === settings.explanation);
+      if (found >= 0) setIndex(found);
+    }
+  }, [settings, pages]);
   const heading = useRef<HTMLHeadingElement>(null);
   const page = pages[index];
   const multiple = pages.length > 1;
   function changePage(next: number, moveFocus = true) {
+    selected.current = true;
     setIndex(Math.max(0, Math.min(next, pages.length - 1)));
     if (!moveFocus) return;
     // Bring the new explanation into view after a long code example on a phone.
@@ -108,6 +121,14 @@ function AnswerReader({ front, back }: { front: string; back: string }) {
 
 function ExplanationBody({ body }: { body: string }) {
   const [checked, setChecked] = useState(false);
+  const draftKey =
+    "answer:" +
+    Array.from(body).reduce(
+      (hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0,
+      2166136261,
+    );
+  const [attempt, setAttempt] = useState(() => readDraft(draftKey));
+  const [draftError, setDraftError] = useState("");
   const marker = "<!-- recall:solution -->";
   const boundary = body.indexOf(marker);
   if (boundary < 0)
@@ -115,16 +136,36 @@ function ExplanationBody({ body }: { body: string }) {
   return (
     <>
       <MarkdownView source={body.slice(0, boundary)} className="card-answer" />
+      <label className="setting-label">
+        Your answer (optional)
+        <textarea
+          rows={4}
+          value={attempt}
+          onChange={(event) => {
+            setAttempt(event.target.value);
+            if (!storeDraft(draftKey, event.target.value))
+              setDraftError(
+                "Could not save this attempt. Keep a copy before leaving.",
+              );
+          }}
+        />
+      </label>
+      {draftError && <p role="alert">{draftError}</p>}
       <button
         className="practice-reveal"
         type="button"
         aria-expanded={checked}
         onClick={() => setChecked(!checked)}
       >
-        {checked ? "Hide practice solution" : "Check my answer"}
+        {checked ? "Hide sample solution" : "Show sample solution"}
       </button>
       {checked && (
         <div className="practice-solution">
+          <p>
+            Compare your main claim and reasoning with the example. Check any
+            assumptions or limitations. This reveals a reference; it does not
+            grade your response.
+          </p>
           <MarkdownView
             source={body.slice(boundary + marker.length)}
             className="card-answer"

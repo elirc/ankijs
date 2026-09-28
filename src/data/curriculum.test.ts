@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import manifest from "./section-expansion-manifest.json";
+import workshopUnits from "./workshop-units.json";
 import { curriculum, loadStarterCards, starterCardCount } from "./curriculum";
 
 describe("expanded curriculum integrity", () => {
   it("ships the declared curriculum with stable IDs and self-contained offline answers", async () => {
     const packs = await loadStarterCards();
     const cards = [...packs.values()].flat();
-    expect(starterCardCount).toBe(manifest.baseCards + manifest.addedCards);
-    expect(cards.some(card => card.id.startsWith("a1000000-"))).toBe(false);
-    const scenarios = cards.filter(card => card.id.startsWith("a2000000-"));
+    // Workshop cards (2 per unit) are built at runtime and sit outside the manifest.
+    const workshopCardCount = workshopUnits.length * 2;
+    expect(starterCardCount).toBe(
+      manifest.baseCards + manifest.addedCards + workshopCardCount,
+    );
+    expect(cards.some((card) => card.id.startsWith("a1000000-"))).toBe(false);
+    const scenarios = cards.filter((card) => card.id.startsWith("a2000000-"));
     expect(scenarios).toHaveLength(manifest.kinds.scenario);
     for (const card of scenarios) {
       expect(card.front).not.toMatch(/\[recall\]|____/);

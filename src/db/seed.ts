@@ -5,7 +5,7 @@ import { db, type Card, type Deck, type SyncTableName } from "./schema";
 import { retireLegacyCurriculum } from "./retiredCurriculum";
 import { installTimestamp } from "./retiredLibrary";
 
-export const curriculumVersionKey = `starter_curriculum_v${sectionExpansionVersion}`;
+export const curriculumVersionKey = `starter_curriculum_v${sectionExpansionVersion}_workshop1`;
 
 export interface CurriculumProgress {
   completed: number;
@@ -14,7 +14,9 @@ export interface CurriculumProgress {
 }
 const installBatchSize = 500;
 
-export async function installStarterDecks(onProgress?: (progress: CurriculumProgress) => void): Promise<void> {
+export async function installStarterDecks(
+  onProgress?: (progress: CurriculumProgress) => void,
+): Promise<void> {
   // Fetch before opening the transaction: a network wait can close an IDB transaction.
   const content = await loadStarterCards();
   await db.transaction(
@@ -96,11 +98,25 @@ export async function installStarterDecks(onProgress?: (progress: CurriculumProg
       await db.decks.bulkAdd(decksToAdd);
       // Bound the browser's request backlog while retaining one atomic transaction.
       onProgress?.({ completed: 0, total: cardsToAdd.length, phase: "cards" });
-      for (let offset = 0; offset < cardsToAdd.length; offset += installBatchSize) {
-        await db.cards.bulkAdd(cardsToAdd.slice(offset, offset + installBatchSize));
-        onProgress?.({ completed: Math.min(offset + installBatchSize, cardsToAdd.length), total: cardsToAdd.length, phase: "cards" });
+      for (
+        let offset = 0;
+        offset < cardsToAdd.length;
+        offset += installBatchSize
+      ) {
+        await db.cards.bulkAdd(
+          cardsToAdd.slice(offset, offset + installBatchSize),
+        );
+        onProgress?.({
+          completed: Math.min(offset + installBatchSize, cardsToAdd.length),
+          total: cardsToAdd.length,
+          phase: "cards",
+        });
       }
-      onProgress?.({ completed: cardsToAdd.length, total: cardsToAdd.length, phase: "saving" });
+      onProgress?.({
+        completed: cardsToAdd.length,
+        total: cardsToAdd.length,
+        phase: "saving",
+      });
       await retireLegacyCurriculum();
       // The sync queue commits with the cards, using the same bounded batches.
       const pending = new Map(
@@ -114,7 +130,9 @@ export async function installStarterDecks(onProgress?: (progress: CurriculumProg
         ...row,
       }));
       for (let offset = 0; offset < queued.length; offset += installBatchSize)
-        await db.outbox.bulkPut(queued.slice(offset, offset + installBatchSize));
+        await db.outbox.bulkPut(
+          queued.slice(offset, offset + installBatchSize),
+        );
       await db.sync_meta.put({
         key: "starter_curriculum_v1",
         value: timestamp,
@@ -126,7 +144,9 @@ export async function installStarterDecks(onProgress?: (progress: CurriculumProg
     window.dispatchEvent(new CustomEvent("recall:outbox-enqueued"));
 }
 
-export async function initializeStudyData(onProgress?: (progress: CurriculumProgress) => void): Promise<void> {
+export async function initializeStudyData(
+  onProgress?: (progress: CurriculumProgress) => void,
+): Promise<void> {
   if (!(await db.sync_meta.get(curriculumVersionKey)))
     await installStarterDecks(onProgress);
 }

@@ -15,7 +15,11 @@ export function buildQueue(
   newStudiedToday: number,
   now: Date,
 ): Card[] {
-  return buildQueues(cards, [deck], new Map([[deck.id, newStudiedToday]]), now).get(deck.id) ?? [];
+  return (
+    buildQueues(cards, [deck], new Map([[deck.id, newStudiedToday]]), now).get(
+      deck.id,
+    ) ?? []
+  );
 }
 
 // One pass over the library serves every deck: grouping cards and computing the
@@ -45,20 +49,27 @@ export function buildQueues(
     }
     dueLearning.sort(byDueAsc);
     dueReviews.sort(byDueAsc);
-    const remainingNew = Math.max(0, deck.new_per_day - (newStudiedToday.get(deck.id) ?? 0));
+    const remainingNew = Math.max(
+      0,
+      deck.new_per_day - (newStudiedToday.get(deck.id) ?? 0),
+    );
     let newCards: Card[] = [];
     if (remainingNew > 0 && fresh.length > 0) {
       practiced ??= new Set(
-        cards.filter((card) => card.state !== "new" || card.reps > 0).map(siblingKey),
+        cards
+          .filter((card) => card.state !== "new" || card.reps > 0)
+          .map(siblingKey),
       );
       const familiar = practiced;
       const keys = new Map(fresh.map((card) => [card.id, siblingKey(card)]));
       const seen = new Set<string>();
       newCards = fresh
         // Revisit an eligible familiar idea before moving to another new concept.
-        .sort((a, b) =>
-          Number(familiar.has(keys.get(b.id)!)) - Number(familiar.has(keys.get(a.id)!)) ||
-          byCreatedAsc(a, b))
+        .sort(
+          (a, b) =>
+            Number(familiar.has(keys.get(b.id)!)) -
+              Number(familiar.has(keys.get(a.id)!)) || byCreatedAsc(a, b),
+        )
         .filter((card) => {
           const key = keys.get(card.id)!;
           if (seen.has(key)) return false;

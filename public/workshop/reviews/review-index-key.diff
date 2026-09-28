@@ -1,0 +1,2 @@
+- notes.map(note => <Editor key={note.id} note={note} />)
++ notes.map((note, i) => <Editor key={i} note={note} />)

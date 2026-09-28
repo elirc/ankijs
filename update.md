@@ -41,6 +41,19 @@ alone does nothing for an existing install.
   changes; existing ids are never overwritten except via corrections.
 - Checks: `npm run content:check`, `npx tsc --noEmit`, `npm run build`, content vitest (above).
 
+### Workshop route (separate from the manifest)
+
+- The Workshop track (7 decks, 2 cards per unit) is built **at runtime** from
+  `src/data/workshop-units.json` (`src/data/workshop.ts`, `curriculum.ts`); it is not in the manifest,
+  so `content:check` still reports the manifest total (3,103) while the app has 3,179.
+- Installed on phones by the seed install key `starter_curriculum_v17_workshop1` (`src/db/seed.ts`),
+  not by a `CURRICULUM_VERSION` bump. Validate with `npm run workshop:content`
+  (`scripts/check-workshop.mjs`) and `npm run workshop:check` (node tests for the workshop files).
+- **Limit:** workshop card text has **no correction path**. Changing the install key again
+  (`..._workshop2`, ...) re-runs `installStarterDecks`, but that only adds missing decks/cards (new
+  ids); it skips existing ids, so edited text of an already-installed workshop card never reaches a
+  phone. Ship text fixes as new units/ids, or add a correction path first.
+
 ## Completed: curriculum v16 content-quality pass (2026-09-23) — UNCOMMITTED
 
 - ~2,200 cards/lessons rewritten by Opus author agents + Opus reviewer agents; details and
@@ -286,3 +299,29 @@ actions, SameSite Lax default, --env-file, VITE_ exposure); low RAM — no paral
   `754fb1d` v16 content-quality pass (verified standalone in a temp worktree: content:check PASS,
   2,871 cards) and `24222f9` v17 track + app fixes + docs. `handoff/` (pre-existing, untracked) was
   left out. To ship: merge the branch into `main`, then deploy.
+- 2026-09-28: **Verification of the uncommitted 2026-09-26 phase** (verification agent; nothing committed).
+  Checklist items all implemented except lint/format/CI (partial); sync/0003 never run against a live backend.
+  PASS: content:check (3,103 cards — manifest unchanged), tsc, lint (`--quiet`), features+components 35/35,
+  build (precache 150 entries / 1,463 KiB), workshop content + node tests 15/15.
+  FAIL: content vitest 1/22 (`curriculum.test.ts`: runtime 3,179 ≠ manifest 3,103); db/srs/lib 6/149
+  (seed.test v1/v2/v3/v4/v16 counts don't account for 76 Workshop cards, and Workshop decks are *prepended*
+  to `curriculum`; practiceRepo "no sync work" now sees 1 user_state outbox row); `format:check`
+  (CardEditorScreen.tsx). CURRICULUM_VERSION still 17; workshop cards ship via runtime JSON + install key
+  `starter_curriculum_v17_workshop1` (bypasses manifest/corrections — later text edits won't reach phones).
+  README 3,179/90/86 matches runtime, not the manifest. Recommend: fix tests/format/deck order, then commit
+  formatting separately from features. The report file could not be written (subagent tool restriction).
+- 2026-09-28: **Fixes after verification** (fix agent; nothing committed). Workshop runtime route kept,
+  `CURRICULUM_VERSION` unchanged, manifest/corrections files untouched.
+  Changed: `curriculum.ts` Workshop decks moved to the END of `curriculum` (`curriculum[1]` is the
+  original deck again); `curriculum.test.ts` expects manifest total + `workshop-units.json` units × 2;
+  `seed.test.ts` v2/v3/v4/v16 cases also exclude the "Workshop" track; `practiceRepo.test.ts` now
+  expects 1 outbox row (journal sync) and was renamed; `CardEditorScreen.tsx` prettier-formatted;
+  `package.json` format globs quoted; new "Workshop route" subsection under "How card content ships".
+  Correction to the earlier note: a new install key (`_workshop2`) does NOT rewrite existing workshop
+  cards — `installStarterDecks` only adds missing ids — so workshop text fixes need new ids or a
+  correction path.
+  Results: tsc PASS (52 s); format:check PASS (20 s); curriculum+seed+practiceRepo vitest 17/17 PASS
+  (166 s, incl. "rolls back every batch"); content vitest 21/22 on first run — retiredCurriculum "upgrades
+  v5" timed out at 60 s (host throughput, test near its 60 s limit), timed out again alone, then 6/6
+  PASS on a third run (78 s); content:check PASS (3,103); lint PASS (41 s); build PASS (150 entries /
+  1,463 KiB).

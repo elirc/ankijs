@@ -65,7 +65,8 @@ export function calculateProgress(
     .map((deck) => {
       const tally = tallies.get(deck.id)!;
       let fresh = 0;
-      for (const card of queues.get(deck.id) ?? []) if (card.state === "new") fresh++;
+      for (const card of queues.get(deck.id) ?? [])
+        if (card.state === "new") fresh++;
       return { deck, ...tally, newAvailable: Math.min(remainingNew, fresh) };
     })
     .sort((a, b) => {

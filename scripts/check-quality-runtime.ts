@@ -28,6 +28,7 @@ const libraryCard = (id: string): Card => ({ ...card(0), id, front: `Retired ref
 const packs = await loadStarterCards();
 const all = [...packs.values()].flat();
 assert.equal(all.length, starterCardCount);
+assert.equal(new Set(all.map(c => c.front.replace(/\s+/g, " ").trim())).size, all.length, "Duplicate shipped questions");
 for (const deck of curriculum) assert.equal(packs.get(deck.id)?.length, deck.cardCount);
 assert.equal(all.filter(c => c.id.startsWith('a1000000-')).length, 0);
 assert.equal(all.filter(c => isRetiredLibraryId(c.id)).length, 0, 'Retired library cards must not ship');

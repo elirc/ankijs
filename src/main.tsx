@@ -1,3 +1,4 @@
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
@@ -6,9 +7,13 @@ import { App } from "./App";
 import { HomeScreen } from "./features/home/HomeScreen";
 import { curriculumVersionKey, initializeStudyData } from "./db/seed";
 import { db } from "./db/schema";
-import { isSupabaseConfigured, loadSupabaseClient } from "./db/sync/supabaseClient";
+import {
+  isSupabaseConfigured,
+  loadSupabaseClient,
+} from "./db/sync/supabaseClient";
 import { notifyAppUpdate } from "./lib/appUpdate";
 import "./styles.css";
+import "./improvements.css";
 
 const CardEditorScreen = lazy(() =>
   import("./features/cards/CardEditorScreen").then((module) => ({
@@ -70,6 +75,25 @@ function Loading({ children }: { children: React.ReactNode }) {
   );
 }
 
+const LibraryScreen = lazy(() =>
+  import("./features/library/LibraryScreen").then((m) => ({
+    default: m.LibraryScreen,
+  })),
+);
+const MoreScreen = lazy(() =>
+  import("./features/MoreScreen").then((m) => ({ default: m.MoreScreen })),
+);
+const WorkshopScreen = lazy(() =>
+  import("./features/workshop/WorkshopScreen").then((m) => ({
+    default: m.WorkshopScreen,
+  })),
+);
+const PathScreen = lazy(() =>
+  import("./features/paths/PathScreen").then((m) => ({
+    default: m.PathScreen,
+  })),
+);
+
 const fallback = <Loading>Loading…</Loading>;
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
@@ -77,35 +101,160 @@ const root = ReactDOM.createRoot(document.getElementById("root")!);
 function renderApp() {
   root.render(
     <React.StrictMode>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<App />}>
-            <Route index element={<HomeScreen />} />
-            <Route path="dotnet" element={<Suspense fallback={fallback}><DotnetScreen /></Suspense>} />
-            <Route path="capture" element={<Suspense fallback={fallback}><CaptureScreen /></Suspense>} />
-            <Route path="inbox" element={<Suspense fallback={fallback}><InboxScreen /></Suspense>} />
-            <Route path="study" element={<Suspense fallback={fallback}><StudyScreen /></Suspense>} />
-            <Route path="study/:deckId" element={<Suspense fallback={fallback}><StudyScreen /></Suspense>} />
-            <Route path="decks" element={<Suspense fallback={fallback}><DeckListScreen /></Suspense>} />
-            <Route path="decks/:deckId" element={<Suspense fallback={fallback}><DeckDetailScreen /></Suspense>} />
-            <Route path="cards/new" element={<Suspense fallback={fallback}><CardEditorScreen /></Suspense>} />
-            <Route path="cards/:cardId/edit" element={<Suspense fallback={fallback}><CardEditorScreen /></Suspense>} />
-            <Route path="settings" element={<Suspense fallback={fallback}><SettingsScreen /></Suspense>} />
-            <Route path="progress" element={<Suspense fallback={fallback}><ProgressScreen /></Suspense>} />
-            <Route path="practice" element={<Suspense fallback={fallback}><PracticeScreen /></Suspense>} />
-            <Route path="practice/:missionId" element={<Suspense fallback={fallback}><PracticeScreen /></Suspense>} />
-            <Route
-              path="*"
-              element={
-                <div className="empty-panel">
-                  <h1>Page not found.</h1>
-                  <a href="/">Back to home</a>
-                </div>
-              }
-            />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <AppErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<App />}>
+              <Route index element={<HomeScreen />} />
+              <Route
+                path="library"
+                element={
+                  <Suspense fallback={fallback}>
+                    <LibraryScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="more"
+                element={
+                  <Suspense fallback={fallback}>
+                    <MoreScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="workshop/:unitId?"
+                element={
+                  <Suspense fallback={fallback}>
+                    <WorkshopScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="paths/:path?"
+                element={
+                  <Suspense fallback={fallback}>
+                    <PathScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="dotnet"
+                element={
+                  <Suspense fallback={fallback}>
+                    <DotnetScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="capture"
+                element={
+                  <Suspense fallback={fallback}>
+                    <CaptureScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="inbox"
+                element={
+                  <Suspense fallback={fallback}>
+                    <InboxScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="study"
+                element={
+                  <Suspense fallback={fallback}>
+                    <StudyScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="study/:deckId"
+                element={
+                  <Suspense fallback={fallback}>
+                    <StudyScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="decks"
+                element={
+                  <Suspense fallback={fallback}>
+                    <DeckListScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="decks/:deckId"
+                element={
+                  <Suspense fallback={fallback}>
+                    <DeckDetailScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="cards/new"
+                element={
+                  <Suspense fallback={fallback}>
+                    <CardEditorScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="cards/:cardId/edit"
+                element={
+                  <Suspense fallback={fallback}>
+                    <CardEditorScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="settings"
+                element={
+                  <Suspense fallback={fallback}>
+                    <SettingsScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="progress"
+                element={
+                  <Suspense fallback={fallback}>
+                    <ProgressScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="practice"
+                element={
+                  <Suspense fallback={fallback}>
+                    <PracticeScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="practice/:missionId"
+                element={
+                  <Suspense fallback={fallback}>
+                    <PracticeScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="*"
+                element={
+                  <div className="empty-panel">
+                    <h1>Page not found.</h1>
+                    <a href="/">Back to home</a>
+                  </div>
+                }
+              />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AppErrorBoundary>
     </React.StrictMode>,
   );
 }
@@ -140,9 +289,10 @@ async function prepareLibrary(): Promise<void> {
     });
     return;
   }
-  const upgrade = () => initializeStudyData().catch(() => {
-    window.addEventListener("online", upgrade, { once: true });
-  });
+  const upgrade = () =>
+    initializeStudyData().catch(() => {
+      window.addEventListener("online", upgrade, { once: true });
+    });
   void upgrade();
 }
 

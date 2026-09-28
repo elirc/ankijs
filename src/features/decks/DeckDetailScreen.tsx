@@ -1,3 +1,8 @@
+import {
+  getLearningSettings,
+  learningDefaults,
+  saveLearningSettings,
+} from "../../db/repos/learningRepo";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -37,6 +42,7 @@ export function DeckDetailScreen() {
   const { deckId = "" } = useParams();
   const navigate = useNavigate();
   const now = useNow();
+  const learning = useLiveQuery(getLearningSettings, [], learningDefaults);
   const [visibleCount, setVisibleCount] = useState(30);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -56,8 +62,7 @@ export function DeckDetailScreen() {
       cards: await searchCards(query, deck.id),
     };
   }, [deckId, query, now.getTime()]);
-  if (data === undefined)
-    return <p className="loading-state">Loading deck</p>;
+  if (data === undefined) return <p className="loading-state">Loading deck</p>;
   if (data === null)
     return (
       <div className="empty-panel">
@@ -92,14 +97,26 @@ export function DeckDetailScreen() {
           <div className="detail-heading">
             <DeckIcon id={deck.id} />
             <div>
-              <div className="eyebrow">
-                {info?.track ?? "Personal deck"}
-              </div>
+              <div className="eyebrow">{info?.track ?? "Personal deck"}</div>
               <h1>{deck.name}</h1>
               <p>{info?.description ?? "Cards you added yourself."}</p>
             </div>
           </div>
           <div className="detail-actions">
+            <Button
+              aria-pressed={learning.favorites.includes(deckId)}
+              onClick={() =>
+                void saveLearningSettings({
+                  favorites: learning.favorites.includes(deckId)
+                    ? learning.favorites.filter((id) => id !== deckId)
+                    : [...learning.favorites, deckId],
+                }).catch(() => setError("Could not save this deck."))
+              }
+            >
+              {learning.favorites.includes(deckId)
+                ? "Unsave deck"
+                : "Save deck"}
+            </Button>
             <Button
               variant="primary"
               icon={Play}
@@ -201,7 +218,9 @@ export function DeckDetailScreen() {
       <section className="content-panel">
         <div className="panel-heading">
           <h2>Cards</h2>
-          <span className="text-xs text-muted">Select a question to show its answer</span>
+          <span className="text-xs text-muted">
+            Select a question to show its answer
+          </span>
         </div>
         {cards.length === 0 ? (
           <div className="empty-panel">

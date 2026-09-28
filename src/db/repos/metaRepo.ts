@@ -1,4 +1,4 @@
-import { db } from '../schema';
+import { db } from "../schema";
 
 export async function getMeta(key: string): Promise<string | undefined> {
   return (await db.sync_meta.get(key))?.value;

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
-import { Inbox } from 'lucide-react';
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { Inbox } from "lucide-react";
 
 export function EmptyState({
   title,
@@ -17,7 +17,9 @@ export function EmptyState({
         <Icon className="size-6" aria-hidden="true" />
       </span>
       <p className="max-w-md text-muted">{title}</p>
-      {action ? <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div> : null}
+      {action ? (
+        <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>
+      ) : null}
     </div>
   );
 }

@@ -20,7 +20,9 @@ describe("AnswerExplorer", () => {
     await user.selectOptions(screen.getByLabelText("Explanation style"), "2");
     expect(screen.getByText("What is two plus three?")).toBeInTheDocument();
     expect(screen.queryByText("The solution is five.")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Check my answer" }));
+    await user.click(
+      screen.getByRole("button", { name: "Show sample solution" }),
+    );
     expect(screen.getByText("The solution is five.")).toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "Back to first explanation" }),

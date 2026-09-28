@@ -4,14 +4,22 @@ import { db, resetDatabaseForTests } from "../schema";
 import { createDeck } from "./deckRepo";
 import { createCard } from "./cardRepo";
 import { exportData, importData } from "./dataRepo";
-import { canCompleteMission, emptyPracticeEntry, listPracticeEntries, savePracticeEntry } from "./practiceRepo";
+import {
+  canCompleteMission,
+  emptyPracticeEntry,
+  listPracticeEntries,
+  savePracticeEntry,
+} from "./practiceRepo";
 
 const mission = engineeringMissions[0];
 const evidence = () => ({
   ...emptyPracticeEntry(mission.id),
-  outcome: "Traced note capture through the repository into IndexedDB. See commit abc123.",
-  verification: "Disabled the network, saved a note, and reloaded. The note remained.",
-  tradeoff: "Local persistence works offline; automatic sync remains a separate concern.",
+  outcome:
+    "Traced note capture through the repository into IndexedDB. See commit abc123.",
+  verification:
+    "Disabled the network, saved a note, and reloaded. The note remained.",
+  tradeoff:
+    "Local persistence works offline; automatic sync remains a separate concern.",
   checked: mission.checks.map((check) => check.id),
 });
 
@@ -20,20 +28,33 @@ describe("engineering practice storage and backup", () => {
 
   it("requires actual evidence and every mission check before completion", async () => {
     expect(canCompleteMission(emptyPracticeEntry(mission.id))).toBe(false);
-    expect(canCompleteMission({ ...evidence(), verification: "  " })).toBe(false);
-    expect(canCompleteMission({ ...evidence(), checked: [mission.checks[0].id] })).toBe(false);
+    expect(canCompleteMission({ ...evidence(), verification: "  " })).toBe(
+      false,
+    );
+    expect(
+      canCompleteMission({ ...evidence(), checked: [mission.checks[0].id] }),
+    ).toBe(false);
     expect(canCompleteMission(evidence())).toBe(true);
-    await expect(savePracticeEntry({ ...emptyPracticeEntry(mission.id), completed: true })).rejects.toThrow(/evidence/);
+    await expect(
+      savePracticeEntry({ ...emptyPracticeEntry(mission.id), completed: true }),
+    ).rejects.toThrow(/evidence/);
     expect(await listPracticeEntries()).toEqual([]);
   });
 
-  it("saves drafts and completion without creating card reviews or sync work", async () => {
-    await savePracticeEntry({ ...emptyPracticeEntry(mission.id), outcome: "Work in progress" });
+  it("saves drafts and completion as one synced journal entry without card reviews", async () => {
+    await savePracticeEntry({
+      ...emptyPracticeEntry(mission.id),
+      outcome: "Work in progress",
+    });
     expect((await listPracticeEntries())[0].completed).toBe(false);
     await savePracticeEntry({ ...evidence(), completed: true });
-    expect((await listPracticeEntries())[0]).toMatchObject({ completed: true, outcome: evidence().outcome });
+    expect((await listPracticeEntries())[0]).toMatchObject({
+      completed: true,
+      outcome: evidence().outcome,
+    });
     expect(await db.review_logs.count()).toBe(0);
-    expect(await db.outbox.count()).toBe(0);
+    // Both saves coalesce into a single user_state sync row for this mission.
+    expect(await db.outbox.count()).toBe(1);
   });
 
   it("round-trips the journal with the normal backup and preserves newer local edits", async () => {
@@ -42,14 +63,24 @@ describe("engineering practice storage and backup", () => {
     await resetDatabaseForTests();
     await importData(backup);
     expect(await listPracticeEntries()).toEqual(backup.practice);
-    const reopened = await savePracticeEntry({ ...evidence(), outcome: "A newer work sample", completed: false });
+    const reopened = await savePracticeEntry({
+      ...evidence(),
+      outcome: "A newer work sample",
+      completed: false,
+    });
     await importData(backup);
     expect(await listPracticeEntries()).toEqual([reopened]);
   });
 
   it("exports the latest queued edit even when backup starts while saves are pending", async () => {
-    const first = savePracticeEntry({ ...evidence(), outcome: "First snapshot" });
-    const last = savePracticeEntry({ ...evidence(), outcome: "Final snapshot" });
+    const first = savePracticeEntry({
+      ...evidence(),
+      outcome: "First snapshot",
+    });
+    const last = savePracticeEntry({
+      ...evidence(),
+      outcome: "Final snapshot",
+    });
     const backup = await exportData();
     await Promise.all([first, last]);
     expect(backup.practice?.[0].outcome).toBe("Final snapshot");
@@ -68,9 +99,24 @@ describe("engineering practice storage and backup", () => {
     await savePracticeEntry(evidence());
     const backup = await exportData();
     await resetDatabaseForTests();
-    await expect(importData({ ...backup, practice: [...backup.practice!, ...backup.practice!] })).rejects.toThrow(/Invalid practice/);
-    await expect(importData({ ...backup, practice: [{ ...backup.practice![0], checked: [null] }] })).rejects.toThrow(/Invalid practice/);
-    await expect(importData({ ...backup, practice: [{ ...backup.practice![0], outcome: "x".repeat(12001) }] })).rejects.toThrow(/Invalid practice/);
+    await expect(
+      importData({
+        ...backup,
+        practice: [...backup.practice!, ...backup.practice!],
+      }),
+    ).rejects.toThrow(/Invalid practice/);
+    await expect(
+      importData({
+        ...backup,
+        practice: [{ ...backup.practice![0], checked: [null] }],
+      }),
+    ).rejects.toThrow(/Invalid practice/);
+    await expect(
+      importData({
+        ...backup,
+        practice: [{ ...backup.practice![0], outcome: "x".repeat(12001) }],
+      }),
+    ).rejects.toThrow(/Invalid practice/);
     expect(await db.decks.count()).toBe(0);
     expect(await listPracticeEntries()).toEqual([]);
   });
@@ -84,7 +130,8 @@ describe("engineering practice storage and backup", () => {
     await resetDatabaseForTests();
     const put = db.sync_meta.put.bind(db.sync_meta);
     vi.spyOn(db.sync_meta, "put").mockImplementation((row) => {
-      if (row.key === "daily_goal") throw new Error("Simulated late write failure");
+      if (row.key === "daily_goal")
+        throw new Error("Simulated late write failure");
       return put(row);
     });
     await expect(importData(backup)).rejects.toThrow(/late write failure/);
@@ -95,10 +142,14 @@ describe("engineering practice storage and backup", () => {
   });
 
   it("keeps stable mission identities and distinct, actionable review criteria", () => {
-    expect(new Set(engineeringMissions.map((item) => item.id)).size).toBe(engineeringMissions.length);
+    expect(new Set(engineeringMissions.map((item) => item.id)).size).toBe(
+      engineeringMissions.length,
+    );
     for (const item of engineeringMissions) {
       expect(item.steps.length).toBeGreaterThanOrEqual(3);
-      expect(new Set(item.checks.map((check) => check.id)).size).toBe(item.checks.length);
+      expect(new Set(item.checks.map((check) => check.id)).size).toBe(
+        item.checks.length,
+      );
       expect(item.checks.length).toBeGreaterThanOrEqual(3);
     }
   });

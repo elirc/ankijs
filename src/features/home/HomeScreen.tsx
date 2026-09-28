@@ -1,3 +1,12 @@
+import { DataProtection } from "../../components/DataProtection";
+import { GoalPicker } from "../../components/GoalPicker";
+import {
+  getLearningSettings,
+  learningDefaults,
+  studyLink,
+} from "../../db/repos/learningRepo";
+import { loadStudy } from "../../db/repos/studyRepo";
+import type { Track } from "../../data/curriculum";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -24,8 +33,12 @@ import { engineeringMissions } from "../../data/engineering-missions";
 import { useNow } from "../../lib/useNow";
 import { CreateDeckDialog } from "../decks/CreateDeckDialog";
 
-const startHereCount = curriculum.filter((deck) => deck.track === "Start here").length;
-const keepGoingCount = curriculum.filter((deck) => deck.track === "Keep going").length;
+const startHereCount = curriculum.filter(
+  (deck) => deck.track === "Start here",
+).length;
+const keepGoingCount = curriculum.filter(
+  (deck) => deck.track === "Keep going",
+).length;
 
 const BUILD_TRACK = "Build real apps";
 
@@ -43,7 +56,7 @@ function buildRealAppsPath(): Pathway | null {
   if (decks.length === 0) return null;
   const cards = decks.reduce((total, deck) => total + deck.cardCount, 0);
   return {
-    to: `/decks?track=${encodeURIComponent(BUILD_TRACK)}`,
+    to: `/paths/${encodeURIComponent(BUILD_TRACK)}`,
     icon: Layers,
     label: BUILD_TRACK,
     text: `${decks.length} ${decks.length === 1 ? "deck" : "decks"} · ${cards} ${cards === 1 ? "card" : "cards"}. Apply what you learned by building small, working apps end to end.`,
@@ -53,13 +66,13 @@ function buildRealAppsPath(): Pathway | null {
 
 const basePaths: Pathway[] = [
   {
-    to: "/decks?track=Start+here",
+    to: "/paths/Start%20here",
     icon: BookOpen,
     label: "Start here",
     text: `${startHereCount} beginner decks. Each card has a plain-English answer, a worked example, an analogy, a common mistake, and a practice question.`,
   },
   {
-    to: "/decks?track=Keep+going",
+    to: "/paths/Keep%20going",
     icon: Wrench,
     label: "Keep going",
     text: `${keepGoingCount} decks on TypeScript, Python, debugging, testing, accessibility, APIs, SQL, security, and delivery.`,
@@ -81,6 +94,16 @@ const basePaths: Pathway[] = [
 export function HomeScreen() {
   const navigate = useNavigate();
   const now = useNow();
+  const learning = useLiveQuery(getLearningSettings, [], learningDefaults);
+  const focused = useLiveQuery(
+    () =>
+      loadStudy(
+        undefined,
+        now,
+        learning.path ? (learning.path as Track) : undefined,
+      ),
+    [now.getTime(), learning.path],
+  );
   const data = useLiveQuery(() => getDashboard(now), [now.getTime()]);
   const inboxCount = useLiveQuery(
     async () => (await listInbox()).length,
@@ -97,6 +120,12 @@ export function HomeScreen() {
         Loading your decks
       </div>
     );
+  const sessionReady = focused?.queue.length ?? data.ready;
+  const sessionDue =
+    focused?.queue.filter((card) => card.state !== "new").length ?? data.due;
+  const sessionNew =
+    focused?.queue.filter((card) => card.state === "new").length ??
+    data.newAvailable;
   const buildPath = buildRealAppsPath();
   // Insert after "Keep going" to mirror the Track order.
   const paths = buildPath
@@ -124,25 +153,27 @@ export function HomeScreen() {
           </p>
         </div>
       </div>
+      <GoalPicker />
+      <DataProtection compact />
       <div className="hero-grid">
         <section className="study-hero" aria-labelledby="study-heading">
           <div className="hero-copy">
             <h2 id="study-heading">
-              {data.ready > 0
-                ? `${data.ready} cards ready`
+              {sessionReady > 0
+                ? `${sessionReady} cards ready`
                 : "Nothing due right now"}
             </h2>
             <p>
-              {data.ready > 0 ? (
+              {sessionReady > 0 ? (
                 <>
-                  <strong>{data.due} due</strong> for review and{" "}
-                  <strong>{data.newAvailable} new</strong> cards available.
-                  Choose a session length and start. You can stop at any time.
+                  <strong>{sessionDue} due</strong> for review and{" "}
+                  <strong>{sessionNew} new</strong> cards available. Choose a
+                  session length and start. You can stop at any time.
                 </>
               ) : (
                 <>
-                  Come back when the next review is due, or open a deck to
-                  read its cards.
+                  Come back when the next review is due, or open a deck to read
+                  its cards.
                 </>
               )}
             </p>
@@ -165,15 +196,17 @@ export function HomeScreen() {
             <Button
               className="start-study"
               variant="primary"
-              disabled={data.ready === 0}
-              onClick={() => navigate(`/study?minutes=${minutes}`)}
+              disabled={
+                focused ? focused.queue.length === 0 : sessionReady === 0
+              }
+              onClick={() => navigate(studyLink(learning.path, minutes))}
             >
               <Play size={15} fill="currentColor" />
-              Study now
+              {learning.path ? `Study ${learning.path}` : "Study now"}
               <ArrowRight size={17} />
             </Button>
             <span className="hero-footnote">
-              {data.due} due · {data.newAvailable} new today. Stop anytime.
+              {sessionDue} due · {sessionNew} new today. Stop anytime.
             </span>
           </div>
         </section>
@@ -266,8 +299,7 @@ export function HomeScreen() {
               Decks <span className="count-pill">{data.summaries.length}</span>
             </h2>
             <p>
-              {data.learned} of {data.totalCards} cards are in the review
-              stage.
+              {data.learned} of {data.totalCards} cards are in the review stage.
             </p>
           </div>
           <Link className="text-link" to="/decks">

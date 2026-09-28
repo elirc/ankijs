@@ -1,4 +1,4 @@
-import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 const url: string | undefined = import.meta.env.VITE_SUPABASE_URL;
 const anonKey: string | undefined = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -13,7 +13,7 @@ export function isSupabaseConfigured(): boolean {
 // The Supabase SDK stays out of the startup bundle; most installs never sync.
 export function loadSupabaseClient(): Promise<SupabaseClient | null> {
   if (!url || !anonKey) return Promise.resolve(null);
-  loading ??= import('@supabase/supabase-js')
+  loading ??= import("@supabase/supabase-js")
     .then(({ createClient }) => {
       cachedClient = createClient(url, anonKey, {
         auth: {

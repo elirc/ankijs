@@ -26,19 +26,41 @@ export function loadContentRevisions(): Promise<ContentRevision[]> {
   return revisions;
 }
 
-export const matchesRevision = (card: Card, revision: ContentRevision): boolean =>
+export const matchesRevision = (
+  card: Card,
+  revision: ContentRevision,
+): boolean =>
   (card.front === revision.front && card.back === revision.back) ||
-  revision.previous.some((previous) => previous.front === card.front && previous.back === card.back);
+  revision.previous.some(
+    (previous) => previous.front === card.front && previous.back === card.back,
+  );
 
-export async function reviewedContentUpdates(timestamp: string): Promise<Card[]> {
+export async function reviewedContentUpdates(
+  timestamp: string,
+): Promise<Card[]> {
   // The import is an external promise; waitFor keeps the caller's IDB transaction alive.
-  const active = (await Dexie.waitFor(loadContentRevisions(), 120_000))
-    .filter((revision) => !isRetiredLibraryId(revision.id));
+  const active = (await Dexie.waitFor(loadContentRevisions(), 120_000)).filter(
+    (revision) => !isRetiredLibraryId(revision.id),
+  );
   const cards = await db.cards.bulkGet(active.map((revision) => revision.id));
   return cards.flatMap((card, index) => {
     const revision = active[index];
-    if (!card || card.deleted_at || !revision.previous.some((previous) =>
-      previous.front === card.front && previous.back === card.back)) return [];
-    return [{ ...card, front: revision.front, back: revision.back, content_updated_at: timestamp }];
+    if (
+      !card ||
+      card.deleted_at ||
+      !revision.previous.some(
+        (previous) =>
+          previous.front === card.front && previous.back === card.back,
+      )
+    )
+      return [];
+    return [
+      {
+        ...card,
+        front: revision.front,
+        back: revision.back,
+        content_updated_at: timestamp,
+      },
+    ];
   });
 }

@@ -52,7 +52,7 @@ test("CRUD lessons replace puzzle decks and work offline", async ({ page, contex
   await expect(page.locator(".explanation-body")).toContainText("request key");
   await page.getByLabel("Explanation style").selectOption("4");
   await expect(page.locator(".practice-solution")).toHaveCount(0);
-  await page.getByRole("button", { name: "Check my answer" }).click();
+  await page.getByRole("button", { name: "Show sample solution" }).click();
   await expect(page.locator(".practice-solution")).toContainText("Reuse the same key");
   await page.getByRole("button", { name: /Good/ }).click();
   await expect(page.getByText("2-minute session · 1 reviewed")).toBeVisible();
@@ -144,7 +144,7 @@ test("beginner explanations, practice checks, and review navigation", async ({
   });
   await page.getByLabel("Explanation style").selectOption("4");
   await expect(page.locator(".practice-solution")).toHaveCount(0);
-  await page.getByRole("button", { name: "Check my answer" }).click();
+  await page.getByRole("button", { name: "Show sample solution" }).click();
   await expect(page.locator(".practice-solution")).toBeVisible();
   await page.getByRole("button", { name: "Back to first explanation" }).click();
   await expect(page.getByText("Explanation 1 of 5")).toBeVisible();
@@ -175,11 +175,12 @@ test("beginner explanations, practice checks, and review navigation", async ({
 
 test("practical decks are discoverable, bookmarkable, and teach offline", async ({ page, context }, testInfo) => {
   await page.locator(".pathway-card", { hasText: "Keep going" }).click();
-  await expect(page.getByRole("button", { name: "Keep going", exact: true }))
-    .toHaveAttribute("aria-pressed", "true");
+  await expect(page).toHaveURL(/paths\/Keep%20going/);
   await expect(page.locator(".deck-card")).toHaveCount(10);
   await page.reload();
   await expect(page.locator(".deck-card")).toHaveCount(10);
+  await page.goto("/decks?track=Keep+going");
+  await expect(page.getByRole("button", { name: "Keep going", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByLabel("Search decks").fill("TypeScript");
   await expect(page.locator(".deck-card")).toHaveCount(1);
   await page.locator(".deck-card").click();
@@ -194,7 +195,7 @@ test("practical decks are discoverable, bookmarkable, and teach offline", async 
   await expect(page.locator(".explanation-body")).toContainText("attempts");
   await page.getByLabel("Explanation style").selectOption("4");
   await expect(page.locator(".practice-solution")).toHaveCount(0);
-  await page.getByRole("button", { name: "Check my answer" }).click();
+  await page.getByRole("button", { name: "Show sample solution" }).click();
   await expect(page.locator(".practice-solution")).toContainText("inferred as boolean");
   await page.screenshot({ path: `artifacts/${testInfo.project.name}-practical-lesson.png`, fullPage: true });
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
@@ -257,7 +258,7 @@ test(".NET learning path, scoped reviews, editing, and offline study", async ({ 
   expect((await page.getByRole("button", { name: "Next explanation" }).boundingBox())?.height).toBeGreaterThanOrEqual(44);
   await page.getByLabel("Explanation style").selectOption("4");
   await expect(page.locator(".practice-solution")).toHaveCount(0);
-  await page.getByRole("button", { name: "Check my answer" }).click();
+  await page.getByRole("button", { name: "Show sample solution" }).click();
   await expect(page.locator(".practice-solution")).toBeVisible();
   await page.screenshot({ path: `artifacts/${testInfo.project.name}-dotnet-lesson.png`, fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

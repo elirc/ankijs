@@ -11,7 +11,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run workshop:content
+      - run: npm run workshop:check
+      - run: npm run content:check
+      - run: npm run content:runtime
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e

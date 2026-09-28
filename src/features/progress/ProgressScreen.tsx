@@ -4,6 +4,7 @@ import { ArrowRight, Check, Flame, TrendingUp } from "lucide-react";
 import { getDashboard } from "../../db/repos/dashboardRepo";
 import { DeckIcon } from "../../components/DeckCard";
 import { useNow } from "../../lib/useNow";
+import { LearningDiagnostics } from "../../components/LearningDiagnostics";
 import { PracticeSummary } from "../practice/PracticeSummary";
 export function ProgressScreen() {
   const now = useNow();
@@ -18,6 +19,7 @@ export function ProgressScreen() {
         </div>
       </div>
       <PracticeSummary />
+      <LearningDiagnostics />
       <div className="stats-row">
         <div className="stat-item">
           <span className="stat-icon mint">

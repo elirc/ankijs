@@ -4,7 +4,12 @@ import practicalLessons from "./practical-lessons.json";
 import appliedLessons from "./applied-lessons.json";
 import report from "./content-report.json";
 import { loadStarterCards } from "./curriculum";
-import { DOTNET_TRACK, dotnetDecks, dotnetStages, dotnetStudyUrl } from "./dotnet-path";
+import {
+  DOTNET_TRACK,
+  dotnetDecks,
+  dotnetStages,
+  dotnetStudyUrl,
+} from "./dotnet-path";
 import { parseAnswerPages, teachingLessons } from "../teaching/answers";
 
 describe("C# and .NET web curriculum", () => {
@@ -12,20 +17,43 @@ describe("C# and .NET web curriculum", () => {
     expect(dotnetDecks).toHaveLength(12);
     expect(dotnetStages.flatMap((stage) => stage.decks)).toEqual(dotnetDecks);
     expect(lessons).toHaveLength(96);
-    expect(new Set([...teachingLessons, ...practicalLessons, ...appliedLessons, ...lessons].map((lesson) => lesson.key)).size).toBe(report.teachingLessons);
+    expect(
+      new Set(
+        [
+          ...teachingLessons,
+          ...practicalLessons,
+          ...appliedLessons,
+          ...lessons,
+        ].map((lesson) => lesson.key),
+      ).size,
+    ).toBe(report.teachingLessons);
     const packs = await loadStarterCards();
-    const cards = dotnetDecks.flatMap((deck) => packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)));
+    const cards = dotnetDecks.flatMap((deck) =>
+      packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)),
+    );
     expect(cards).toHaveLength(192);
     expect(cards.length).toBe(report.dotnetCards);
     expect(lessons.length).toBe(report.dotnetLessons);
     dotnetDecks.forEach((deck, index) => {
-      expect(deck.name).toMatch(new RegExp(`^${String(index + 1).padStart(2, "0")}`));
-      expect(packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id))).toHaveLength(16);
+      expect(deck.name).toMatch(
+        new RegExp(`^${String(index + 1).padStart(2, "0")}`),
+      );
+      expect(
+        packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)),
+      ).toHaveLength(16);
       expect(deck.resource.url).toMatch(/^https:\/\/learn.microsoft.com\//);
     });
     for (const lesson of lessons) {
-      expect(lesson.check).not.toMatch(/\b(?:code|function|example) (?:above|below)\b/i);
-      for (const field of [lesson.plain, lesson.example, lesson.analogy, lesson.mistake, lesson.answer]) {
+      expect(lesson.check).not.toMatch(
+        /\b(?:code|function|example) (?:above|below)\b/i,
+      );
+      for (const field of [
+        lesson.plain,
+        lesson.example,
+        lesson.analogy,
+        lesson.mistake,
+        lesson.answer,
+      ]) {
         expect(field.length, lesson.key).toBeGreaterThan(60);
         expect(field).not.toMatch(/TODO|lorem ipsum|Write an example/);
       }

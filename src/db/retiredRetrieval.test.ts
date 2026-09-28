@@ -8,16 +8,34 @@ import { importData } from "./repos/dataRepo";
 import legacyPacks from "../data/section-packs/retrieval-01.json";
 
 const timestamp = "2026-01-01T00:00:00.000Z";
-const deck = { id: legacyPacks[0].id, name: "My custom deck name", user_id: null,
-  new_per_day: 3, created_at: timestamp, updated_at: timestamp, deleted_at: null };
-const fixture = (index: number): Card => ({ ...legacyPacks[0].cards[index], deck_id: deck.id,
-  user_id: null, note_id: null, suspended: false, ...newCardFields(new Date(timestamp)),
-  created_at: timestamp, content_updated_at: timestamp, srs_updated_at: timestamp, deleted_at: null });
+const deck = {
+  id: legacyPacks[0].id,
+  name: "My custom deck name",
+  user_id: null,
+  new_per_day: 3,
+  created_at: timestamp,
+  updated_at: timestamp,
+  deleted_at: null,
+};
+const fixture = (index: number): Card => ({
+  ...legacyPacks[0].cards[index],
+  deck_id: deck.id,
+  user_id: null,
+  note_id: null,
+  suspended: false,
+  ...newCardFields(new Date(timestamp)),
+  created_at: timestamp,
+  content_updated_at: timestamp,
+  srs_updated_at: timestamp,
+  deleted_at: null,
+});
 
 describe("quality retirement", () => {
   afterEach(() => vi.unstubAllGlobals());
   beforeEach(async () => {
-    const { webcrypto } = await vi.importActual<{ webcrypto: Crypto }>("node:crypto");
+    const { webcrypto } = await vi.importActual<{ webcrypto: Crypto }>(
+      "node:crypto",
+    );
     vi.stubGlobal("crypto", webcrypto);
     await resetDatabaseForTests();
   });
@@ -28,7 +46,10 @@ describe("quality retirement", () => {
     const edited = { ...fixture(1), back: "My own explanation" };
     const moved = { ...fixture(2), deck_id: "personal-deck" };
     const deleted = { ...fixture(3), deleted_at: timestamp };
-    const personal = { ...fixture(4), id: "10000000-0000-4000-8000-000000000099" };
+    const personal = {
+      ...fixture(4),
+      id: "10000000-0000-4000-8000-000000000099",
+    };
     await db.cards.bulkAdd([reviewed, edited, moved, deleted, personal]);
     const review = rate(reviewed, 3, new Date());
     await applyReview(review.card, review.log);
@@ -53,7 +74,14 @@ describe("quality retirement", () => {
   it("reapplies retirement to an old backup without removing an edited drill", async () => {
     const old = fixture(0);
     const edited = { ...fixture(1), front: "My revised question" };
-    const backup = { version: 1, exported_at: timestamp, decks: [deck], cards: [old, edited], notes: [], review_logs: [] };
+    const backup = {
+      version: 1,
+      exported_at: timestamp,
+      decks: [deck],
+      cards: [old, edited],
+      notes: [],
+      review_logs: [],
+    };
     await importData(backup);
     expect((await db.cards.get(old.id))?.deleted_at).toBeTruthy();
     expect(await db.cards.get(edited.id)).toEqual(edited);
@@ -66,11 +94,15 @@ describe("quality retirement", () => {
     await db.decks.add(deck);
     const old = fixture(0);
     await db.cards.add(old);
-    const failure = vi.spyOn(db.outbox, "bulkPut").mockRejectedValue(new Error("queue failed"));
+    const failure = vi
+      .spyOn(db.outbox, "bulkPut")
+      .mockRejectedValue(new Error("queue failed"));
     try {
       await expect(initializeStudyData()).rejects.toThrow("queue failed");
       expect(await db.cards.toArray()).toEqual([old]);
       expect(await db.sync_meta.get(curriculumVersionKey)).toBeUndefined();
-    } finally { failure.mockRestore(); }
+    } finally {
+      failure.mockRestore();
+    }
   }, 120_000);
 });

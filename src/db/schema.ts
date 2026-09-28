@@ -64,7 +64,14 @@ export interface ReviewLog {
   reviewed_at: ISODate;
 }
 
-export type SyncTableName = "decks" | "cards" | "notes" | "review_logs";
+export interface UserState {
+  id: string;
+  user_id: string | null;
+  payload: string;
+  updated_at: string;
+}
+export type SyncTableName =
+  "decks" | "cards" | "notes" | "review_logs" | "user_state";
 
 export interface OutboxEntry {
   id?: number;
@@ -85,6 +92,7 @@ export class RecallDB extends Dexie {
   review_logs!: Table<ReviewLog, string>;
   outbox!: Table<OutboxEntry, number>;
   sync_meta!: Table<SyncMeta, string>;
+  user_state!: Table<UserState, string>;
 
   constructor() {
     super("recall");
@@ -95,6 +103,10 @@ export class RecallDB extends Dexie {
       review_logs: "id, card_id, reviewed_at",
       outbox: "++id, [table_name+row_id]",
       sync_meta: "key",
+    });
+    this.version(2).stores({ user_state: "id, user_id, updated_at" });
+    this.version(3).stores({
+      review_logs: "id, card_id, reviewed_at, state_before",
     });
   }
 }

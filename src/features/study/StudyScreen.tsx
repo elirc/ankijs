@@ -12,7 +12,12 @@ import {
   PartyPopper,
   RotateCcw,
 } from "lucide-react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { Button } from "../../components/Button";
 import { MarkdownView } from "../../components/MarkdownView";
 import { AnswerExplorer } from "../../components/AnswerExplorer";
@@ -25,6 +30,7 @@ import {
 import { loadStudy } from "../../db/repos/studyRepo";
 import type { Card } from "../../db/schema";
 import { rate } from "../../srs/scheduler";
+import { RelatedPractice } from "../../components/RelatedPractice";
 import { RatingBar } from "./RatingBar";
 import { DOTNET_TRACK } from "../../data/dotnet-path";
 import { curriculum, getDeckInfo, type Track } from "../../data/curriculum";
@@ -38,7 +44,10 @@ function withCardFirst(next: StudyData, cardId: string | undefined): StudyData {
   if (!cardId || next.queue[0]?.id === cardId) return next;
   const card = next.queue.find((item) => item.id === cardId);
   if (!card) return next;
-  return { ...next, queue: [card, ...next.queue.filter((item) => item.id !== cardId)] };
+  return {
+    ...next,
+    queue: [card, ...next.queue.filter((item) => item.id !== cardId)],
+  };
 }
 
 interface UndoSnapshot {
@@ -54,8 +63,12 @@ export function StudyScreen() {
   const location = useLocation();
   const trackParam = params.get("track");
   const track =
-    trackParam && STUDY_TRACKS.has(trackParam) ? (trackParam as Track) : undefined;
-  const isDotnet = track === DOTNET_TRACK || (deckId && getDeckInfo(deckId)?.track === DOTNET_TRACK);
+    trackParam && STUDY_TRACKS.has(trackParam)
+      ? (trackParam as Track)
+      : undefined;
+  const isDotnet =
+    track === DOTNET_TRACK ||
+    (deckId && getDeckInfo(deckId)?.track === DOTNET_TRACK);
   const backTo = isDotnet ? "/dotnet" : "/";
   const requestedMinutes = Number(params.get("minutes"));
   const minutes = [2, 5, 10].includes(requestedMinutes) ? requestedMinutes : 0;
@@ -90,13 +103,15 @@ export function StudyScreen() {
         : 0;
 
   function visibleElapsedMs(now = Date.now()) {
-    const hiddenNow = hiddenSince.current === null ? 0 : now - hiddenSince.current;
+    const hiddenNow =
+      hiddenSince.current === null ? 0 : now - hiddenSince.current;
     return Math.max(0, now - start.current - hiddenMs.current - hiddenNow);
   }
   function restartClock() {
     start.current = Date.now();
     hiddenMs.current = 0;
-    hiddenSince.current = document.visibilityState === "hidden" ? Date.now() : null;
+    hiddenSince.current =
+      document.visibilityState === "hidden" ? Date.now() : null;
   }
 
   useEffect(() => {
@@ -117,15 +132,23 @@ export function StudyScreen() {
       const revision = writeGeneration.current;
       try {
         const next = await loadStudy(deckId, new Date(), track);
-        if (active && generation === routeGeneration.current &&
-          revision === writeGeneration.current && !busy.current) {
+        if (
+          active &&
+          generation === routeGeneration.current &&
+          revision === writeGeneration.current &&
+          !busy.current
+        ) {
           // Keep the card being read in front so a newly due card never swaps
           // out the question (or its revealed answer) mid-thought.
           setData((previous) => withCardFirst(next, previous?.queue[0]?.id));
           setError("");
         }
       } catch {
-        if (active && generation === routeGeneration.current && revision === writeGeneration.current)
+        if (
+          active &&
+          generation === routeGeneration.current &&
+          revision === writeGeneration.current
+        )
           setError(
             "Could not load your cards. Please reopen this study session.",
           );
@@ -204,9 +227,10 @@ export function StudyScreen() {
       if (minutes > 0 && visibleElapsedMs() >= minutes * 60_000)
         setFinished(true);
     } catch {
-      if (generation === routeGeneration.current) setError(
-        "We could not finish this review. Your saved progress is safe. Please retry.",
-      );
+      if (generation === routeGeneration.current)
+        setError(
+          "We could not finish this review. Your saved progress is safe. Please retry.",
+        );
     } finally {
       finishWrite(generation);
     }
@@ -361,7 +385,11 @@ export function StudyScreen() {
           </p>
         )}
         <div className="completion-actions">
-          <Button icon={Home} variant="primary" onClick={() => navigate(backTo)}>
+          <Button
+            icon={Home}
+            variant="primary"
+            onClick={() => navigate(backTo)}
+          >
             {isDotnet ? "Back to .NET path" : "Back to home"}
           </Button>
           {finished && current && (
@@ -494,6 +522,7 @@ export function StudyScreen() {
           </Button>
         )}
       </div>
+      {revealed && <RelatedPractice card={current} />}
       <div className="study-toolbar">
         <button
           aria-label="Undo"

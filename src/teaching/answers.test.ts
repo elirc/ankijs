@@ -32,9 +32,14 @@ describe("beginner explanations", () => {
   });
 
   it("does not suggest retired algorithm teaching", () => {
-    expect(findTeachingLesson("Explain Two Sum and binary search", "A puzzle")).toBeUndefined();
-    expect(teachingLessons.some((lesson) =>
-      ["pairs", "big-o", "binary-search", "recursion"].includes(lesson.key))).toBe(false);
+    expect(
+      findTeachingLesson("Explain Two Sum and binary search", "A puzzle"),
+    ).toBeUndefined();
+    expect(
+      teachingLessons.some((lesson) =>
+        ["pairs", "big-o", "binary-search", "recursion"].includes(lesson.key),
+      ),
+    ).toBe(false);
   });
 
   it("keeps the actual missing code and attribution when adding background teaching", () => {
@@ -101,7 +106,10 @@ describe("beginner explanations", () => {
     const allCards = beginnerDecks.flatMap((d) => packs.get(d.id)!);
     expect(allCards).toHaveLength(
       160 +
-        beginnerDecks.reduce((total, d) => total + sectionAdditionCount(d.id), 0),
+        beginnerDecks.reduce(
+          (total, d) => total + sectionAdditionCount(d.id),
+          0,
+        ),
     );
     const cards = allCards.filter((card) => !expansionIds.has(card.id));
     expect(cards).toHaveLength(160);

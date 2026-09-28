@@ -15,17 +15,31 @@ export const installTimestamp = "2026-01-01T00:00:00.000Z";
 export async function unchangedRetiredLibraryCards(): Promise<Card[]> {
   const candidates: Card[] = [];
   for (const prefix of retiredLibraryPrefixes)
-    candidates.push(...await db.cards.where(":id").between(prefix, `${prefix}￿`)
-      .filter((card) => !card.deleted_at).toArray());
+    candidates.push(
+      ...(await db.cards
+        .where(":id")
+        .between(prefix, `${prefix}￿`)
+        .filter((card) => !card.deleted_at)
+        .toArray()),
+    );
   if (!candidates.length) return [];
-  const unchanged = candidates.filter((card) => card.content_updated_at === installTimestamp);
-  const edited = candidates.filter((card) => card.content_updated_at !== installTimestamp);
+  const unchanged = candidates.filter(
+    (card) => card.content_updated_at === installTimestamp,
+  );
+  const edited = candidates.filter(
+    (card) => card.content_updated_at !== installTimestamp,
+  );
   if (!edited.length) return unchanged;
-  const revisions = new Map((await Dexie.waitFor(loadContentRevisions(), 120_000))
-    .filter((revision) => isRetiredLibraryId(revision.id))
-    .map((revision) => [revision.id, revision]));
-  return [...unchanged, ...edited.filter((card) => {
-    const revision = revisions.get(card.id);
-    return revision ? matchesRevision(card, revision) : false;
-  })];
+  const revisions = new Map(
+    (await Dexie.waitFor(loadContentRevisions(), 120_000))
+      .filter((revision) => isRetiredLibraryId(revision.id))
+      .map((revision) => [revision.id, revision]),
+  );
+  return [
+    ...unchanged,
+    ...edited.filter((card) => {
+      const revision = revisions.get(card.id);
+      return revision ? matchesRevision(card, revision) : false;
+    }),
+  ];
 }

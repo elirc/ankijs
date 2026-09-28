@@ -1,8 +1,20 @@
+import { workshopUnits, workshopGroups } from "./workshop";
 import expandedCatalog from "./expanded-catalog.json";
-import { loadSectionExpansion, sectionAdditionCount } from "./section-expansion";
+import {
+  loadSectionExpansion,
+  sectionAdditionCount,
+} from "./section-expansion";
 
 export type Track =
-  "Start here" | "Keep going" | "Build real apps" | "C# & .NET" | "Foundations" | "Frontend" | "Backend" | "Practice";
+  | "Start here"
+  | "Keep going"
+  | "Build real apps"
+  | "C# & .NET"
+  | "Foundations"
+  | "Frontend"
+  | "Backend"
+  | "Practice"
+  | "Workshop";
 export interface StarterDeck {
   id: string;
   name: string;
@@ -48,7 +60,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "What does a closure remember?",
-        "**Access to the outer variables themselves, not a copy of their values.** A function keeps its enclosing scope alive, so it sees the variable's *current* value when it runs.\n```js\nlet count = 1;\nconst read = () => count;\ncount = 2;\nconsole.log(read()); // 2\n```\nThis is how event handlers and callbacks \"remember\" data after the outer function has returned.",
+        '**Access to the outer variables themselves, not a copy of their values.** A function keeps its enclosing scope alive, so it sees the variable\'s *current* value when it runs.\n```js\nlet count = 1;\nconst read = () => count;\ncount = 2;\nconsole.log(read()); // 2\n```\nThis is how event handlers and callbacks "remember" data after the outer function has returned.',
       ],
       [
         "What is the difference between `unknown` and `any`?",
@@ -164,7 +176,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "A button contains only a trash icon. What is missing?",
-        "**An accessible name**, e.g. `<button aria-label=\"Delete card\">`. Screen readers otherwise announce just \"button\". Hide the decorative icon with `aria-hidden=\"true\"` and keep the tap target large (about 44×44 px).",
+        '**An accessible name**, e.g. `<button aria-label="Delete card">`. Screen readers otherwise announce just "button". Hide the decorative icon with `aria-hidden="true"` and keep the tap target large (about 44×44 px).',
       ],
       [
         "Why use a native `<button>` instead of a clickable `<div>`?",
@@ -361,7 +373,7 @@ export const originalCurriculum: StarterDeck[] = [
       ],
       [
         "401 versus 403: what is the useful distinction?",
-        "**401 Unauthorized** means \"we don't know who you are\": credentials are missing, invalid, or expired, so log in again. **403 Forbidden** means \"we know who you are, but you're not allowed\": logging in again as the same user won't help.",
+        '**401 Unauthorized** means "we don\'t know who you are": credentials are missing, invalid, or expired, so log in again. **403 Forbidden** means "we know who you are, but you\'re not allowed": logging in again as the same user won\'t help.',
       ],
       [
         "What does HTTP method idempotency mean?",
@@ -588,7 +600,19 @@ export const curriculum: DeckInfo[] = [
     cardCount: cards.length + sectionAdditionCount(info.id),
   })),
   ...(expandedCatalog as DeckInfo[]).map((deck) => ({
-    ...deck, cardCount: deck.cardCount + sectionAdditionCount(deck.id),
+    ...deck,
+    cardCount: deck.cardCount + sectionAdditionCount(deck.id),
+  })),
+  ...workshopGroups.map((group): DeckInfo => ({
+    id: workshopUnits.find((u) => u.group === group)!.deckId,
+    name: group + " · Workshop",
+    description: "Apply, verify and explain " + group.toLowerCase() + ".",
+    track: "Workshop",
+    icon: "bug",
+    color: "mint",
+    topics: [group],
+    resource: { label: "Open guided workshop", url: "/workshop" },
+    cardCount: workshopUnits.filter((u) => u.group === group).length * 2,
   })),
 ];
 const deckInfoById = new Map(curriculum.map((deck) => [deck.id, deck]));
@@ -608,21 +632,39 @@ export interface StarterCard {
 export async function loadStarterCards(): Promise<Map<string, StarterCard[]>> {
   // Keep the expanded content out of the application shell; load it only for installation.
   const expanded = (await import("./expanded-cards.json")).default;
-  const entries: [string, StarterCard[]][] = originalCurriculum.map(
-    (deck) => [
-      deck.id,
-      deck.cards.map(([front, back], index) => ({
-        id: `b0000000-0000-4000-8000-${String(Number(deck.id.slice(-12)) * 1000 + index + 1).padStart(12, "0")}`,
-        front,
-        back,
-      })),
-    ],
-  );
+  const entries: [string, StarterCard[]][] = originalCurriculum.map((deck) => [
+    deck.id,
+    deck.cards.map(([front, back], index) => ({
+      id: `b0000000-0000-4000-8000-${String(Number(deck.id.slice(-12)) * 1000 + index + 1).padStart(12, "0")}`,
+      front,
+      back,
+    })),
+  ]);
   const content = new Map([
     ...entries,
     ...expanded.map((deck) => [deck.id, deck.cards] as [string, StarterCard[]]),
   ]);
   for (const pack of await loadSectionExpansion())
     content.set(pack.id, [...(content.get(pack.id) ?? []), ...pack.cards]);
+  for (const unit of workshopUnits) {
+    const credit =
+      "\n\nFurther reading: " +
+      unit.sources.map((url) => `[Official reference](${url})`).join(" · ");
+    content.set(unit.deckId, [
+      ...(content.get(unit.deckId) ?? []),
+      { id: unit.cardIds[0], front: unit.question, back: unit.answer + credit },
+      {
+        id: unit.cardIds[1],
+        front:
+          unit.evidence +
+          "\n\nWhat would you change, and how would you verify it?",
+        back:
+          unit.solution +
+          "\n\n" +
+          unit.rubric.map((x) => "- " + x).join("\n") +
+          credit,
+      },
+    ]);
+  }
   return content;
 }

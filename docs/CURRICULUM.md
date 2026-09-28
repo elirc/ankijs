@@ -1,3 +1,7 @@
+# Current library: 3,179 cards across 90 decks
+
+The v17 core below retains its 3,103 cards and 83 decks. The guided workshop adds 76 cards across seven decks without changing existing card identities or progress. See [the full workshop inventory](WORKSHOP.md) for 38 supplied units and both capstones.
+
 # Recall curriculum
 
 The current v17 library contains 3,103 cards across 83 decks: 2,959 retained base cards plus 144 authored scenarios. It includes 712 guided lesson cards across 356 lessons, alongside 48 hands-on engineering missions. Version 15 retired the generated source-derived library added in curriculum versions 12 through 14; [the release notes](RELEASE.md) record what that does to an existing installation. The automatic retrieval layer remains retired as well; [the earlier quality review](CONTENT-REVIEW.md) documents that decision.
@@ -116,3 +120,16 @@ Source filtering happens after assigning the original deck part boundaries. Nati
 ## Historical retrieval variation provenance
 
 Each generated answer is extracted from its own existing lesson. Code restoration keeps the full surrounding example; output questions use results explicitly documented by the source; explanation prompts hide a bounded concept or phrase. All cards retain the existing no-puzzles scope and source credits. The family index connects variations to original cards without changing the database schema, so backup and sync retain the relationship through stable IDs.
+
+
+## Workshop decks
+
+| Deck | Cards | Supplied units |
+|---|---:|---:|
+| Capstones | 4 | 2 |
+| Debugging | 12 | 6 |
+| Code review | 12 | 6 |
+| SQL concurrency | 12 | 6 |
+| Integrations | 12 | 6 |
+| Operations | 12 | 6 |
+| AI-assisted engineering | 12 | 6 |

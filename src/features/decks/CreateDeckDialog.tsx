@@ -15,10 +15,7 @@ export function CreateDeckDialog({
   const [error, setError] = useState("");
   const navigate = useNavigate();
   return (
-    <Modal
-      title={deck ? "Rename deck" : "New deck"}
-      onClose={onClose}
-    >
+    <Modal title={deck ? "Rename deck" : "New deck"} onClose={onClose}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();

@@ -10,8 +10,17 @@ import { CreateDeckDialog } from "./CreateDeckDialog";
 import { useNow } from "../../lib/useNow";
 
 const filters = [
-  "All decks", "Start here", "Keep going", "Build real apps", "C# & .NET", "Foundations", "Frontend",
-  "Backend", "Practice", "Personal",
+  "All decks",
+  "Start here",
+  "Keep going",
+  "Build real apps",
+  "C# & .NET",
+  "Foundations",
+  "Frontend",
+  "Backend",
+  "Practice",
+  "Workshop",
+  "Personal",
 ];
 
 export function DeckListScreen() {
@@ -19,20 +28,30 @@ export function DeckListScreen() {
   const now = useNow();
   const data = useLiveQuery(() => getDashboard(now), [now.getTime()]);
   const query = params.get("q") ?? "";
-  const setQuery = (value: string) => setParams((current) => {
-    const next = new URLSearchParams(current);
-    if (value) next.set("q", value);
-    else next.delete("q");
-    return next;
-  }, { replace: true });
+  const setQuery = (value: string) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set("q", value);
+        else next.delete("q");
+        return next;
+      },
+      { replace: true },
+    );
   const requestedTrack = params.get("track") ?? "All decks";
-  const filter = filters.includes(requestedTrack) ? requestedTrack : "All decks";
-  const setFilter = (value: string) => setParams((current) => {
-    const next = new URLSearchParams(current);
-    if (value === "All decks") next.delete("track");
-    else next.set("track", value);
-    return next;
-  }, { replace: true });
+  const filter = filters.includes(requestedTrack)
+    ? requestedTrack
+    : "All decks";
+  const setFilter = (value: string) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value === "All decks") next.delete("track");
+        else next.set("track", value);
+        return next;
+      },
+      { replace: true },
+    );
   const [creating, setCreating] = useState(false);
   if (!data) return <p className="loading-state">Loading decks</p>;
   const rows = data.summaries.filter(
@@ -76,9 +95,19 @@ export function DeckListScreen() {
           </button>
         ))}
       </div>
-      {filter === "C# & .NET" && <Link to="/dotnet" className="next-step-link">
-        Open the C# & .NET path for these decks in order
-      </Link>}
+      <Link className="text-link" to="/library">
+        Search all cards, saved decks and difficult topics
+      </Link>
+      {filter !== "All decks" && filter !== "Personal" && (
+        <Link className="text-link" to={"/paths/" + encodeURIComponent(filter)}>
+          Open the ordered learning path
+        </Link>
+      )}
+      {filter === "C# & .NET" && (
+        <Link to="/dotnet" className="next-step-link">
+          Open the C# & .NET path for these decks in order
+        </Link>
+      )}
       {filter !== "All decks" && filter !== "Personal" && (
         <Link
           to={`/study?track=${encodeURIComponent(filter)}&minutes=5`}

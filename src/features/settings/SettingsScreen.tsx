@@ -24,7 +24,7 @@ import {
   signOut,
   subscribeAuth,
 } from "../../db/sync/auth";
-import { syncNow } from "../../db/sync/engine";
+import { syncNow, getSyncState } from "../../db/sync/engine";
 import { getSupabaseClient } from "../../db/sync/supabaseClient";
 import { localDateStamp, relativeAge } from "../../lib/dates";
 import { installStarterDecks } from "../../db/seed";
@@ -34,6 +34,10 @@ import {
 } from "../../db/repos/studyRepo";
 import { defaultStudyPreferences } from "../../srs/preferences";
 import { starterCardCount } from "../../data/curriculum";
+
+import { DataProtection } from "../../components/DataProtection";
+import { ReadingPreferences } from "../../components/ReadingPreferences";
+import { GoalPicker } from "../../components/GoalPicker";
 
 interface InstallPrompt extends Event {
   prompt(): Promise<void>;
@@ -74,9 +78,13 @@ export function SettingsScreen() {
       setInstalled(true);
       setInstallPrompt(null);
     };
+    const preferenceError = () =>
+      setMessage("Could not save reading preferences. Please try again.");
+    window.addEventListener("recall:preference-error", preferenceError);
     window.addEventListener("beforeinstallprompt", prompt);
     window.addEventListener("appinstalled", done);
     return () => {
+      window.removeEventListener("recall:preference-error", preferenceError);
       window.removeEventListener("beforeinstallprompt", prompt);
       window.removeEventListener("appinstalled", done);
     };
@@ -107,7 +115,9 @@ export function SettingsScreen() {
     await perform(async () => {
       const maxBytes = text ? 20_000_000 : 100_000_000;
       if (file.size > maxBytes)
-        throw new Error(`Please choose a file smaller than ${maxBytes / 1_000_000} MB.`);
+        throw new Error(
+          `Please choose a file smaller than ${maxBytes / 1_000_000} MB.`,
+        );
       setMessage(text ? "Importing cards…" : "Restoring backup…");
       const contents = await file.text();
       if (text) {
@@ -134,6 +144,9 @@ export function SettingsScreen() {
           {message}
         </p>
       )}
+      <GoalPicker />
+      <ReadingPreferences />
+      <DataProtection />
       <section className="content-panel settings-section">
         <h2>Daily study</h2>
         <p>
@@ -187,7 +200,8 @@ export function SettingsScreen() {
         <p>
           Start with 5–10 new cards a day. Each deck’s own limit also applies.
           Due reviews come first and never count against this allowance. Related
-          new exercises revisit the same idea after 1 day, then 3 days, then 7 days. Due reviews keep their own schedule.
+          new exercises revisit the same idea after 1 day, then 3 days, then 7
+          days. Due reviews keep their own schedule.
         </p>
         <label className="setting-label">
           Target retention
@@ -275,8 +289,9 @@ export function SettingsScreen() {
       <section className="content-panel settings-section">
         <h2>Backup and restore</h2>
         <p>
-          Export all decks, cards, notes, review history, and your practice journal. Import a Recall
-          backup to restore or merge progress on another device.
+          Export all decks, cards, notes, review history, and your practice
+          journal. Import a Recall backup to restore or merge progress on
+          another device.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -297,7 +312,8 @@ export function SettingsScreen() {
                 anchor.click();
                 anchor.remove();
                 window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-                return "Backup downloaded. Keep it somewhere safe.";
+                await setMeta("last_backup_at", backup.exported_at);
+                return "Backup download requested. Check that the file was saved, and keep it somewhere safe.";
               })
             }
           >
@@ -354,6 +370,13 @@ export function SettingsScreen() {
       </section>
       <section className="content-panel settings-section">
         <h2>Sync between devices</h2>
+        <p>
+          Sync includes cards, notes, review history, practice journals, reading
+          preferences, and learning goals. Undone reviews are revoked on other
+          updated devices. Install server migration 0003 before enabling this
+          version. Each browser profile stays bound to its first sync account;
+          use a separate profile for another account.
+        </p>
         {!configured ? (
           <>
             <p>
@@ -390,6 +413,10 @@ export function SettingsScreen() {
                   onClick={() =>
                     void perform(async () => {
                       await syncNow();
+                      if (getSyncState().phase === "error")
+                        throw new Error(
+                          getSyncState().message ?? "Sync failed",
+                        );
                       return "Sync check complete.";
                     })
                   }
@@ -452,9 +479,7 @@ export function SettingsScreen() {
         </a>
       </p>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-        <span>
-          Recall · {starterCardCount} bundled cards
-        </span>
+        <span>Recall · {starterCardCount} bundled cards</span>
         <a
           href="https://github.com/open-spaced-repetition/fsrs4anki"
           target="_blank"

@@ -1,0 +1,7 @@
+node_modules
+dist
+artifacts
+public/workshop
+handoff
+package-lock.json
+src/data/*.json

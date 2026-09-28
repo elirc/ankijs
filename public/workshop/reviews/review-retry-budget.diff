@@ -1,0 +1,5 @@
+- return await sendOrder(order);
++ while (true) {
++   try { return await sendOrder(order); }
++   catch { await sleep(1000); }
++ }

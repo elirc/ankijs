@@ -1,23 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { Save } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
-import { Button } from '../../components/Button';
-import { TextArea } from '../../components/TextArea';
-import { captureNote, listInbox } from '../../db/repos/noteRepo';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { readDraft, storeDraft } from "../../lib/drafts";
+import { Save } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Button } from "../../components/Button";
+import { TextArea } from "../../components/TextArea";
+import { captureNote, listInbox } from "../../db/repos/noteRepo";
 
 export function CaptureScreen() {
   const [searchParams] = useSearchParams();
   const sharedText = useMemo(() => {
-    return ['title', 'text', 'url']
+    return ["title", "text", "url"]
       .map((key) => searchParams.get(key)?.trim())
       .filter(Boolean)
-      .join('\n');
+      .join("\n");
   }, [searchParams]);
-  const [body, setBody] = useState(sharedText);
+  const [body, setBody] = useState(() => sharedText || readDraft("capture"));
   const [toast, setToast] = useState<string | null>(null);
+  const busy = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const textRef = useRef<HTMLTextAreaElement | null>(null);
-  const inboxCount = useLiveQuery(async () => (await listInbox()).length, [], 0);
+  const inboxCount = useLiveQuery(
+    async () => (await listInbox()).length,
+    [],
+    0,
+  );
 
   useEffect(() => {
     if (sharedText) setBody(sharedText);
@@ -25,13 +33,30 @@ export function CaptureScreen() {
   }, [sharedText]);
 
   async function save() {
-    if (!body.trim()) return;
-    await captureNote(body);
-    setBody('');
-    const count = (await listInbox()).length;
-    setToast(`Saved to inbox (${count})`);
-    window.setTimeout(() => setToast(null), 1500);
-    window.setTimeout(() => textRef.current?.focus(), 0);
+    if (!body.trim() || busy.current) return;
+    busy.current = true;
+    setSaving(true);
+    setError("");
+    const snapshot = body;
+    try {
+      await captureNote(snapshot);
+      setBody((current) => {
+        if (current === snapshot) {
+          storeDraft("capture", "");
+          return "";
+        }
+        return current;
+      });
+      setToast("Saved to inbox");
+      textRef.current?.focus();
+    } catch {
+      setError(
+        "Could not save. Your draft is still here. Retry when storage is available.",
+      );
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
   }
 
   return (
@@ -44,9 +69,15 @@ export function CaptureScreen() {
         ref={textRef}
         autoFocus
         value={body}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => {
+          setBody(event.target.value);
+          if (!storeDraft("capture", event.target.value))
+            setError(
+              "Draft recovery is unavailable. Keep this page open until you save.",
+            );
+        }}
         onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
             event.preventDefault();
             void save();
           }
@@ -55,14 +86,25 @@ export function CaptureScreen() {
         placeholder="Write the thought before it fades."
         aria-label="Capture note"
       />
+      {error && <p role="alert">{error}</p>}
+      <p className="text-muted">Drafts are kept on this device until saved.</p>
       <div className="flex items-center gap-3">
-        <Button variant="primary" icon={Save} disabled={!body.trim()} onClick={() => void save()}>
+        <Button
+          variant="primary"
+          icon={Save}
+          disabled={saving || !body.trim()}
+          onClick={() => void save()}
+        >
           Save
         </Button>
         {toast ? (
-          <p className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">{toast}</p>
+          <p className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+            {toast}
+          </p>
         ) : (
-          <p className="hidden text-sm text-muted md:block">Ctrl+Enter saves and keeps you writing</p>
+          <p className="hidden text-sm text-muted md:block">
+            Ctrl+Enter saves and keeps you writing
+          </p>
         )}
       </div>
     </div>

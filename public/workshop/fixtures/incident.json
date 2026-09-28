@@ -1,0 +1,59 @@
+{
+  "slowQuery": {
+    "rows": 200000,
+    "p95BeforeMs": 80,
+    "p95DuringMs": 900,
+    "query": "owner_id = $1 AND archived = false ORDER BY updated_at,id LIMIT 30"
+  },
+  "rollout": [
+    {
+      "at": "10:00",
+      "event": "B writes archived state"
+    },
+    {
+      "at": "10:04",
+      "event": "error rate rises"
+    },
+    {
+      "at": "10:05",
+      "event": "A rejects archived rows after rollback"
+    }
+  ],
+  "queue": {
+    "depth": [
+      20,
+      5000
+    ],
+    "oldestAgeMinutes": [
+      1,
+      70
+    ],
+    "cpu": "low",
+    "head": {
+      "id": "poison-1",
+      "attempts": 999,
+      "error": "invalid-schema"
+    }
+  },
+  "trace": [
+    {
+      "request": "r17",
+      "event": "e9",
+      "status": "accepted"
+    },
+    {
+      "event": "e9",
+      "attempt": 1,
+      "error": "dependency_timeout"
+    },
+    {
+      "event": "e9",
+      "attempt": 2,
+      "status": "delivered"
+    },
+    {
+      "request": "r18",
+      "status": 200
+    }
+  ]
+}

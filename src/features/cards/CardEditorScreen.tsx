@@ -11,9 +11,17 @@ import { TextArea } from "../../components/TextArea";
 import { createCard, getCard, updateContent } from "../../db/repos/cardRepo";
 import { listDecks } from "../../db/repos/deckRepo";
 
+import { readDraft, storeDraft } from "../../lib/drafts";
+
 type MobileMode = "edit" | "preview";
 
 export function CardEditorScreen() {
+  const { cardId } = useParams();
+  const [params] = useSearchParams();
+  return <CardEditor key={cardId ?? params.get("deckId") ?? "new"} />;
+}
+
+function CardEditor() {
   const { cardId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -31,17 +39,45 @@ export function CardEditorScreen() {
   const [mode, setMode] = useState<MobileMode>("edit");
   const returnTo = searchParams.get("returnTo");
   const editing = Boolean(cardId);
+  const draftKey = "card:" + (cardId ?? searchParams.get("deckId") ?? "new");
+  const initialized = useRef("");
+  const [draftReady, setDraftReady] = useState(false);
   const busy = useRef(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (card) {
-      setDeckId(card.deck_id);
-      setFront(card.front);
-      setBack(card.back);
+    if (initialized.current === draftKey || (editing && card === undefined))
+      return;
+    initialized.current = draftKey;
+    let draft: { front?: string; back?: string; deckId?: string } = {};
+    try {
+      const stored: unknown = JSON.parse(readDraft(draftKey) || "{}");
+      if (stored && typeof stored === "object") {
+        const values = stored as Record<string, unknown>;
+        draft = {
+          front: typeof values.front === "string" ? values.front : undefined,
+          back: typeof values.back === "string" ? values.back : undefined,
+          deckId: typeof values.deckId === "string" ? values.deckId : undefined,
+        };
+      }
+    } catch {
+      /* ignore a damaged draft */
     }
-  }, [card]);
+    setDeckId(
+      draft.deckId ?? card?.deck_id ?? searchParams.get("deckId") ?? "",
+    );
+    setFront(draft.front ?? card?.front ?? "");
+    setBack(draft.back ?? card?.back ?? "");
+    setDraftReady(true);
+  }, [card, draftKey, editing, searchParams]);
+  useEffect(() => {
+    if (draftReady)
+      storeDraft(
+        draftKey,
+        front || back ? JSON.stringify({ front, back, deckId }) : "",
+      );
+  }, [draftKey, front, back, deckId, draftReady]);
 
   useEffect(() => {
     if (!editing && decks.length > 0 && !deckId) {
@@ -61,6 +97,7 @@ export function CardEditorScreen() {
           front: front.trim(),
           back: back.trim(),
         });
+        storeDraft(draftKey, "");
         navigate(returnTo ?? `/decks/${deckId}`);
         return;
       }
@@ -70,6 +107,7 @@ export function CardEditorScreen() {
         back,
         note_id: searchParams.get("noteId") ?? undefined,
       });
+      storeDraft(draftKey, "");
       if (addAnother) {
         setFront("");
         setBack("");

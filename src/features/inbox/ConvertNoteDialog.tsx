@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Save, Split } from 'lucide-react';
-import { Button } from '../../components/Button';
-import { Modal } from '../../components/Modal';
-import { TextArea } from '../../components/TextArea';
-import type { Deck, Note } from '../../db/schema';
-import { createCard } from '../../db/repos/cardRepo';
-import { markConverted } from '../../db/repos/noteRepo';
-import { getMeta, setMeta } from '../../db/repos/metaRepo';
+import { useEffect, useState } from "react";
+import { Save, Split } from "lucide-react";
+import { Button } from "../../components/Button";
+import { Modal } from "../../components/Modal";
+import { TextArea } from "../../components/TextArea";
+import type { Deck, Note } from "../../db/schema";
+import { createCard } from "../../db/repos/cardRepo";
+import { markConverted } from "../../db/repos/noteRepo";
+import { getMeta, setMeta } from "../../db/repos/metaRepo";
 
 export function ConvertNoteDialog({
   note,
@@ -18,21 +18,26 @@ export function ConvertNoteDialog({
   onClose: () => void;
 }) {
   const [front, setFront] = useState(note.body);
-  const [back, setBack] = useState('');
-  const [deckId, setDeckId] = useState(decks[0]?.id ?? '');
+  const [back, setBack] = useState("");
+  const [deckId, setDeckId] = useState(decks[0]?.id ?? "");
   const [createdIds, setCreatedIds] = useState<string[]>([]);
   const canCreate = Boolean(deckId && front.trim() && back.trim());
 
   useEffect(() => {
-    void getMeta('last_deck_id').then((value) => {
+    void getMeta("last_deck_id").then((value) => {
       if (value && decks.some((deck) => deck.id === value)) setDeckId(value);
     });
   }, [decks]);
 
   async function createOne(): Promise<string | null> {
     if (!canCreate) return null;
-    const card = await createCard({ deck_id: deckId, front, back, note_id: note.id });
-    await setMeta('last_deck_id', deckId);
+    const card = await createCard({
+      deck_id: deckId,
+      front,
+      back,
+      note_id: note.id,
+    });
+    await setMeta("last_deck_id", deckId);
     setCreatedIds((ids) => [...ids, card.id]);
     return card.id;
   }
@@ -68,11 +73,19 @@ export function ConvertNoteDialog({
         )}
         <label className="block text-sm font-medium">
           Front
-          <TextArea className="mt-1 min-h-28" value={front} onChange={(event) => setFront(event.target.value)} />
+          <TextArea
+            className="mt-1 min-h-28"
+            value={front}
+            onChange={(event) => setFront(event.target.value)}
+          />
         </label>
         <label className="block text-sm font-medium">
           Back
-          <TextArea className="mt-1 min-h-28" value={back} onChange={(event) => setBack(event.target.value)} />
+          <TextArea
+            className="mt-1 min-h-28"
+            value={back}
+            onChange={(event) => setBack(event.target.value)}
+          />
         </label>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -92,8 +105,8 @@ export function ConvertNoteDialog({
             onClick={async () => {
               const id = await createOne();
               if (!id) return;
-              setFront('');
-              setBack('');
+              setFront("");
+              setBack("");
             }}
           >
             Create and add another
