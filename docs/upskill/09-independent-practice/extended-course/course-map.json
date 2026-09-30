@@ -1,0 +1,440 @@
+{
+  "status": "complete",
+  "chapters": [
+    "01-curriculum-provenance-and-placement.md",
+    "02-tests-that-own-their-asynchronous-work.md",
+    "03-search-completion-and-current-intent.md",
+    "04-save-guards-and-versioned-writes.md",
+    "05-backup-validation-and-atomic-import.md",
+    "06-card-clocks-and-tombstones.md",
+    "07-local-account-ownership-before-sync.md",
+    "08-outbox-coalescing-and-acknowledgment.md",
+    "09-review-application-and-durable-undo.md",
+    "10-local-days-and-study-accounting.md",
+    "11-practice-journals-and-pending-writes.md",
+    "12-user-state-conflicts-and-deferred-validation.md",
+    "13-curriculum-migrations-that-preserve-personal-work.md",
+    "14-sync-pagination-and-resumable-cursors.md",
+    "15-offline-startup-and-update-notifications.md",
+    "16-notes-conversion-and-search-contracts.md",
+    "17-webhook-signatures-and-authenticated-input.md",
+    "18-operation-identity-and-retry-budgets.md",
+    "19-event-delivery-order-and-recoverable-workers.md",
+    "20-sql-concurrency-as-an-invariant-laboratory.md",
+    "21-restoration-and-data-aware-recovery.md",
+    "22-ai-assisted-review-with-independent-evidence.md",
+    "23-notes-capstone-contract-and-interface.md",
+    "24-independent-sync-and-recovery-capstone.md"
+  ],
+  "workshopUnits": [
+    {
+      "id": "capstone-typescript",
+      "deckId": "a0000000-0000-4000-8000-000000090001",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000010",
+        "f0000000-0000-4000-8000-000000000011"
+      ],
+      "fixture": "/workshop/capstone-typescript.md",
+      "missionId": "lab-capstone-typescript"
+    },
+    {
+      "id": "debug-stale-search",
+      "deckId": "a0000000-0000-4000-8000-000000090002",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000030",
+        "f0000000-0000-4000-8000-000000000031"
+      ],
+      "fixture": "/workshop/debug-stale-search.md",
+      "missionId": "lab-debug-stale-search"
+    },
+    {
+      "id": "debug-duplicate-save",
+      "deckId": "a0000000-0000-4000-8000-000000090002",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000040",
+        "f0000000-0000-4000-8000-000000000041"
+      ],
+      "fixture": "/workshop/debug-duplicate-save.md",
+      "missionId": "lab-debug-duplicate-save"
+    },
+    {
+      "id": "debug-stale-edit",
+      "deckId": "a0000000-0000-4000-8000-000000090002",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000050",
+        "f0000000-0000-4000-8000-000000000051"
+      ],
+      "fixture": "/workshop/debug-stale-edit.md",
+      "missionId": "lab-debug-stale-edit"
+    },
+    {
+      "id": "debug-date-boundary",
+      "deckId": "a0000000-0000-4000-8000-000000090002",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000060",
+        "f0000000-0000-4000-8000-000000000061"
+      ],
+      "fixture": "/workshop/debug-date-boundary.md",
+      "missionId": "lab-debug-date-boundary"
+    },
+    {
+      "id": "debug-offline-update",
+      "deckId": "a0000000-0000-4000-8000-000000090002",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000070",
+        "f0000000-0000-4000-8000-000000000071"
+      ],
+      "fixture": "/workshop/debug-offline-update.md",
+      "missionId": "lab-debug-offline-update"
+    },
+    {
+      "id": "debug-partial-import",
+      "deckId": "a0000000-0000-4000-8000-000000090002",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000080",
+        "f0000000-0000-4000-8000-000000000081"
+      ],
+      "fixture": "/workshop/debug-partial-import.md",
+      "missionId": "lab-debug-partial-import"
+    },
+    {
+      "id": "review-owner-filter",
+      "deckId": "a0000000-0000-4000-8000-000000090003",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000090",
+        "f0000000-0000-4000-8000-000000000091"
+      ],
+      "fixture": "/workshop/review-owner-filter.md",
+      "missionId": "lab-review-owner-filter"
+    },
+    {
+      "id": "review-retry-budget",
+      "deckId": "a0000000-0000-4000-8000-000000090003",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000100",
+        "f0000000-0000-4000-8000-000000000101"
+      ],
+      "fixture": "/workshop/review-retry-budget.md",
+      "missionId": "lab-review-retry-budget"
+    },
+    {
+      "id": "review-false-positive-test",
+      "deckId": "a0000000-0000-4000-8000-000000090003",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000120",
+        "f0000000-0000-4000-8000-000000000121"
+      ],
+      "fixture": "/workshop/review-false-positive-test.md",
+      "missionId": "lab-review-false-positive-test"
+    },
+    {
+      "id": "sql-lost-update",
+      "deckId": "a0000000-0000-4000-8000-000000090004",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000150",
+        "f0000000-0000-4000-8000-000000000151"
+      ],
+      "fixture": "/workshop/sql-lost-update.md",
+      "missionId": "lab-sql-lost-update"
+    },
+    {
+      "id": "sql-unique-race",
+      "deckId": "a0000000-0000-4000-8000-000000090004",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000160",
+        "f0000000-0000-4000-8000-000000000161"
+      ],
+      "fixture": "/workshop/sql-unique-race.md",
+      "missionId": "lab-sql-unique-race"
+    },
+    {
+      "id": "sql-deadlock",
+      "deckId": "a0000000-0000-4000-8000-000000090004",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000170",
+        "f0000000-0000-4000-8000-000000000171"
+      ],
+      "fixture": "/workshop/sql-deadlock.md",
+      "missionId": "lab-sql-deadlock"
+    },
+    {
+      "id": "sql-keyset",
+      "deckId": "a0000000-0000-4000-8000-000000090004",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000180",
+        "f0000000-0000-4000-8000-000000000181"
+      ],
+      "fixture": "/workshop/sql-keyset.md",
+      "missionId": "lab-sql-keyset"
+    },
+    {
+      "id": "sql-write-skew",
+      "deckId": "a0000000-0000-4000-8000-000000090004",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000190",
+        "f0000000-0000-4000-8000-000000000191"
+      ],
+      "fixture": "/workshop/sql-write-skew.md",
+      "missionId": "lab-sql-write-skew"
+    },
+    {
+      "id": "sql-expand-contract",
+      "deckId": "a0000000-0000-4000-8000-000000090004",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000200",
+        "f0000000-0000-4000-8000-000000000201"
+      ],
+      "fixture": "/workshop/sql-expand-contract.md",
+      "missionId": "lab-sql-expand-contract"
+    },
+    {
+      "id": "integration-signature",
+      "deckId": "a0000000-0000-4000-8000-000000090005",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000210",
+        "f0000000-0000-4000-8000-000000000211"
+      ],
+      "fixture": "/workshop/integration-signature.md",
+      "missionId": "lab-integration-signature"
+    },
+    {
+      "id": "integration-dedup",
+      "deckId": "a0000000-0000-4000-8000-000000090005",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000220",
+        "f0000000-0000-4000-8000-000000000221"
+      ],
+      "fixture": "/workshop/integration-dedup.md",
+      "missionId": "lab-integration-dedup"
+    },
+    {
+      "id": "integration-order",
+      "deckId": "a0000000-0000-4000-8000-000000090005",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000230",
+        "f0000000-0000-4000-8000-000000000231"
+      ],
+      "fixture": "/workshop/integration-order.md",
+      "missionId": "lab-integration-order"
+    },
+    {
+      "id": "integration-idempotency",
+      "deckId": "a0000000-0000-4000-8000-000000090005",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000240",
+        "f0000000-0000-4000-8000-000000000241"
+      ],
+      "fixture": "/workshop/integration-idempotency.md",
+      "missionId": "lab-integration-idempotency"
+    },
+    {
+      "id": "integration-rate-limit",
+      "deckId": "a0000000-0000-4000-8000-000000090005",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000250",
+        "f0000000-0000-4000-8000-000000000251"
+      ],
+      "fixture": "/workshop/integration-rate-limit.md",
+      "missionId": "lab-integration-rate-limit"
+    },
+    {
+      "id": "integration-outbox",
+      "deckId": "a0000000-0000-4000-8000-000000090005",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000260",
+        "f0000000-0000-4000-8000-000000000261"
+      ],
+      "fixture": "/workshop/integration-outbox.md",
+      "missionId": "lab-integration-outbox"
+    },
+    {
+      "id": "ops-bad-rollout",
+      "deckId": "a0000000-0000-4000-8000-000000090006",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000280",
+        "f0000000-0000-4000-8000-000000000281"
+      ],
+      "fixture": "/workshop/ops-bad-rollout.md",
+      "missionId": "lab-ops-bad-rollout"
+    },
+    {
+      "id": "ops-queue-backlog",
+      "deckId": "a0000000-0000-4000-8000-000000090006",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000290",
+        "f0000000-0000-4000-8000-000000000291"
+      ],
+      "fixture": "/workshop/ops-queue-backlog.md",
+      "missionId": "lab-ops-queue-backlog"
+    },
+    {
+      "id": "ops-restore",
+      "deckId": "a0000000-0000-4000-8000-000000090006",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000300",
+        "f0000000-0000-4000-8000-000000000301"
+      ],
+      "fixture": "/workshop/ops-restore.md",
+      "missionId": "lab-ops-restore"
+    },
+    {
+      "id": "ops-trace-failure",
+      "deckId": "a0000000-0000-4000-8000-000000090006",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000310",
+        "f0000000-0000-4000-8000-000000000311"
+      ],
+      "fixture": "/workshop/ops-trace-failure.md",
+      "missionId": "lab-ops-trace-failure"
+    },
+    {
+      "id": "ops-shutdown",
+      "deckId": "a0000000-0000-4000-8000-000000090006",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000320",
+        "f0000000-0000-4000-8000-000000000321"
+      ],
+      "fixture": "/workshop/ops-shutdown.md",
+      "missionId": "lab-ops-shutdown"
+    },
+    {
+      "id": "ai-review-diff",
+      "deckId": "a0000000-0000-4000-8000-000000090007",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000330",
+        "f0000000-0000-4000-8000-000000000331"
+      ],
+      "fixture": "/workshop/ai-review-diff.md",
+      "missionId": "lab-ai-review-diff"
+    },
+    {
+      "id": "ai-api-verification",
+      "deckId": "a0000000-0000-4000-8000-000000090007",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000340",
+        "f0000000-0000-4000-8000-000000000341"
+      ],
+      "fixture": "/workshop/ai-api-verification.md",
+      "missionId": "lab-ai-api-verification"
+    },
+    {
+      "id": "ai-challenge-tests",
+      "deckId": "a0000000-0000-4000-8000-000000090007",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000350",
+        "f0000000-0000-4000-8000-000000000351"
+      ],
+      "fixture": "/workshop/ai-challenge-tests.md",
+      "missionId": "lab-ai-challenge-tests"
+    },
+    {
+      "id": "ai-untrusted-text",
+      "deckId": "a0000000-0000-4000-8000-000000090007",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000360",
+        "f0000000-0000-4000-8000-000000000361"
+      ],
+      "fixture": "/workshop/ai-untrusted-text.md",
+      "missionId": "lab-ai-untrusted-text"
+    },
+    {
+      "id": "ai-scope-control",
+      "deckId": "a0000000-0000-4000-8000-000000090007",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000370",
+        "f0000000-0000-4000-8000-000000000371"
+      ],
+      "fixture": "/workshop/ai-scope-control.md",
+      "missionId": "lab-ai-scope-control"
+    },
+    {
+      "id": "ai-evidence-report",
+      "deckId": "a0000000-0000-4000-8000-000000090007",
+      "cardIds": [
+        "f0000000-0000-4000-8000-000000000380",
+        "f0000000-0000-4000-8000-000000000381"
+      ],
+      "fixture": "/workshop/ai-evidence-report.md",
+      "missionId": "lab-ai-evidence-report"
+    }
+  ],
+  "sourceFiles": [
+    "public/workshop/ai-api-verification.md",
+    "public/workshop/ai-challenge-tests.md",
+    "public/workshop/ai-evidence-report.md",
+    "public/workshop/ai-review-diff.md",
+    "public/workshop/ai-untrusted-text.md",
+    "public/workshop/capstone-typescript.md",
+    "public/workshop/capstone/contract.mjs",
+    "public/workshop/capstone/typescript/reference/App.tsx",
+    "public/workshop/capstone/typescript/reference/server.mjs",
+    "public/workshop/capstone/typescript/starter/server.ts",
+    "public/workshop/checks/debugging.test.mjs",
+    "public/workshop/checks/fake-service.test.mjs",
+    "public/workshop/checks/review-and-operations.test.mjs",
+    "public/workshop/debug-duplicate-save.md",
+    "public/workshop/debug-stale-edit.md",
+    "public/workshop/debug-stale-search.md",
+    "public/workshop/fixtures/fake-service.mjs",
+    "public/workshop/fixtures/reference.mjs",
+    "public/workshop/integration-idempotency.md",
+    "public/workshop/integration-outbox.md",
+    "public/workshop/integration-rate-limit.md",
+    "public/workshop/integration-signature.md",
+    "public/workshop/ops-bad-rollout.md",
+    "public/workshop/ops-queue-backlog.md",
+    "public/workshop/ops-restore.md",
+    "public/workshop/ops-shutdown.md",
+    "public/workshop/ops-trace-failure.md",
+    "public/workshop/review-false-positive-test.md",
+    "public/workshop/review-owner-filter.md",
+    "public/workshop/sql/setup.sql",
+    "public/workshop/sql/sql-deadlock.sql",
+    "public/workshop/sql/sql-expand-contract.sql",
+    "public/workshop/sql/sql-lost-update.sql",
+    "public/workshop/sql/sql-unique-race.sql",
+    "public/workshop/sql/sql-write-skew.sql",
+    "public/workshop/sql/verify.sql",
+    "src/App.tsx",
+    "src/components/UpdateToast.test.tsx",
+    "src/components/UpdateToast.tsx",
+    "src/data/curriculum-catalog.ts",
+    "src/data/curriculum.ts",
+    "src/data/workshop-units.json",
+    "src/data/workshop.ts",
+    "src/db/contentCorrections.ts",
+    "src/db/repos/cardRepo.test.ts",
+    "src/db/repos/cardRepo.ts",
+    "src/db/repos/dataRepo.test.ts",
+    "src/db/repos/dataRepo.ts",
+    "src/db/repos/noteRepo.test.ts",
+    "src/db/repos/noteRepo.ts",
+    "src/db/repos/practiceRepo.test.ts",
+    "src/db/repos/practiceRepo.ts",
+    "src/db/repos/practiceWrites.ts",
+    "src/db/repos/reviewRepo.ts",
+    "src/db/repos/userStateRepo.test.ts",
+    "src/db/repos/userStateRepo.ts",
+    "src/db/retiredCurriculum.test.ts",
+    "src/db/retiredCurriculum.ts",
+    "src/db/retiredLibrary.ts",
+    "src/db/retiredRetrieval.ts",
+    "src/db/schema.ts",
+    "src/db/sync/engine.test.ts",
+    "src/db/sync/engine.ts",
+    "src/db/sync/merge.test.ts",
+    "src/db/sync/merge.ts",
+    "src/db/sync/outbox.test.ts",
+    "src/db/sync/outbox.ts",
+    "src/db/sync/ownership.test.ts",
+    "src/db/sync/ownership.ts",
+    "src/features/inbox/ConvertNoteDialog.tsx",
+    "src/features/inbox/InboxScreen.tsx",
+    "src/lib/appUpdate.ts",
+    "src/lib/dates.test.ts",
+    "src/lib/dates.ts",
+    "src/main.tsx",
+    "src/test/setup.ts",
+    "vite.config.ts"
+  ]
+}

@@ -1,11 +1,11 @@
 import { curriculum, loadStarterCards } from "../data/curriculum";
-import { sectionExpansionVersion } from "../data/section-expansion";
 import { newCardFields } from "../srs/scheduler";
 import { db, type Card, type Deck, type SyncTableName } from "./schema";
 import { retireLegacyCurriculum } from "./retiredCurriculum";
 import { installTimestamp } from "./retiredLibrary";
+import { curriculumVersionKey } from "./curriculumVersion";
 
-export const curriculumVersionKey = `starter_curriculum_v${sectionExpansionVersion}_workshop1`;
+export { curriculumVersionKey } from "./curriculumVersion";
 
 export interface CurriculumProgress {
   completed: number;
@@ -117,7 +117,11 @@ export async function installStarterDecks(
         total: cardsToAdd.length,
         phase: "saving",
       });
-      await retireLegacyCurriculum();
+      // A new library contains only current cards. Loading archived corrections
+      // and scanning retirement candidates here added megabytes to first install.
+      // Populated libraries still run every migration, preserving edits and tombstones.
+      if (existingDecks.size > 0 || existingCards.size > 0)
+        await retireLegacyCurriculum();
       // The sync queue commits with the cards, using the same bounded batches.
       const pending = new Map(
         (await db.outbox.toArray()).map((row) => [
@@ -144,9 +148,16 @@ export async function installStarterDecks(
     window.dispatchEvent(new CustomEvent("recall:outbox-enqueued"));
 }
 
-export async function initializeStudyData(
+let initialization: Promise<void> | undefined;
+export function initializeStudyData(
   onProgress?: (progress: CurriculumProgress) => void,
 ): Promise<void> {
-  if (!(await db.sync_meta.get(curriculumVersionKey)))
-    await installStarterDecks(onProgress);
+  // Coalesce simultaneous boot requests; a failed install is retryable.
+  initialization ??= (async () => {
+    if (!(await db.sync_meta.get(curriculumVersionKey)))
+      await installStarterDecks(onProgress);
+  })().finally(() => {
+    initialization = undefined;
+  });
+  return initialization;
 }

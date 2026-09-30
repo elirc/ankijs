@@ -1,0 +1,19 @@
+{
+  "projects": 23,
+  "buildMilestones": 138,
+  "practiceDrills": 864,
+  "activities": 1002,
+  "acceptanceChecks": 3006,
+  "instructionalWords": 195957,
+  "activityMultiplier": 11.93,
+  "wordMultiplier": 10,
+  "catalogGzipBytes": 74323,
+  "detailGzipBytes": 397872,
+  "reinforcement": {
+    "projects": 9,
+    "activities": 162,
+    "retrievalQuestions": 324,
+    "workedExamples": 162,
+    "addedInstructionalWords": 58485
+  }
+}

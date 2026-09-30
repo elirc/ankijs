@@ -1,0 +1,29 @@
+{
+  "projects": 7,
+  "milestones": 21,
+  "acceptanceChecks": 63,
+  "instructionalWords": 5009,
+  "originalMilestoneIds": [
+    "effect-tracker-create",
+    "effect-tracker-edit",
+    "effect-tracker-layers",
+    "effect-milestones-crud",
+    "effect-milestones-evidence",
+    "effect-milestones-atomic",
+    "effect-import-decode",
+    "effect-import-commit",
+    "effect-import-roundtrip",
+    "effect-sharing-auth",
+    "effect-sharing-members",
+    "effect-sharing-conflicts",
+    "effect-sync-retry",
+    "effect-sync-outbox",
+    "effect-sync-lifecycle",
+    "effect-tickets-slice",
+    "effect-tickets-workflow",
+    "effect-tickets-release",
+    "effect-inventory-catalog",
+    "effect-inventory-race",
+    "effect-inventory-lifecycle"
+  ]
+}

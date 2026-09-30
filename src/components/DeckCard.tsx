@@ -11,7 +11,7 @@ import {
   Atom,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getDeckInfo } from "../data/curriculum";
+import { getDeckInfo } from "../data/curriculum-catalog";
 import type { DeckSummary } from "../db/repos/dashboardRepo";
 
 const icons = {

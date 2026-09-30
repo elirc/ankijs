@@ -147,5 +147,43 @@
       "label": "GitHub Docs · Pull requests",
       "url": "https://docs.github.com/en/pull-requests"
     }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007009",
+    "name": "29 · Data modeling and migrations",
+    "track": "Build real apps",
+    "icon": "database",
+    "color": "violet",
+    "topics": [
+      "Keys and relationships",
+      "Constraints",
+      "NULL and defaults",
+      "Migrations"
+    ],
+    "description": "Design tables that stay correct: primary and foreign keys, join tables, constraints, the indexes a new table needs, NULL and defaults, and migration files.",
+    "resource": {
+      "label": "PostgreSQL 17 · Data definition",
+      "url": "https://www.postgresql.org/docs/17/ddl.html"
+    }
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007010",
+    "name": "30 · Performance and caching basics",
+    "track": "Build real apps",
+    "icon": "network",
+    "color": "amber",
+    "topics": [
+      "Measuring",
+      "N+1 queries",
+      "Paging",
+      "Caching layers",
+      "Indexes",
+      "React and bundles"
+    ],
+    "description": "Make a working CRUD app fast: time each step, fix N+1 queries and skipped indexes, page without counting, pick a cache layer, and trim React and bundle costs.",
+    "resource": {
+      "label": "MDN · Web performance",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/Performance"
+    }
   }
 ]

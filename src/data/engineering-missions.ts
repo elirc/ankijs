@@ -1,5 +1,5 @@
-import { workshopMissions } from "./workshop";
-import { additionalEngineeringMissions } from "./engineering-mission-expansion";
+import { workshopMissions } from "./workshop.ts";
+import { additionalEngineeringMissions } from "./engineering-mission-expansion.ts";
 
 export interface EngineeringMission {
   id: string;

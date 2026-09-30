@@ -4,8 +4,7 @@ import ReactDOM from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { App } from "./App";
-import { HomeScreen } from "./features/home/HomeScreen";
-import { curriculumVersionKey, initializeStudyData } from "./db/seed";
+import { curriculumVersionKey } from "./db/curriculumVersion";
 import { db } from "./db/schema";
 import {
   isSupabaseConfigured,
@@ -15,6 +14,11 @@ import { notifyAppUpdate } from "./lib/appUpdate";
 import "./styles.css";
 import "./improvements.css";
 
+const loadHomeScreen = () =>
+  import("./features/home/HomeScreen").then((module) => ({
+    default: module.HomeScreen,
+  }));
+const HomeScreen = lazy(loadHomeScreen);
 const CardEditorScreen = lazy(() =>
   import("./features/cards/CardEditorScreen").then((module) => ({
     default: module.CardEditorScreen,
@@ -96,6 +100,12 @@ const PathScreen = lazy(() =>
 
 const fallback = <Loading>Loading…</Loading>;
 
+const EffectLabScreen = lazy(() =>
+  import("./features/effect-lab/EffectLabScreen").then((module) => ({
+    default: module.EffectLabScreen,
+  })),
+);
+
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
 function renderApp() {
@@ -105,7 +115,22 @@ function renderApp() {
         <BrowserRouter>
           <Routes>
             <Route element={<App />}>
-              <Route index element={<HomeScreen />} />
+              <Route
+                index
+                element={
+                  <Suspense fallback={fallback}>
+                    <HomeScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="effect-lab/:projectId?/:milestoneId?"
+                element={
+                  <Suspense fallback={fallback}>
+                    <EffectLabScreen />
+                  </Suspense>
+                }
+              />
               <Route
                 path="library"
                 element={
@@ -278,6 +303,7 @@ function renderStorageError() {
 async function prepareLibrary(): Promise<void> {
   if (await db.sync_meta.get(curriculumVersionKey)) return;
   if ((await db.decks.count()) === 0) {
+    const { initializeStudyData } = await import("./db/seed");
     await initializeStudyData(({ completed, total, phase }) => {
       root.render(
         <Loading>
@@ -290,10 +316,13 @@ async function prepareLibrary(): Promise<void> {
     return;
   }
   const upgrade = () =>
-    initializeStudyData().catch(() => {
-      window.addEventListener("online", upgrade, { once: true });
-    });
-  void upgrade();
+    import("./db/seed")
+      .then(({ initializeStudyData }) => initializeStudyData())
+      .catch(() => {
+        window.addEventListener("online", upgrade, { once: true });
+      });
+  // Let the existing library paint before the optional upgrade downloads and writes.
+  window.setTimeout(() => void upgrade(), 100);
 }
 
 async function startSync(): Promise<void> {
@@ -317,6 +346,11 @@ const updateSW = registerSW({
 window.addEventListener("recall:apply-update", () => void updateSW(true));
 
 root.render(<Loading>Opening Recall…</Loading>);
+// Download the current route while IndexedDB opens. Native module loading
+// shares this request with React.lazy; other entry routes keep Home deferred.
+// A prefetch failure does not turn a storage check into a storage error.
+if (window.location.pathname === "/")
+  void loadHomeScreen().catch(() => undefined);
 prepareLibrary()
   .then(() => {
     renderApp();

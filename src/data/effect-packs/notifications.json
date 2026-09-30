@@ -1,0 +1,2051 @@
+{
+  "id": "notifications",
+  "title": "Notification center",
+  "kind": "Standalone app",
+  "summary": "Build inbox CRUD, preferences, delivery jobs, provider adapters, callbacks, and daily digests.",
+  "outcome": "A notification service that respects user choices and makes delivery outcomes observable without pretending every timeout means failure.",
+  "prerequisites": "Reliable sync, outbox transactions, request identity, and clock-based testing. Start with fake providers and generated recipient data.",
+  "model": [
+    "Notification: id, recipientId, topic, payloadVersion, createdAt. InboxState: notificationId, readAt, archivedAt.",
+    "Preference: recipientId, topic, channel, enabled. Delivery: notificationId, channel, state, operationId, providerId, attempts.",
+    "DigestWindow groups eligible events for one recipient and interval. Separate user-visible inbox state from external delivery status."
+  ],
+  "boundaries": "Accepted domain event → notification/outbox transaction → preference-aware worker → provider adapter → authenticated callback reducer.",
+  "milestones": [
+    {
+      "id": "effect-notify-inbox",
+      "title": "Create a per-user notification inbox",
+      "concept": "Owner-scoped CRUD · idempotent updates",
+      "brief": "List, read, mark unread, and archive notifications while keeping each recipient's state isolated and stable across devices.",
+      "explanation": "Notification content and a user's read state are different records with different lifetimes. Repeated mark-read commands should not create duplicate content or reset meaningful timestamps unexpectedly. Define what unread means after an archive or restore action, and apply the same rule to counts and filtered lists.",
+      "steps": [
+        "Create fixtures for unread, read, archived, and missing notifications across two recipients. Specify state transitions and timestamp semantics.",
+        "Implement recipient-scoped reads and idempotent state commands with loading, empty, and failed-action UI states.",
+        "Test repeated updates, a notification disappearing while open, and simultaneous changes from two clients. Compare counts with the actual filtered records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Recipients cannot read or change another user's inbox state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repeated commands preserve the declared timestamp semantics."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unread counts agree with list and archive behavior."
+        }
+      ],
+      "experiment": "Mark a notification read in one tab while archiving it in another. Verify the resulting state follows a defined rule rather than whichever UI response arrived last.",
+      "review": "Ask the agent to identify the authoritative state and explain whether updates commute. Keep delivery status out of the user's read/unread model.",
+      "stretch": "Add bulk mark-read with an explicit cutoff so newly arriving notifications are not silently included.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-notify-preferences",
+      "title": "Respect channel and topic preferences",
+      "concept": "Policy services · current-state checks",
+      "brief": "Let users manage notification preferences and enforce those choices when delivery occurs, including queued work.",
+      "explanation": "A preference captured when an event was created may be stale when a worker sends it. Define which policy is evaluated at creation and which at delivery. Distinguish optional product topics from any separately defined essential messages, and never let a client-supplied category bypass the server's topic policy.",
+      "steps": [
+        "Write a topic/channel matrix with defaults, supported overrides, and treatment of missing preference records.",
+        "Implement validated preference CRUD and a delivery eligibility service. Show the effect of a change using representative pending notifications.",
+        "Queue a notification, disable its channel, then run delivery. Test restored preferences, unknown topics, and direct unauthorized updates."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Preferences affect delivery according to the documented timing rule."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unsupported topics and channels are rejected consistently."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A user can modify only their own preference records."
+        }
+      ],
+      "experiment": "Pause a worker immediately before provider submission and change the preference. State the decision boundary and verify behavior at that boundary.",
+      "review": "A checkbox label should explain the actual policy. Avoid implying immediate cancellation of a provider request that has already been accepted.",
+      "stretch": "Version topic definitions and test how new topics inherit defaults for existing users.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-notify-outbox",
+      "title": "Queue notifications atomically",
+      "concept": "Transactional outbox · fan-out limits",
+      "brief": "Create notification intent with the originating business event and expand recipients without unbounded synchronous work.",
+      "explanation": "If a business update commits and notification intent is lost, a retrying worker cannot recover what was never recorded. Put durable intent in the same transaction where possible. Large fan-out needs bounded batches and a checkpoint, and recipient identity must be part of the duplicate-prevention key.",
+      "steps": [
+        "Choose one originating event, such as a ticket assignment. Define its stable identity, recipient resolution, and duplicate policy.",
+        "Commit event and outbox intent together, then expand recipients in bounded batches with durable progress.",
+        "Inject failure before intent commit, during recipient expansion, and after a batch completes but before acknowledgement. Compare recipient delivery identities."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Committed events retain their required notification intent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Restarted expansion does not duplicate recipient notifications."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Batch size and active work remain within documented limits."
+        }
+      ],
+      "experiment": "Restart fan-out after the first half of recipients have been inserted. Verify the completed half is recognized instead of recreated.",
+      "review": "Separate at-least-once processing from user-visible duplicates. Explain the unique keys and transaction boundaries that connect those two concerns.",
+      "stretch": "Add per-workspace fairness so a large audience cannot starve small interactive notifications.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-notify-providers",
+      "title": "Swap providers and classify failures",
+      "concept": "Service Layers · retry budgets",
+      "brief": "Implement fake and live-shaped provider adapters with a common contract for accepted, rejected, rate-limited, and ambiguous responses.",
+      "explanation": "Provider APIs differ in error meaning and idempotency support. Normalize their responses at the adapter boundary without erasing distinctions the delivery policy needs. A timeout after submission may mean unknown outcome. Retries need a finite budget, and failover can duplicate a message if the first provider actually accepted it.",
+      "steps": [
+        "Define an adapter interface and fixtures for acceptance, permanent rejection, rate limiting, timeout, and malformed responses.",
+        "Implement a deterministic fake Layer and provider-shaped adapter. Map failures into explicit categories and cap retry time and attempts.",
+        "Test a lost accepted response, repeated rate limits, and a permanent address failure. Record operation IDs and provider receipts without logging message secrets."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All adapter outcomes map to documented delivery states."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Permanent failures do not enter blind retry loops."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Ambiguous outcomes are represented honestly and remain diagnosable."
+        }
+      ],
+      "experiment": "Accept a message in the fake provider but drop its response. Try a fallback provider and explain the duplicate risk before choosing a policy.",
+      "review": "Do not infer delivery to a human from provider acceptance. Keep submitted, accepted, delivered, and read meanings distinct.",
+      "stretch": "Add a provider circuit policy and verify that recovery probes do not release an unbounded retry surge.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-notify-callbacks",
+      "title": "Process delivery callbacks safely",
+      "concept": "Authenticated events · monotonic transitions",
+      "brief": "Update delivery state from verified provider callbacks that may arrive twice, late, or in an unexpected order.",
+      "explanation": "Callbacks are untrusted network input until their authenticity and schema are checked. Keep the provider's event identity and relate it to a known delivery. Define which state transitions are allowed so a late accepted event cannot overwrite a later delivered or failed state without an explicit rule.",
+      "steps": [
+        "Create callback fixtures for delivered, bounced, duplicate, unknown receipt, invalid signature, and out-of-order events.",
+        "Verify callbacks using the provider's documented raw-body/signature contract, then store a receipt and apply the transition atomically.",
+        "Replay callbacks in different orders and restart after receipt insertion failure. Keep invalid events from mutating delivery records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Unverified callbacks cannot alter delivery state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Duplicate events are acknowledged without duplicate transitions."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Out-of-order events follow the declared state model."
+        }
+      ],
+      "experiment": "Deliver a final outcome followed by an older intermediate event. Verify the later arrival does not regress the meaningful state.",
+      "review": "Explain the difference between transport arrival time and provider event time. Preserve enough provenance to investigate contradictory callbacks.",
+      "stretch": "Add a quarantined view for unknown provider receipts and a reviewed reconciliation procedure.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-notify-digests",
+      "title": "Build resumable daily digests",
+      "concept": "Windowed jobs · clock and checkpoint services",
+      "brief": "Group eligible notifications into a daily digest with explicit time-zone windows and recovery after interrupted processing.",
+      "explanation": "A daily digest is a windowing policy, not merely a cron expression. Define which event timestamps qualify, how late events are handled, and which recipient zone sets the day boundary. Persist a window identity and checkpoint so rerunning a job does not resend the same digest or skip unprocessed recipients.",
+      "steps": [
+        "Specify digest windows, late-arrival policy, recipient preferences, and empty-window behavior. Include a daylight-saving boundary fixture.",
+        "Build bounded recipient processing with a unique digest identity and provider adapter. Persist composition before delivery so retries use the same content.",
+        "Interrupt processing mid-window, resume, then rerun the entire job. Compare window receipts, recipient counts, and final inbox content."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Events belong to the documented window, including boundary cases."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Restart and rerun do not create duplicate digest identities."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Preferences and empty-window behavior remain consistent."
+        }
+      ],
+      "experiment": "Insert an event for yesterday after yesterday's digest has been composed. Verify it follows the declared late-arrival policy instead of disappearing silently.",
+      "review": "Use a fake clock and inspect persisted window boundaries. Record whether external delivery can still be ambiguous despite local duplicate prevention.",
+      "stretch": "Add a dry-run digest preview and a recovery report for recipients left unprocessed after a provider outage.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-recipient-isolation",
+      "parentId": "effect-notify-inbox",
+      "title": "Separate users' read state",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Send N1 to Ada and Bo.",
+      "explanation": "One recipient reading a notice cannot mark it read for everyone. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Store recipient-specific read state. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Ada becomes read."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Bo remains unread."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Shared content is unchanged."
+        }
+      ],
+      "experiment": "Forge recipient ID in read command. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Add group-delivery fanout checks. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-read-retry",
+      "parentId": "effect-notify-inbox",
+      "title": "Make repeated read commands harmless",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Mark N2 read twice after timeout.",
+      "explanation": "Repeated acknowledgment must not corrupt unread counts. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use conditional state transition or derived count. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Unread decreases once."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Both responses are consistent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Other notices stay unread."
+        }
+      ],
+      "experiment": "Race requests from two tabs. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Track first-read time explicitly. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-mark-all-boundary",
+      "parentId": "effect-notify-inbox",
+      "title": "Define the scope of mark-all-read",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Receive N9 while marking earlier notices read.",
+      "explanation": "New arrivals must not disappear into an old bulk action. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Bind command to a visible cutoff. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Earlier scope becomes read."
+        },
+        {
+          "id": "criterion-2",
+          "label": "N9 stays unread under policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Response reports affected count."
+        }
+      ],
+      "experiment": "Delay bulk commit behind new arrival. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Add explicit filtered-scope marking. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-inbox-pagination",
+      "parentId": "effect-notify-inbox",
+      "title": "Page equal-time notices stably",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Create thirty notices at one instant.",
+      "explanation": "Timestamps alone cannot stabilize inbox navigation. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Order by timestamp plus stable identifier. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every notice appears once."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Reload preserves order."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Read changes do not reorder unexpectedly."
+        }
+      ],
+      "experiment": "Insert another equal-time notice. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Compare live versus snapshot pagination. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-optimistic-read",
+      "parentId": "effect-notify-inbox",
+      "title": "Recover a rejected optimistic read",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Mark N3 read while storage fails.",
+      "explanation": "Failed server writes cannot leave a falsely read inbox. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Reconcile optimistic state with command result. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "N3 returns to unread."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Failure is announced."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry remains available."
+        }
+      ],
+      "experiment": "Respond after another successful read. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Use mutation generations for rollback. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-keyboard-inbox",
+      "parentId": "effect-notify-inbox",
+      "title": "Read notices without losing keyboard position",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Navigate an inbox while a new notice arrives.",
+      "explanation": "New arrivals cannot steal focus from existing content. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Preserve focus and announce updates appropriately. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Focused item stays focused."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unread badge is labeled."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Notice action is keyboard accessible."
+        }
+      ],
+      "experiment": "Delete the currently focused notice. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Choose a predictable next focus target. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-deleted-target",
+      "parentId": "effect-notify-inbox",
+      "title": "Explain notices pointing to removed records",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Open a notice for deleted ticket T6.",
+      "explanation": "Historical notification does not guarantee target availability. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Resolve destination with an explicit unavailable state. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Inbox still renders."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Target failure is understandable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Private deleted content stays hidden."
+        }
+      ],
+      "experiment": "Revoke target permission instead of deleting. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Distinguish unavailable from unauthorized safely. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-inbox-delete",
+      "parentId": "effect-notify-inbox",
+      "title": "Keep dismissal separate from domain deletion",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Dismiss notification for active request R8.",
+      "explanation": "Dismissing a notice must not delete its target record. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Implement recipient-scoped dismissal. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Notice disappears for actor."
+        },
+        {
+          "id": "criterion-2",
+          "label": "R8 still exists."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Other recipient is unaffected."
+        }
+      ],
+      "experiment": "Replay stale dismiss command. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Offer bounded undo. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-inbox-agent-debug",
+      "parentId": "effect-notify-inbox",
+      "title": "Find a negative unread badge",
+      "concept": "Recipient state · accessible inbox CRUD",
+      "brief": "Seed duplicate client decrement after retry.",
+      "explanation": "Derived counts must follow actual recipient state. An inbox is recipient-specific state layered over notification content. Keep identity and unread transitions explicit, apply authorization to each mutation, and ensure background updates do not disrupt reading or keyboard navigation.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Trace response and optimistic update accounting. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Regression reproduces negative count."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fix uses consistent authority."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reload matches stored unread rows."
+        }
+      ],
+      "experiment": "Race mark-all with individual read. Record persisted state and a recovery action.",
+      "review": "Compare inbox counts with underlying recipient rows. Ask the agent to prove behavior with two users and competing tabs rather than a single happy-path screenshot.",
+      "stretch": "Document count reconciliation strategy. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-default-policy",
+      "parentId": "effect-notify-preferences",
+      "title": "Define preferences for new users",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Create user with no stored channel settings.",
+      "explanation": "Missing preference rows must have explicit defaults. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Resolve defaults through a single policy service. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Default channels match product contract."
+        },
+        {
+          "id": "criterion-2",
+          "label": "UI reflects them."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Saving creates explicit overrides."
+        }
+      ],
+      "experiment": "Delete one optional preference field. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Version default policy changes. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-required-notices",
+      "parentId": "effect-notify-preferences",
+      "title": "Explain mandatory service notices",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Disable marketing while retaining required account notices.",
+      "explanation": "Required categories need clear semantics rather than hidden overrides. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Separate categories and show policy explanations. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Marketing is suppressed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Required category follows declared rule."
+        },
+        {
+          "id": "criterion-3",
+          "label": "UI describes unavailable toggle."
+        }
+      ],
+      "experiment": "Craft request disabling required category. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Review category assignment at producers. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-queued-optout",
+      "parentId": "effect-notify-preferences",
+      "title": "Honor opt-out timing policy",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Opt out after promotional notice is queued.",
+      "explanation": "Queued intent does not automatically authorize later delivery. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Evaluate current preference before sending. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Notice is suppressed under policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Job records reason."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Other permitted categories continue."
+        }
+      ],
+      "experiment": "Change preference while worker is paused. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Document unavoidable provider-boundary race. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-channel-specific",
+      "parentId": "effect-notify-preferences",
+      "title": "Keep channel choices independent",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Disable email while enabling inbox for topic T.",
+      "explanation": "Email opt-out cannot accidentally disable in-app notices. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Model topic-channel decisions explicitly. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Email is suppressed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Inbox notice appears."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Settings survive reload."
+        }
+      ],
+      "experiment": "Submit partial settings update. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Add push as a separate channel. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-preference-conflict",
+      "parentId": "effect-notify-preferences",
+      "title": "Protect concurrent preference edits",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Two tabs edit channels at revision 4.",
+      "explanation": "Stale settings cannot overwrite newer choices silently. Compare the saved revision before replacing the preference matrix; otherwise a harmless channel edit can undo an important opt-out. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use revision-aware settings command. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One save commits."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Other receives conflict."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Local choices remain reviewable."
+        }
+      ],
+      "experiment": "Delay success behind conflict response. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Merge non-overlapping changes explicitly. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-quiet-window",
+      "parentId": "effect-notify-preferences",
+      "title": "Interpret quiet hours across midnight",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Set 22:00–07:00 in customer zone.",
+      "explanation": "A local quiet interval may span two dates. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Evaluate wraparound interval with explicit zone. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "23:00 is quiet."
+        },
+        {
+          "id": "criterion-2",
+          "label": "08:00 is allowed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Midnight is handled correctly."
+        }
+      ],
+      "experiment": "Test a clock-change night. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Define bypass policy for urgent notices. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-unsubscribe-token",
+      "parentId": "effect-notify-preferences",
+      "title": "Scope unsubscribe capabilities narrowly",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Use token for topic updates email channel.",
+      "explanation": "A link should change only its intended preference. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Validate signed scoped token and expiry. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only target preference changes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Other channels remain."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Tampering is rejected."
+        }
+      ],
+      "experiment": "Replay after preference already disabled. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Provide privacy-preserving confirmation. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-settings-accessibility",
+      "parentId": "effect-notify-preferences",
+      "title": "Make preference controls understandable",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Edit a matrix using screen reader.",
+      "explanation": "Visual grouping alone cannot communicate topic and channel. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Associate controls with both row and column labels. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Toggle name identifies topic-channel."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Save status is announced."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Keyboard order is coherent."
+        }
+      ],
+      "experiment": "Render long translated topic names. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Test narrow mobile layout. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-preference-audit",
+      "parentId": "effect-notify-preferences",
+      "title": "Explain why a delivery was suppressed",
+      "concept": "Preference policy · send-time decisions",
+      "brief": "Suppress N8 due to user opt-out.",
+      "explanation": "Policy outcomes need safe diagnostic evidence. Preferences are policy inputs, not scattered checkbox conditions. Define defaults and required categories, distinguish intent-time from send-time decisions, and make every delivery path explain why a channel is allowed.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Record policy category and evaluated preference version. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reason is inspectable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Sensitive content is absent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Delivery is not mislabeled failed."
+        }
+      ],
+      "experiment": "Change settings after suppression. Record persisted state and a recovery action.",
+      "review": "Trace one preference change through UI, persistence, and worker evaluation. Ensure alternate producers cannot bypass policy by choosing a provider directly.",
+      "stretch": "Keep historical decision evidence bounded. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-business-rollback",
+      "parentId": "effect-notify-outbox",
+      "title": "Roll back notification intent with its event",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Fail ticket creation after outbox insert.",
+      "explanation": "Failed business mutation must not notify success. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Commit ticket and intent in one transaction. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No ticket persists."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No notice is sent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry creates one coherent pair."
+        }
+      ],
+      "experiment": "Crash before transaction commit. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Add transactional audit entry. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-commit-discovery",
+      "parentId": "effect-notify-outbox",
+      "title": "Discover committed work after restart",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Commit N1 then crash before waking worker.",
+      "explanation": "Intent cannot depend on an ephemeral enqueue callback. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Poll or durably discover pending outbox rows. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "N1 is eventually found."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Business record remains."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No manual requeue is required."
+        }
+      ],
+      "experiment": "Restart worker twice. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Measure discovery delay. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-outbox-identity",
+      "parentId": "effect-notify-outbox",
+      "title": "Deduplicate intents from retried commands",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Retry status-change command after lost reply.",
+      "explanation": "One transition needs one logical notification identity. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Derive intent identity from committed transition. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One outbox intent exists."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Business retry is stable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Other transitions get new identities."
+        }
+      ],
+      "experiment": "Reuse command ID with changed body. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Add per-recipient identity boundaries. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-claim-expiry",
+      "parentId": "effect-notify-outbox",
+      "title": "Recover an abandoned worker claim",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Claim N2 then terminate worker.",
+      "explanation": "A crashed worker cannot own an intent forever. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use bounded lease and guarded state transitions. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Before expiry second worker waits."
+        },
+        {
+          "id": "criterion-2",
+          "label": "After expiry work resumes."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Completion checks ownership."
+        }
+      ],
+      "experiment": "Let old worker return after lease expiry. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Add fencing evidence. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-batch-fairness",
+      "parentId": "effect-notify-outbox",
+      "title": "Prevent one tenant monopolizing delivery",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Tenant A queues 10000 notices while B queues one.",
+      "explanation": "Large backlogs need bounded fair scheduling. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Apply documented batching or tenant fairness policy. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "B progresses within bound."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A still drains."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Ordering promises remain clear."
+        }
+      ],
+      "experiment": "Keep appending A notices. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Measure latency by tenant. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-poison-intent",
+      "parentId": "effect-notify-outbox",
+      "title": "Quarantine permanently invalid work",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Queue bad payload between valid N3 and N5.",
+      "explanation": "One malformed intent must not block healthy notifications. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Classify permanent failure and bound attempts. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Bad job quarantines."
+        },
+        {
+          "id": "criterion-2",
+          "label": "N3 and N5 deliver."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Diagnostic identifies schema issue."
+        }
+      ],
+      "experiment": "Restart at quarantine boundary. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Support reviewed replay after repair. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-cancel-intent",
+      "parentId": "effect-notify-outbox",
+      "title": "Cancel unsent work without lying about delivery",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Cancel while intent is queued then sending.",
+      "explanation": "Cancellation cannot retract accepted external messages. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Model cancellable and uncertain boundaries. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Queued work stops."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Accepted send remains recorded."
+        },
+        {
+          "id": "criterion-3",
+          "label": "UI explains partial outcome."
+        }
+      ],
+      "experiment": "Race cancel with provider call. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Add provider-specific cancellation support. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-outbox-query",
+      "parentId": "effect-notify-outbox",
+      "title": "Index actionable work rather than every row",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Seed 100000 completed and 100 pending intents.",
+      "explanation": "Queue performance needs representative old and active data. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Measure claim query and choose targeted index. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Pending lookup stays bounded."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Correct jobs are claimed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Write overhead is measured."
+        }
+      ],
+      "experiment": "Test mostly leased rows. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Track oldest pending age. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-agent-outbox-review",
+      "parentId": "effect-notify-outbox",
+      "title": "Catch provider calls inside transactions",
+      "concept": "Durable intent · transactional delivery queues",
+      "brief": "Agent sends email inside ticket transaction.",
+      "explanation": "External latency cannot safely define database commit success. Business mutation and delivery intent must agree even when a process crashes. Keep provider calls outside the business transaction, give each intent a stable identity, and design workers to recover abandoned work.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Move delivery behind durable intent. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Ticket commit avoids provider wait."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Intent survives outage."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Rollback sends nothing."
+        }
+      ],
+      "experiment": "Provider hangs for thirty seconds. Record persisted state and a recovery action.",
+      "review": "Draw the transaction boundary and crash points. Ask which records exist after each failure and whether retry could invent duplicate business or notification effects.",
+      "stretch": "Add request-latency regression evidence. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-rate-limit",
+      "parentId": "effect-notify-providers",
+      "title": "Respect provider retry timing",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Provider returns 429 with retry guidance.",
+      "explanation": "Rate limiting should not trigger a retry storm. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Map retryable outcome into bounded scheduling. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Next attempt respects policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Attempts are bounded."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Other jobs remain processable."
+        }
+      ],
+      "experiment": "Return malformed retry header. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Add per-provider concurrency limits. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-bad-recipient",
+      "parentId": "effect-notify-providers",
+      "title": "Stop retrying permanent recipient failures",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Provider rejects malformed email permanently.",
+      "explanation": "Invalid destination is not a transient outage. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Classify recipient failure distinctly. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Job stops retrying."
+        },
+        {
+          "id": "criterion-2",
+          "label": "User can correct address."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Diagnostic excludes message body."
+        }
+      ],
+      "experiment": "Mix bad and valid recipients. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Add recipient repair workflow. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-ambiguous-timeout",
+      "parentId": "effect-notify-providers",
+      "title": "Keep uncertain acceptance visible",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Fake provider accepts then times out.",
+      "explanation": "A lost response cannot prove unsent status. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Represent unknown outcome and idempotent retry policy. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "UI avoids false failure certainty."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Receipt identity is retained."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry follows declared contract."
+        }
+      ],
+      "experiment": "Restart after accepted request. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Add provider lookup reconciliation. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-provider-swap",
+      "parentId": "effect-notify-providers",
+      "title": "Swap adapters without changing business logic",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Replace fake email adapter with alternate fake contract.",
+      "explanation": "Business commands must depend on delivery capability. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Provide adapter through existing Effect service boundary. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Same domain fixture works."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Errors map consistently."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Business code stays provider-agnostic."
+        }
+      ],
+      "experiment": "Remove required adapter configuration. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Create a contract test suite. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-secret-redaction",
+      "parentId": "effect-notify-providers",
+      "title": "Keep provider credentials out of errors",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Provider client throws error containing request headers.",
+      "explanation": "Debugging cannot expose authorization material. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Sanitize structured diagnostics at adapter boundary. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Logs omit token."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Error category remains useful."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Client response contains no secret."
+        }
+      ],
+      "experiment": "Trigger configuration failure. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Test redaction with synthetic markers. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-timeout-budget",
+      "parentId": "effect-notify-providers",
+      "title": "Bound total delivery attempt duration",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Three calls each exceed network timeout.",
+      "explanation": "Nested retries cannot multiply into unbounded waiting. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Define one operation budget with bounded retries. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Attempt finishes within budget."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Job retains retry state."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Resources are released."
+        }
+      ],
+      "experiment": "Interrupt during retry delay. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Separate per-call and total budgets. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-provider-response",
+      "parentId": "effect-notify-providers",
+      "title": "Decode malformed provider success",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Provider returns 200 missing message identifier.",
+      "explanation": "HTTP success alone does not establish usable acceptance. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Validate response contract explicitly. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Malformed result is classified."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No invented receipt is stored."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Diagnostic supports investigation."
+        }
+      ],
+      "experiment": "Return HTML instead of JSON. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Add response-version fixtures. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-fallback-policy",
+      "parentId": "effect-notify-providers",
+      "title": "Avoid accidental duplicate sends during fallback",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Primary times out after accepting message.",
+      "explanation": "Switching providers after uncertainty may duplicate delivery. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Allow fallback only under declared certainty policy. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Unknown primary outcome is visible."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Blind fallback is prevented."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Definite rejection can recover."
+        }
+      ],
+      "experiment": "Primary response arrives late. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Add operator-approved resend. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-provider-health",
+      "parentId": "effect-notify-providers",
+      "title": "Measure actionable delivery health",
+      "concept": "Provider adapters · typed delivery outcomes",
+      "brief": "Email fails while inbox delivery succeeds.",
+      "explanation": "Aggregate success rate can hide one broken channel. A provider adapter translates an external contract into domain outcomes. Separate permanent recipient failures, retryable infrastructure errors, and uncertain acceptance; keep provider-specific details out of UI and business commands.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Track adapter-specific outcomes and latency. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Email failure is visible."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Inbox stays healthy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Alerts identify affected scope."
+        }
+      ],
+      "experiment": "Inject one slow provider region. Record persisted state and a recovery action.",
+      "review": "Review the adapter against the installed client and provider contract. Avoid treating all thrown errors as interchangeable or promising exactly-once delivery without supporting evidence.",
+      "stretch": "Create provider degradation runbook. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-callback-signature",
+      "parentId": "effect-notify-callbacks",
+      "title": "Authenticate delivery callbacks",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Send a tampered provider-shaped callback.",
+      "explanation": "Unverified callbacks cannot mark messages delivered. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Verify raw signed material before decoding. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Tampered event fails."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Valid fixture succeeds."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No message state changes on rejection."
+        }
+      ],
+      "experiment": "Reformat signed JSON whitespace. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Test secret rotation overlap. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-callback-duplicate",
+      "parentId": "effect-notify-callbacks",
+      "title": "Apply repeated delivery events once",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Send delivered event E1 three times.",
+      "explanation": "Provider retries cannot duplicate status history. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Deduplicate stable provider event identity. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One business transition occurs."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Receipts remain diagnosable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Status stays delivered."
+        }
+      ],
+      "experiment": "Crash after update before acknowledgment. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Race two callback handlers. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-callback-order",
+      "parentId": "effect-notify-callbacks",
+      "title": "Handle accepted after delivered",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Deliver delivered then accepted callbacks.",
+      "explanation": "Older events cannot regress newer delivery evidence. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use explicit status transition rules. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Status remains delivered."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Late accepted is recorded appropriately."
+        },
+        {
+          "id": "criterion-3",
+          "label": "History explains ignored event."
+        }
+      ],
+      "experiment": "Reverse all supported event permutations. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Add provider sequence support. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-unknown-message",
+      "parentId": "effect-notify-callbacks",
+      "title": "Quarantine callbacks lacking correlation",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Callback references message never sent by this system.",
+      "explanation": "Unknown provider IDs must not mutate arbitrary messages. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Store bounded unmatched evidence under policy. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No unrelated message changes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Event is diagnosable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reconciliation can retry lookup."
+        }
+      ],
+      "experiment": "Deliver callback before send receipt commit. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Use delayed correlation safely. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-bounce-after-delivery",
+      "parentId": "effect-notify-callbacks",
+      "title": "Represent a later bounce honestly",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Receive delivered then bounce for one email.",
+      "explanation": "Delivery lifecycle may contain legitimate later failure evidence. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Model provider-supported transitions explicitly. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Bounce remains visible."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Prior delivery evidence is retained."
+        },
+        {
+          "id": "criterion-3",
+          "label": "User read state is separate."
+        }
+      ],
+      "experiment": "Receive duplicate late bounce. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Classify hard and soft bounce policy. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-callback-tenant",
+      "parentId": "effect-notify-callbacks",
+      "title": "Resolve tenant from trusted correlation",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Send valid-looking event with forged workspace field.",
+      "explanation": "Callback payload tenant fields cannot choose mutation scope. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Find internal message through provider identity. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Correct tenant record is resolved."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Foreign claim is ignored or rejected."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No cross-tenant update occurs."
+        }
+      ],
+      "experiment": "Reuse provider ID across configured accounts. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Scope correlation by provider account. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-callback-body-limit",
+      "parentId": "effect-notify-callbacks",
+      "title": "Bound callback request size",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Post a callback body exceeding configured limit.",
+      "explanation": "Authentication paths still need resource limits. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Reject oversized body before expensive processing. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Request is rejected."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Queue stays unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Service remains responsive."
+        }
+      ],
+      "experiment": "Stream without content-length header. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Add bounded diagnostic sampling. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-callback-read-state",
+      "parentId": "effect-notify-callbacks",
+      "title": "Keep email delivery separate from inbox reading",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Mark email delivered for unread inbox N4.",
+      "explanation": "Provider delivery cannot claim the recipient read the app notice. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Update channel outcome only. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Inbox stays unread."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Email shows delivered."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Counts remain consistent."
+        }
+      ],
+      "experiment": "Process provider open event under declared policy. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Explain observed versus inferred engagement. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-callback-recovery",
+      "parentId": "effect-notify-callbacks",
+      "title": "Rebuild delivery projection from receipts",
+      "concept": "Delivery events · authenticated projections",
+      "brief": "Erase disposable statuses while retaining callback receipts.",
+      "explanation": "Projection repair cannot contact the provider again. Callbacks are untrusted external events that may repeat or arrive out of order. Authenticate using the provider contract, correlate stable message identities, and keep observed delivery state separate from user read state.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Replay authenticated stored events deterministically. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Statuses reconstruct."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No new sends occur."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unknown transitions quarantine."
+        }
+      ],
+      "experiment": "Interrupt projection rebuild. Record persisted state and a recovery action.",
+      "review": "Compare callback receipts with the projected message status. Explain ordering assumptions and demonstrate that replay cannot regress an established terminal outcome accidentally.",
+      "stretch": "Version the projection reducer. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-window-boundaries",
+      "parentId": "effect-notify-digests",
+      "title": "Assign events to digest windows once",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "Events arrive exactly at 09:00 cutoff.",
+      "explanation": "Adjacent digest windows need unambiguous boundaries. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use half-open membership intervals. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Boundary event belongs to one window."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Earlier events stay in prior digest."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No gap appears."
+        }
+      ],
+      "experiment": "Run two windows concurrently. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Document source versus receipt time. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-digest-timezone",
+      "parentId": "effect-notify-digests",
+      "title": "Schedule by recipient local day",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "Users in Tokyo and New York request 08:00.",
+      "explanation": "Daily delivery is not a fixed UTC hour for everyone. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Calculate next local schedule through zone library. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each gets local 08:00."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Stored instants differ."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Clock-change policy is explicit."
+        }
+      ],
+      "experiment": "Change recipient zone overnight. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Separate display and scheduling preferences. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-empty-digest",
+      "parentId": "effect-notify-digests",
+      "title": "Avoid meaningless empty messages",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "All events in window become inaccessible.",
+      "explanation": "A successful aggregation may have no sendable content. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Skip delivery with explicit empty outcome. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No email is sent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Window is marked processed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Next window still runs."
+        }
+      ],
+      "experiment": "Remove access during aggregation. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Offer configurable empty summaries. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-digest-resume",
+      "parentId": "effect-notify-digests",
+      "title": "Resume partially completed recipient batches",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "Process 100 recipients then crash after 37.",
+      "explanation": "Restart cannot resend every finished recipient. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Checkpoint per-recipient digest outcome. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "First 37 remain settled."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Remaining 63 progress."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Duplicate policy is explicit."
+        }
+      ],
+      "experiment": "Crash after provider accepts recipient 38. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Reconcile uncertain recipient separately. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-membership-snapshot",
+      "parentId": "effect-notify-digests",
+      "title": "Keep a retry's digest content stable",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "New event arrives after digest body is prepared.",
+      "explanation": "Retry should not silently change an approved message body. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Persist selected event membership or immutable payload. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Retry uses same membership."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New event enters later window."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Evidence identifies included IDs."
+        }
+      ],
+      "experiment": "Edit source event before retry. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Choose revision snapshot policy. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-digest-optout",
+      "parentId": "effect-notify-digests",
+      "title": "Recheck preferences before digest send",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "Recipient opts out after digest preparation.",
+      "explanation": "Aggregation does not freeze permission indefinitely. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Evaluate send-time preference policy. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Digest is suppressed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Membership remains explainable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Future schedule follows preference."
+        }
+      ],
+      "experiment": "Opt back in before next window. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Define skipped-event carryover policy. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-large-digest",
+      "parentId": "effect-notify-digests",
+      "title": "Bound oversized digest content",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "Window contains 20000 ticket updates.",
+      "explanation": "One busy recipient cannot create unbounded messages. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Apply explicit item and byte limits with continuation. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Message stays bounded."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Omitted count is honest."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Link exposes authorized remaining items."
+        }
+      ],
+      "experiment": "Use extremely long event titles. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Add safe truncation and escaping. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-late-events",
+      "parentId": "effect-notify-digests",
+      "title": "Choose a policy for late-arriving events",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "Yesterday's event is received today.",
+      "explanation": "Old source timestamps can arrive after a digest closes. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use documented late-event inclusion rule. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Event is not silently lost."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Its actual time is shown."
+        },
+        {
+          "id": "criterion-3",
+          "label": "It appears once under policy."
+        }
+      ],
+      "experiment": "Replay same late event tomorrow. Record persisted state and a recovery action.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Measure lateness distribution. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-notifications-digest-release",
+      "parentId": "effect-notify-digests",
+      "title": "Verify restart across digest format upgrades",
+      "concept": "Digest windows · resumable aggregation",
+      "brief": "Upgrade the digest template while old prepared jobs remain, using isolated storage and a fake delivery provider.",
+      "explanation": "Prepared digests may survive deployment changes. Digest delivery combines a bounded event window with recipient policy and external side effects. Snapshot or checkpoint the chosen membership, keep scheduling zone-aware, and make restart behavior explicit for every recipient.",
+      "steps": [
+        "Before restoring pending jobs, configure isolated storage and a fake provider; assert that the rehearsal cannot reach the live delivery adapter.",
+        "Version the prepared payload and rendering contract so old jobs retain their membership and supported template interpretation.",
+        "Run old and new prepared jobs through the isolated worker, restart it, and compare message bodies and recipient receipts with the fixtures."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old job remains readable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New job uses new template."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Restore and rollback rehearsals produce no live provider calls and retain an explicit outcome for every prepared digest."
+        }
+      ],
+      "experiment": "Restore a backup containing pending digests into the isolated environment, then start the worker. Verify the fake provider receives the expected jobs and the live-provider call counter remains zero.",
+      "review": "Inspect digest membership and send receipts separately. Ask how a retry proves which events were included without silently dropping or repeating events across windows.",
+      "stretch": "Make the worker refuse startup when a restore-rehearsal marker is combined with live-provider configuration, and test that guard before processing any job.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ],
+  "track": "Project practice"
+}

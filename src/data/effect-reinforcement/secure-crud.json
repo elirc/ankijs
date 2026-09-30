@@ -1,0 +1,657 @@
+{
+  "project": {
+    "id": "secure-crud",
+    "title": "Secure CRUD foundations lab",
+    "summary": "Build a tenant-scoped document desk and make authentication, authorization, browser boundaries, input handling, and regression evidence explicit.",
+    "outcome": "A defensive CRUD service that rejects unauthorized object access, protects session-based writes, handles untrusted content safely, and runs with restricted privileges.",
+    "prerequisites": "A working HTTP CRUD slice, runtime input decoding, and basic database relationships. Use a local disposable fixture and established authentication libraries.",
+    "model": [
+      "Users Ada U1 and Bo U2 belong to tenant A; Cy U3 belongs to tenant B. Ada is editor, Bo is viewer, and Cy is editor.",
+      "Document D1 belongs to tenant A and D2 to tenant B; each has title, plain-text body, revision, and attachment metadata.",
+      "Sessions map opaque random identifiers to server-validated principals; membership and role are authoritative server facts."
+    ],
+    "boundaries": "Browser → session and CSRF boundary → decoded command → Effect authorization operation → tenant-scoped repository → constrained storage. The caller never supplies trusted principal, role, or tenant membership facts.",
+    "resources": [
+      {
+        "label": "OWASP authorization guidance",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+      },
+      {
+        "label": "OWASP session management",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html"
+      },
+      {
+        "label": "OWASP CSRF prevention",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html"
+      },
+      {
+        "label": "OWASP SQL injection prevention",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+      },
+      {
+        "label": "OWASP output encoding",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+      },
+      {
+        "label": "OWASP file upload",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"
+      },
+      {
+        "label": "OWASP database security",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Database_Security_Cheat_Sheet.html"
+      }
+    ],
+    "kind": "Standalone app",
+    "track": "Fundamentals",
+    "milestones": [
+      {
+        "id": "effect-secure-crud-identity",
+        "title": "Separate identity from permission",
+        "concept": "Authentication · authorization · trusted principal",
+        "brief": "Build a document-edit operation that knows who is calling and independently decides whether that caller may edit.",
+        "explanation": "Authentication establishes an identity from a validated credential or session. Authorization evaluates whether that identity may perform a particular action on a particular resource in the current context. A signed-in user is not automatically an editor, and hiding a button does not enforce a permission. Pass a trusted principal through the server boundary while loading role and membership from authoritative state. Keep expected denial separate from infrastructure failure so unavailable membership storage cannot accidentally become permission granted.",
+        "steps": [
+          "Seed Ada U1 as tenant-A editor, Bo U2 as tenant-A viewer, and D1 as an A document.",
+          "Resolve the principal from the server session, then make the Effect edit operation require a permission decision before invoking the write repository.",
+          "Call the same endpoint as Ada, Bo, and an unauthenticated client, including a request body that claims role = editor."
+        ],
+        "checks": [
+          "Ada can edit D1 and the returned revision matches the stored row.",
+          "Bo cannot edit even when directly calling the endpoint or submitting an editor role.",
+          "Unauthenticated access and authenticated denial follow the documented response policy without any mutation."
+        ],
+        "experiment": "Make membership lookup fail and verify the operation fails closed rather than treating an unavailable role as a default editor.",
+        "review": "Explain where identity evidence originates and ask an agent to trace every field used in the permission decision back to a trusted source.",
+        "stretch": "Represent permissions as actions such as document:edit so role naming can evolve without duplicating checks across routes.",
+        "stage": "Build independently",
+        "minutes": 75,
+        "workedExample": "Ada's session resolves to U1; membership storage says U1 is an A editor, so editing A document D1 is allowed. Bo's session resolves to U2, whose role is viewer, so the same command is denied before SQL mutation. A body containing {role:'editor'} changes neither principal nor membership. Authentication succeeded for Bo, but authorization did not, demonstrating two separate decisions rather than one login gate.",
+        "retrieval": [
+          {
+            "question": "Does a valid session prove edit permission?",
+            "answer": "No. It proves identity under the session policy; resource-specific action permission still needs evaluation."
+          },
+          {
+            "question": "Why should the operation receive a trusted principal instead of a userId from the body?",
+            "answer": "A caller can edit body fields, while a trusted principal is derived from validated server-side authentication evidence."
+          }
+        ]
+      },
+      {
+        "id": "effect-secure-crud-sessions",
+        "title": "Protect the browser session boundary",
+        "concept": "Opaque sessions · cookies · CSRF",
+        "brief": "Implement session-authenticated writes with deliberate cookie and request-origin protections.",
+        "explanation": "A session cookie is a credential the browser may attach automatically. Protecting its contents from JavaScript with HttpOnly does not stop the browser from sending it on a forged request. Secure restricts cookie transmission to secure transport, while SameSite supplies useful browser restrictions whose behavior must match the deployment. For cookie-authenticated mutations, use the framework's established CSRF protection or a validated session-bound token plus appropriate origin checks. CORS governs script access to cross-origin responses and is not a substitute for authorization or CSRF defenses.",
+        "steps": [
+          "Use an established session implementation with opaque random identifiers, server validation, appropriate expiry, and deliberate Secure, HttpOnly, and SameSite settings.",
+          "Require a validated CSRF mechanism for state-changing document requests and keep GET routes free of intentional mutations.",
+          "Test a valid same-origin edit, an edit with missing or wrong CSRF evidence, and an expired session using local fixtures."
+        ],
+        "checks": [
+          "A legitimate edit works with the expected session and CSRF evidence.",
+          "Missing or invalid CSRF evidence causes no document mutation.",
+          "Cookie and expiry settings match the deployment and the session credential never appears in application logs."
+        ],
+        "experiment": "Submit a state-changing request from a separate local test origin with the browser's available credentials and verify the server rejects it under the chosen protection.",
+        "review": "Explain what each cookie attribute does and ask an agent to avoid claiming HttpOnly or CORS alone solves CSRF.",
+        "stretch": "Document token rotation and multiple-tab behavior using the selected framework's supported session mechanisms.",
+        "stage": "Build independently",
+        "minutes": 75,
+        "workedExample": "Ada's cookie identifies session S1, and the edit page obtains valid CSRF evidence bound to that session policy. Her legitimate request edits D1. A second request carrying the cookie but missing the required CSRF evidence is rejected before the operation writes. HttpOnly helps prevent script access to S1, but the browser still attaches cookies automatically; the server therefore checks the mutation's separate CSRF protection.",
+        "retrieval": [
+          {
+            "question": "Why does HttpOnly not prevent CSRF?",
+            "answer": "It limits script reading of the cookie, not automatic browser transmission of that cookie with requests."
+          },
+          {
+            "question": "Is successful CORS configuration proof that an edit is authorized?",
+            "answer": "No. The server must independently validate identity, CSRF requirements, and resource-specific permission."
+          }
+        ]
+      },
+      {
+        "id": "effect-secure-crud-tenant-scope",
+        "title": "Authorize the object, not just the route",
+        "concept": "Object authorization · tenant-scoped repositories",
+        "brief": "Prevent a valid editor in tenant B from reading or editing a tenant-A document by changing its identifier.",
+        "explanation": "A route-level login check does not establish access to the object named in the URL. Resolve tenant membership from the trusted principal and scope resource access accordingly. Include the authorized tenant in repository queries and mutations so a later code path cannot forget the relationship. Opaque IDs reduce guessability but are not permission checks. Choose a consistent denial-versus-not-found response policy that avoids unnecessary existence disclosure while keeping internal diagnostics useful. Apply the same rule to reads, edits, deletions, and alternate resource representations.",
+        "steps": [
+          "Seed D1 in A and D2 in B; authenticate Cy as a B editor and request D1 by its known fixture identifier.",
+          "Implement repository lookups and conditional updates that include both document ID and authorized tenant scope.",
+          "Exercise read, edit, delete, attachment lookup, and list endpoints under Ada, Bo, and Cy."
+        ],
+        "checks": [
+          "Cy cannot retrieve D1's title, body, metadata, or attachment contents.",
+          "A cross-tenant write changes zero rows even when its ID and revision are valid.",
+          "Authorized users retain their intended same-tenant read or edit capabilities."
+        ],
+        "experiment": "Remove the tenant predicate from one repository mutation in the disposable fixture and confirm the regression test detects the unauthorized row change.",
+        "review": "Ask an agent to trace the trusted tenant source and explain why a URL tenantId is only a requested scope until membership is verified.",
+        "stretch": "Add composite foreign keys for tenant-owned relationships where useful, while retaining operation-level authorization.",
+        "stage": "Make it reliable",
+        "minutes": 75,
+        "workedExample": "Cy's session resolves to U3 with membership in B. A request names D1, but the repository looks for id = D1 and tenantId = B, finding no authorized row. D1 remains in A at its original revision. Requesting D2 succeeds under Cy's editor permission. Knowing D1's exact identifier did not change the authorized scope, and submitting tenantId = A in the body did not establish membership.",
+        "retrieval": [
+          {
+            "question": "Why are unpredictable object IDs insufficient authorization?",
+            "answer": "Anyone who learns an identifier could still access it unless the server checks the principal's relationship to the object."
+          },
+          {
+            "question": "What should a tenantId from a URL represent?",
+            "answer": "A requested scope that must be validated against trusted membership, not an automatically trusted authorization fact."
+          }
+        ]
+      },
+      {
+        "id": "effect-secure-crud-injection",
+        "title": "Separate data from executable syntax",
+        "concept": "Parameterized SQL · output encoding",
+        "brief": "Store and display untrusted document text without letting it become SQL or executable browser markup.",
+        "explanation": "Input validation defines accepted domain values, while injection prevention keeps data separate from executable syntax. Bind SQL values through the database driver's parameter mechanism; do not concatenate user text into statements. Render plain text through the UI framework's safe text path rather than inserting raw HTML. Encoding depends on output context, so HTML text handling does not automatically make a value safe as a URL, script, or style. Keep the lesson's content inert and local, with tests verifying literal text and unchanged database structure.",
+        "steps": [
+          "Create D1 title O'Reilly notes and body <b>draft</b>; persist both through parameterized repository statements.",
+          "Render the body as plain text, then inspect that the angle brackets remain visible instead of producing a bold element.",
+          "Allowlist supported sort fields separately from bound search values and reject unknown sort identifiers before building SQL."
+        ],
+        "checks": [
+          "The apostrophe-containing title round-trips exactly and creates no SQL syntax error.",
+          "The body displays literal markup text without introducing executable or structural HTML.",
+          "Unsupported sort columns cannot become raw SQL identifiers supplied by the caller."
+        ],
+        "experiment": "Replace a safe text render with raw HTML insertion in the disposable view and observe the harmless formatting change; restore safe rendering and retain the regression.",
+        "review": "Explain validation versus parameter binding versus output encoding, and ask an agent to identify each context where user data crosses into syntax.",
+        "stretch": "Add a URL field with explicit allowed schemes instead of assuming text escaping makes every URL safe.",
+        "stage": "Make it reliable",
+        "minutes": 75,
+        "workedExample": "O'Reilly notes is bound as one SQL value, so its apostrophe remains part of the title rather than ending a SQL string. The body <b>draft</b> is stored exactly as supplied under the plain-text contract. Safe text rendering displays the tags visibly instead of constructing a bold element. Sort = title maps to a known column; sort = unknown is rejected before SQL is constructed.",
+        "retrieval": [
+          {
+            "question": "Can title-length validation replace SQL parameter binding?",
+            "answer": "No. Valid-length text can contain syntax characters; parameter binding keeps all accepted values in the data channel."
+          },
+          {
+            "question": "Why does HTML text encoding not settle URL safety?",
+            "answer": "A URL has scheme and destination semantics that need their own validation even when characters are escaped."
+          }
+        ]
+      },
+      {
+        "id": "effect-secure-crud-uploads",
+        "title": "Handle attachments as untrusted objects",
+        "concept": "File validation · storage isolation · authorized download",
+        "brief": "Add a small PDF attachment flow with explicit size, type, identity, and access controls.",
+        "explanation": "A filename and browser-provided content type are claims, not proof of file contents or permission. Use generated storage identifiers, enforce size limits during ingestion, and inspect content according to the accepted format with maintained libraries or scanning services where appropriate. Keep untrusted uploads outside executable application paths and serve them through an authorized download flow. Validation reduces accepted risk but does not make a complex file format inherently harmless. Model upload acceptance, processing, and availability separately so a rejected file never appears ready.",
+        "steps": [
+          "Accept only the lab's bounded PDF attachment type for D1, assign a generated storage key, and preserve the original filename only as display metadata.",
+          "Enforce request and streamed-byte limits, inspect the file using the chosen maintained tooling, and record pending versus accepted metadata.",
+          "Require document authorization before download and return deliberate content type and disposition headers without exposing storage paths."
+        ],
+        "checks": [
+          "Oversized or format-mismatched files are rejected without leaving a ready attachment record.",
+          "An accepted attachment is available only through the authorized document relationship.",
+          "The original filename cannot choose a filesystem location or overwrite application files."
+        ],
+        "experiment": "Upload a harmless text file labeled application/pdf and a tiny valid PDF; verify the metadata claim alone does not determine acceptance.",
+        "review": "Ask an agent to trace temporary-file cleanup, final storage identity, and download authorization as separate responsibilities.",
+        "stretch": "Add a quarantine state and a recovery policy for interrupted scanning without labeling unscanned files as safe.",
+        "stage": "Own the outcome",
+        "minutes": 75,
+        "workedExample": "Ada uploads report.pdf with a claimed PDF content type. The server generates storage key F17 instead of using report.pdf as a path, enforces the byte limit, and verifies the accepted format. A text file with the same name and type claim is rejected. The accepted F17 belongs to D1; Cy cannot download it because the parent document is outside tenant B, regardless of knowing F17.",
+        "retrieval": [
+          {
+            "question": "Why is checking the filename extension insufficient?",
+            "answer": "The extension is caller-controlled metadata and can disagree with the bytes or processing behavior."
+          },
+          {
+            "question": "Why keep attachment readiness separate from record existence?",
+            "answer": "An upload can exist while validation or scanning is incomplete, and should not be downloadable as an accepted file yet."
+          }
+        ]
+      },
+      {
+        "id": "effect-secure-crud-privileges",
+        "title": "Run the application with only needed authority",
+        "concept": "Least privilege · database roles · secret boundaries",
+        "brief": "Separate runtime database access from migration authority and prove the runtime account cannot change schema.",
+        "explanation": "Least privilege reduces the consequences of a mistake or compromised component by limiting available actions. The web process usually needs specific data operations, not unrestricted schema administration. Separate migration credentials from runtime credentials and keep secrets in server-side configuration rather than browser bundles or committed fixtures. Restriction must be tested with the actual application account: a policy document is not evidence that grants are correct. Authorization inside the application remains necessary even when the database account has limited privileges.",
+        "steps": [
+          "Create a disposable runtime database role with only the tables and operations required by the document service, plus a separate migration role.",
+          "Run normal create, read, and edit flows under runtime credentials, then attempt a schema change and access to an unrelated table.",
+          "Inspect frontend configuration and build inputs to ensure server credentials are not exported into client-visible environment variables."
+        ],
+        "checks": [
+          "Required document operations work under the restricted runtime role.",
+          "Schema changes and unrelated-table access fail under that role.",
+          "Migration credentials are unavailable to the running web process and absent from browser-visible configuration."
+        ],
+        "experiment": "Run the service temporarily with an administrative test role and compare the actions it can perform; restore the restricted role before completing the lab.",
+        "review": "Ask an agent to justify each granted privilege with a real operation and identify secrets that could cross the server-to-client build boundary.",
+        "stretch": "Separate read-only reporting access from mutation access and test both principals against the same fixture.",
+        "stage": "Own the outcome",
+        "minutes": 75,
+        "workedExample": "The runtime role can SELECT documents and perform the allowed INSERT and UPDATE operations needed by the app. An attempted ALTER TABLE is denied, while the migration role can perform the intended schema upgrade in its separate workflow. This does not decide whether Bo may edit D1; application authorization still denies him. Database privilege limits constrain what the process can do, while domain authorization constrains what each user can request.",
+        "retrieval": [
+          {
+            "question": "Does a restricted database role replace tenant authorization?",
+            "answer": "No. It limits the process's database capabilities but may still span data belonging to multiple application users or tenants."
+          },
+          {
+            "question": "Why separate migration credentials?",
+            "answer": "Schema-changing authority is needed during controlled upgrades, not for every ordinary web request."
+          }
+        ]
+      }
+    ]
+  },
+  "drills": [
+    {
+      "id": "effect-secure-crud-permission-matrix",
+      "title": "Turn permissions into an explicit matrix",
+      "concept": "Deny by default · action inventory",
+      "brief": "Describe who can list, read, create, edit, and delete before scattering conditional checks through handlers.",
+      "explanation": "Permission rules become difficult to audit when every route invents its own role comparison. A matrix makes actions, resource relationships, and allowed roles explicit. Deny by default means an unlisted action or unknown role is not silently granted access. The matrix is still a domain model, not proof of enforcement: routes, background operations, exports, and alternate representations must actually use it. Test allowed behavior as well as denial so a secure implementation remains useful to legitimate users.",
+      "steps": [
+        "Create a matrix where A viewers may list and read A documents, A editors may additionally create and edit, and deletion requires a separately defined owner role.",
+        "Implement one policy seam and wire every document route to the corresponding action rather than reusing a generic isLoggedIn check.",
+        "Run table-driven cases for Ada, Bo, Cy, an unknown role, and no principal against D1 and the collection endpoint."
+      ],
+      "checks": [
+        "Every route has an explicitly named action and denied cases cause no repository mutation.",
+        "Unknown roles and newly added unregistered actions are denied.",
+        "Bo can still read authorized A documents, proving the policy is not merely blocking everyone."
+      ],
+      "experiment": "Add an export endpoint without registering its permission action and verify the default behavior denies access until its policy is explicit.",
+      "review": "Ask an agent to list every entry point that can reveal document data and compare that inventory with the matrix.",
+      "stretch": "Add a review requirement for permission changes so a new action cannot inherit editor power accidentally.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "For D1 in tenant A, Bo's viewer row allows read but denies edit and delete. Ada's editor row allows read and edit but still denies the owner-only delete. Cy is an editor in B, so A's resource relationship fails before the role can authorize anything. An unknown role matches no allow rule. The matrix therefore evaluates both relationship and action rather than ranking all users on one universal ladder.",
+      "retrieval": [
+        {
+          "question": "Why test legitimate access alongside denials?",
+          "answer": "A policy that denies everyone may prevent disclosure but fails the application's required behavior."
+        },
+        {
+          "question": "What should happen when a new action has no policy entry?",
+          "answer": "It should remain denied until an explicit rule and its tests are added."
+        }
+      ],
+      "parentId": "effect-secure-crud-identity"
+    },
+    {
+      "id": "effect-secure-crud-revocation",
+      "title": "Observe changed permissions during a session",
+      "concept": "Revocation · session freshness · fail closed",
+      "brief": "Remove Ada's editor membership while her browser still has an open edit form.",
+      "explanation": "Authorization information can change after login. A long-lived browser view or cached role is only an observation, not permanent authority. Choose a freshness policy for membership checks and a revocation mechanism consistent with the application's needs. For this lab, read current membership at each protected operation. Rechecking at the UI alone is insufficient because direct requests remain possible. Preserve the user's draft after denial, but do not reinterpret the old role or a transient lookup failure as authorization.",
+      "steps": [
+        "Open D1 as Ada while she is an A editor, retaining a local draft at revision 4.",
+        "Change Ada's membership to viewer in authoritative storage without changing the browser's existing form.",
+        "Submit the draft through the existing session and make the operation evaluate current permission before any write."
+      ],
+      "checks": [
+        "The stale editor UI cannot perform a write after membership changes.",
+        "The denied submission preserves local text while clearly explaining that permission changed.",
+        "A membership-store outage grants no access and remains distinguishable in restricted diagnostics from an ordinary denial."
+      ],
+      "experiment": "Cache the editor role indefinitely in a session object and repeat revocation; measure the stale privilege before restoring current checks.",
+      "review": "Explain the chosen freshness guarantee and ask an agent to identify any alternate route that trusts the old browser role.",
+      "stretch": "Design bounded caching with an explicit invalidation strategy and document its maximum revocation delay.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "At 10:00 Ada opens D1 while membership says editor. At 10:05 an administrator changes her role to viewer. At 10:06 her still-open form submits a title edit. The session continues proving U1's identity, but the current membership check now denies document:edit. D1 remains revision 4. The draft can remain visible locally because retaining intent is different from accepting a server mutation.",
+      "retrieval": [
+        {
+          "question": "Does revoking a role always require logging the user out?",
+          "answer": "Not necessarily; identity may remain valid while the set of allowed actions changes."
+        },
+        {
+          "question": "What must be explicit when authorization decisions are cached?",
+          "answer": "Their freshness and invalidation policy, including how long revoked permission could remain effective."
+        }
+      ],
+      "parentId": "effect-secure-crud-identity"
+    },
+    {
+      "id": "effect-secure-crud-session-life",
+      "title": "Rotate and revoke session credentials",
+      "concept": "Session fixation · logout · expiry",
+      "brief": "Make login, privilege changes, and logout produce observable changes in accepted session credentials.",
+      "explanation": "A session identifier should be an opaque unpredictable credential, not an encoded user ID or a reusable URL parameter. Established authentication systems rotate session identifiers at important trust transitions and invalidate old credentials according to their lifecycle policy. Logging out must invalidate server acceptance, not merely clear a browser label. Absolute and idle expiry answer different questions. Keep tests focused on observable acceptance of old and current credentials, and avoid implementing custom cryptography when a maintained session library supplies these mechanisms.",
+      "steps": [
+        "Using the chosen session library, record anonymous session A0, complete login, and confirm issuance of a fresh authenticated session A1.",
+        "Implement logout that invalidates A1 server-side and clears the browser cookie with matching attributes.",
+        "Test replay of A0 and A1 after their transitions, plus an expired session using a controllable test clock."
+      ],
+      "checks": [
+        "A pre-login identifier cannot be reused as an authenticated credential after login.",
+        "A logged-out session is rejected even when manually supplied to a direct request.",
+        "Expiry behavior follows the documented idle and absolute lifetime policy rather than only hiding UI controls."
+      ],
+      "experiment": "Implement a temporary client-only logout that clears local state, then replay the old cookie to reveal continued server access.",
+      "review": "Ask an agent to explain credential rotation and invalidation evidence without printing raw session tokens into test output.",
+      "stretch": "Test two concurrent tabs during logout and ensure stale responses cannot restore an authenticated client view.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "A0 represents the anonymous browser. Login creates A1 for Ada and ends any inappropriate trust in A0. A1 can read D1 while valid. Logout revokes A1 in the server's session authority and clears its cookie. Replaying A1 through a direct request now fails; merely showing a signed-out screen would not establish this. An expired A1 likewise fails even if its cookie still exists in an old browser profile.",
+      "retrieval": [
+        {
+          "question": "Why is removing a username from local storage not sufficient logout?",
+          "answer": "The server may still accept the old credential unless it is invalidated or expired under the session policy."
+        },
+        {
+          "question": "Why avoid exposing session IDs in diagnostic output?",
+          "answer": "They are bearer credentials; possession may grant the same access as the user until expiry or revocation."
+        }
+      ],
+      "parentId": "effect-secure-crud-sessions"
+    },
+    {
+      "id": "effect-secure-crud-origin-boundaries",
+      "title": "Distinguish origins, sites, and credentials",
+      "concept": "Browser security model · CORS · SameSite",
+      "brief": "Document the trust boundary between a frontend origin and its API before enabling credentialed requests.",
+      "explanation": "An origin includes scheme, host, and port. Browser same-origin restrictions and cookie SameSite rules are related but distinct concepts; sharing a parent domain does not make two origins identical. Credentialed cross-origin access needs a deliberate allowlist and compatible cookie policy. Do not reflect every supplied Origin into an allowed response. Even when a browser blocks a script from reading a response, the request may still require server-side CSRF protection and authorization. Test the actual deployment arrangement instead of assuming localhost behavior proves production behavior.",
+      "steps": [
+        "List the frontend and API origins, including scheme and port, and decide whether they are same-origin or require cross-origin access.",
+        "Configure the local API to allow only the intended frontend for credentialed script access using established server middleware.",
+        "Test the allowed frontend, a disallowed local origin, and a direct non-browser request against the same authenticated read and mutation routes."
+      ],
+      "checks": [
+        "Only the intended origin receives the configured credentialed cross-origin response permission.",
+        "A disallowed browser origin gains no special authorization from its Origin header.",
+        "Direct requests still require valid authentication and authorization because CORS is not an API access-control mechanism."
+      ],
+      "experiment": "Temporarily reflect any Origin and compare the resulting response headers; restore the allowlist and retain a regression case.",
+      "review": "Explain origin versus site and ask an agent to justify every credential and cookie setting for the actual hostnames.",
+      "stretch": "Add a staging-domain case and ensure preview deployments do not silently expand the production allowlist.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "https://app.example.test and https://api.example.test are different origins because their hosts differ. The API may explicitly allow the app origin for credentialed access, while https://other.example.test remains excluded. That browser permission still does not make Cy an A-tenant editor. A command-line request has no browser CORS enforcement, so the same server authorization policy must independently deny Cy's attempted edit of D1.",
+      "retrieval": [
+        {
+          "question": "Does sharing a parent domain imply the same origin?",
+          "answer": "No. Scheme, host, and port determine an origin; sibling hosts are different origins."
+        },
+        {
+          "question": "Why must authorization work without an Origin header?",
+          "answer": "Non-browser clients are not governed by browser CORS enforcement and can call the API directly."
+        }
+      ],
+      "parentId": "effect-secure-crud-sessions"
+    },
+    {
+      "id": "effect-secure-crud-nested-access",
+      "title": "Check relationships on nested resources",
+      "concept": "Parent-child authorization · attachment lookup",
+      "brief": "Reject an attachment identifier that does not belong to the authorized document in its URL.",
+      "explanation": "Nested URLs suggest relationships but do not enforce them. Loading an attachment only by its own ID can ignore the document and tenant named in the route. Check the full relationship in the repository query or validate it before releasing data. This applies equally to comments, revisions, exports, and download tokens. An authorized parent does not authorize an arbitrary child, and an authorized child lookup should not accidentally expose storage keys or sibling metadata. Test mismatched but valid identifiers rather than only nonexistent ones.",
+      "steps": [
+        "Seed D1/A with attachment F1 and D2/B with F2; define /documents/:documentId/attachments/:attachmentId.",
+        "Query the attachment through its authorized document and tenant relationship, returning only public metadata or a permitted download.",
+        "Request D1/F1 as Ada, D1/F2 as Ada, and D2/F2 as Cy with known fixture identifiers."
+      ],
+      "checks": [
+        "Ada can access F1 but cannot access F2 by pairing it with authorized D1.",
+        "A mismatched parent-child request produces no attachment bytes or internal storage key.",
+        "Cy retains valid access to F2 through D2 under the same policy."
+      ],
+      "experiment": "Change the query to attachment.id alone and run the mismatched fixture; restore the relationship predicate when the test exposes the leak.",
+      "review": "Explain which foreign key proves data shape and which principal check proves access, then ask an agent to inspect every nested lookup.",
+      "stretch": "Issue short-lived download grants only after authorization and bind their scope to the intended object and action.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "F1 belongs to D1 in A; F2 belongs to D2 in B. Ada requests /documents/D1/attachments/F2. D1 is authorized, but F2's documentId is D2, so the joined relationship does not match and no bytes are returned. A handler that fetched D1 for permission and then fetched F2 independently would miss this mismatch. The full relationship, not URL appearance, determines the valid resource.",
+      "retrieval": [
+        {
+          "question": "Why test a real child under the wrong parent?",
+          "answer": "A nonexistent child tests absence; a valid mismatched child exposes missing relationship enforcement."
+        },
+        {
+          "question": "Does an attachment foreign key alone authorize a caller?",
+          "answer": "No. It ensures the parent exists, while authorization determines whether the caller may access that relationship."
+        }
+      ],
+      "parentId": "effect-secure-crud-tenant-scope"
+    },
+    {
+      "id": "effect-secure-crud-bulk-authorization",
+      "title": "Preserve scope in bulk operations",
+      "concept": "Batch authorization · atomicity policy",
+      "brief": "Define what happens when a bulk archive request mixes authorized and unauthorized document IDs.",
+      "explanation": "Bulk operations can bypass careful single-record checks if they accept an ID list and run one broad update. Decide whether the batch is atomic or permits per-item results, and make that policy explicit. For an atomic command, verify that every requested unique object is within authorized scope and that the mutation remains scoped. Avoid revealing unauthorized object details in error reports. Bound batch size and handle duplicate IDs deliberately so a count mismatch does not create misleading authorization decisions.",
+      "steps": [
+        "Seed A documents D1 and D3 plus B document D2; choose all-or-nothing archival for this lab.",
+        "Decode and deduplicate a bounded ID list, authorize the requested scope, and perform the scoped mutation in the chosen transaction boundary.",
+        "Submit [D1,D3], [D1,D2], duplicate [D1,D1], and an oversized list under Ada's identity."
+      ],
+      "checks": [
+        "The authorized batch archives both A documents.",
+        "The mixed batch archives neither document and discloses no B document content.",
+        "Duplicates and oversized input follow the documented contract without weakening the authorization check."
+      ],
+      "experiment": "Perform authorized updates before discovering an unauthorized item and observe the partial result that violates all-or-nothing semantics.",
+      "review": "Ask an agent to explain the transaction boundary and why affected-row counts are compared against unique requested IDs.",
+      "stretch": "Design a separate partial-success API with explicit per-item outcomes if the product needs that behavior.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "Ada submits [D1,D2], where D1 belongs to A and D2 to B. The atomic policy rejects the batch and D1 remains unarchived; it does not silently process the authorized subset. For [D1,D1], deduplication yields one requested object, so a single affected row is not mistaken for a missing permission. [D1,D3] passes and archives both in one committed operation.",
+      "retrieval": [
+        {
+          "question": "Why must batch semantics be explicit?",
+          "answer": "Users and callers need to know whether one denied item prevents all changes or produces partial success."
+        },
+        {
+          "question": "Why keep tenant predicates in the final UPDATE after a permission precheck?",
+          "answer": "The mutation itself must preserve scope and should not rely on a broad unscoped write being safe because of earlier code."
+        }
+      ],
+      "parentId": "effect-secure-crud-tenant-scope"
+    },
+    {
+      "id": "effect-secure-crud-query-shape",
+      "title": "Allowlist query structure separately from values",
+      "concept": "SQL identifiers · search semantics · bounded queries",
+      "brief": "Support sorting and literal text search without turning user options into SQL fragments.",
+      "explanation": "Most database parameter mechanisms bind values rather than arbitrary SQL identifiers or keywords. A sort option should map to a fixed server-owned expression, not be pasted into ORDER BY. Search semantics also deserve precision: a bound LIKE value is safe from SQL injection but may still interpret percent and underscore as pattern characters. Decide whether the product offers literal substring search or patterns, escape according to that choice, and bound result size. Security and predictable product behavior are related but distinct requirements.",
+      "steps": [
+        "Define allowed sort options titleAsc and updatedDesc, mapping each to fixed SQL ordering with an ID tiebreaker.",
+        "Implement literal substring search for a title containing 100% complete, using bound values and deliberate wildcard escaping.",
+        "Reject unknown sort options and cap page size; test an apostrophe, percent sign, underscore, and empty query with fixture documents."
+      ],
+      "checks": [
+        "Unsupported sort text is rejected rather than interpolated into the statement.",
+        "Searching literal 100% returns the intended percent-sign title instead of every 100-prefixed title.",
+        "Page size remains bounded even when the caller requests a very large number."
+      ],
+      "experiment": "Bind a LIKE pattern without literal escaping and compare 100% with 100 percent; explain why this is a semantic mismatch even though binding prevents SQL injection.",
+      "review": "Ask an agent to mark which SQL pieces are fixed structure and which are bound values, including ordering direction.",
+      "stretch": "Use a query-plan fixture to verify that the supported search mode has an acceptable cost at the intended dataset size.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "The UI sends sort = titleAsc and query = 100%. The server maps titleAsc to a fixed title-and-ID ordering and builds a bound literal-substring pattern that treats the percent as data. Document D1 titled 100% complete matches; D2 titled 100 tasks does not. Sending sort = arbitrary is a decoding error. No caller-controlled text is promoted into a SQL identifier to make the query flexible.",
+      "retrieval": [
+        {
+          "question": "Does parameter binding automatically make LIKE treat percent literally?",
+          "answer": "No. It separates SQL syntax from data, but the LIKE operator still interprets pattern characters unless the application escapes them."
+        },
+        {
+          "question": "Why map sort names to fixed expressions?",
+          "answer": "Identifiers and ordering syntax are query structure; an allowlist lets the server own that structure while exposing controlled choices."
+        }
+      ],
+      "parentId": "effect-secure-crud-injection"
+    },
+    {
+      "id": "effect-secure-crud-rich-content",
+      "title": "Choose a safe rich-text contract",
+      "concept": "Output contexts · sanitization · stored content",
+      "brief": "Decide whether document bodies are plain text, structured rich text, or sanitized HTML before enabling formatting.",
+      "explanation": "Switching from plain text to rich text changes the rendering trust boundary. Escaping all HTML preserves text but removes intended formatting; allowing arbitrary HTML introduces capabilities the product may not need. A maintained sanitizer or structured document format can constrain allowed elements and attributes, but its output must be used in the intended context and kept current. Do not build a homemade regular-expression sanitizer. Keep original input, sanitized output, and editing behavior conceptually separate so later rendering paths cannot accidentally bypass the chosen policy.",
+      "steps": [
+        "Keep plain text as the default and define a small allowed rich-text feature set such as paragraphs, emphasis, and safe links.",
+        "Use a maintained rendering or sanitization library consistent with the installed stack, then test harmless allowed formatting and disallowed structural elements.",
+        "Render the same stored body in detail, preview, and export views through the shared policy rather than separate raw HTML paths."
+      ],
+      "checks": [
+        "Allowed emphasis renders as intended while unsupported elements and attributes are removed or rejected under the documented policy.",
+        "A safe-link policy validates schemes independently of label text.",
+        "All display surfaces apply the same trust decision, including previously stored content."
+      ],
+      "experiment": "Bypass the shared renderer in preview and use a harmless unsupported element to prove the alternate path differs before fixing it.",
+      "review": "Explain why sanitization is a context-specific policy and ask an agent to inventory every raw HTML insertion in the proposed diff.",
+      "stretch": "Add a migration or render-time strategy for content stored before the sanitization policy changed.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "The product permits paragraph and emphasis nodes but not arbitrary embedded frames. Input containing a paragraph with emphasized draft text renders that emphasis. An unsupported frame node is rejected or removed by the selected policy and never reaches the renderer as an active embed. A link label remains text, while its URL must independently satisfy the allowed-scheme rule. Preview and detail share this interpretation instead of trusting the same stored string differently.",
+      "retrieval": [
+        {
+          "question": "Why is a homegrown regex filter a poor HTML security boundary?",
+          "answer": "HTML parsing and context rules are complex; incomplete string matching can miss representations that a browser interprets differently."
+        },
+        {
+          "question": "Why test preview and export as well as the main page?",
+          "answer": "Stored content can become unsafe in any rendering surface that bypasses the shared policy."
+        }
+      ],
+      "parentId": "effect-secure-crud-injection"
+    },
+    {
+      "id": "effect-secure-crud-bounded-input",
+      "title": "Bound work before expensive processing",
+      "concept": "Request limits · streaming · resource budgets",
+      "brief": "Reject oversized document bodies and uploads before they consume unbounded memory or CPU.",
+      "explanation": "Validation after fully buffering input may enforce a domain length rule too late to protect server resources. Apply coarse transport limits before expensive decoding, then finer domain limits after parsing. Count the relevant unit: bytes for network and storage budgets, characters or grapheme clusters for user-facing text rules where chosen. Bound collection sizes and nested structure as well as individual strings. Rate limits and concurrency limits address different load dimensions; keep this lab focused on measured per-request work and predictable rejection behavior.",
+      "steps": [
+        "Set a small test request-byte limit and a separate document-title character limit; record both units in the API contract.",
+        "Feed an oversized body through the request boundary and abort ingestion promptly, cleaning temporary resources through the adapter's lifecycle.",
+        "Test multi-byte text, a large item array, and a valid near-limit request while measuring whether repository work begins."
+      ],
+      "checks": [
+        "Oversized transport input is rejected before a document write or expensive file processing.",
+        "A valid request near the limit still succeeds, including documented multi-byte text behavior.",
+        "Temporary buffers or files are released after rejection and the next valid request completes normally."
+      ],
+      "experiment": "Move size checking after full buffering in a disposable test and compare peak bytes retained before restoring the early limit.",
+      "review": "Explain bytes versus text length and ask an agent to identify limits that exist only in the browser.",
+      "stretch": "Add a bounded concurrency gate for expensive processing and distinguish queue timeout from invalid input.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "A title containing ten multi-byte characters may contain more than ten UTF-8 bytes. The domain can accept its ten-character length while the transport counts its actual encoded bytes. A request exceeding the coarse byte budget is stopped before parsing and never reaches the repository. A smaller request is decoded and then checked against the title rule. These two limits protect different boundaries and should not be represented by one unexplained number.",
+      "retrieval": [
+        {
+          "question": "Why is a server-side size check after buffering incomplete resource protection?",
+          "answer": "The server has already allocated and received the oversized input before rejecting it."
+        },
+        {
+          "question": "Why specify units in every limit?",
+          "answer": "Bytes, code units, characters, and collection items measure different costs and can produce different acceptance outcomes."
+        }
+      ],
+      "parentId": "effect-secure-crud-uploads"
+    },
+    {
+      "id": "effect-secure-crud-storage-paths",
+      "title": "Keep user names out of storage paths",
+      "concept": "Generated keys · path confinement · safe metadata",
+      "brief": "Store two attachments with the same display filename without collisions or path interpretation.",
+      "explanation": "A user-provided filename is presentation metadata, not a storage address. Generate internal object keys and resolve them through a controlled storage adapter. Local filesystem implementations must ensure resolved paths stay within the designated attachment directory, while object storage should use a controlled bucket and namespace. Avoid returning internal keys or paths when public IDs suffice. Normalize display names only for presentation and headers; do not rely on filename cleanup alone as the core containment mechanism.",
+      "steps": [
+        "Upload two harmless files both named report.pdf and assign independent public attachment IDs and generated internal storage keys.",
+        "Implement storage writes through a single adapter with a configured base directory or bucket namespace and explicit containment checks for local paths.",
+        "Test unusual display names containing separators and long Unicode text without allowing those names to determine the stored location."
+      ],
+      "checks": [
+        "Both report.pdf uploads remain separately retrievable by authorized attachment identity.",
+        "Display-name variations cannot escape the configured storage area or overwrite existing objects.",
+        "API responses expose necessary public metadata without absolute filesystem paths or private bucket details."
+      ],
+      "experiment": "Use the original filename as a key in a disposable fixture and demonstrate the duplicate-name overwrite before restoring generated identities.",
+      "review": "Explain why sanitizing a filename and generating a storage key solve different concerns, then ask an agent to inspect every path-construction site.",
+      "stretch": "Define deletion and orphan-cleanup behavior when metadata commit fails after the file write.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Two uploads named report.pdf receive F1 and F2 with unrelated generated storage keys. Their display labels match, but their bytes and authorized document relationships remain distinct. A display name containing a directory separator is retained only under the chosen safe metadata policy; it does not create a directory or influence path resolution. Downloading F1 resolves its stored mapping after authorization rather than concatenating a requested filename into a path.",
+      "retrieval": [
+        {
+          "question": "Why can two identical filenames be valid?",
+          "answer": "A display name need not be globally unique; attachment identity and storage addressing are separate concerns."
+        },
+        {
+          "question": "What should determine the final storage location?",
+          "answer": "A controlled adapter using generated keys and a configured namespace, not raw user input."
+        }
+      ],
+      "parentId": "effect-secure-crud-uploads"
+    },
+    {
+      "id": "effect-secure-crud-safe-audit",
+      "title": "Record security decisions without collecting secrets",
+      "concept": "Audit events · redaction · structured diagnostics",
+      "brief": "Capture denied edits and successful sensitive changes without logging session cookies or full document bodies.",
+      "explanation": "Audit evidence should answer who attempted which action on which scoped resource, when, and with what outcome. More data is not automatically better: raw credentials and document contents can create a second exposure channel. Use structured fields with stable event names, safe identifiers, and controlled access to logs. Distinguish expected denial from unexpected infrastructure failure. Make event delivery policy explicit so a logging outage cannot quietly change authorization behavior or produce an unbounded backlog inside the request.",
+      "steps": [
+        "Record document.edit.allowed and document.edit.denied with request ID, principal ID, resource ID, tenant scope, and a coarse outcome code.",
+        "Add redaction tests for Cookie, Authorization, CSRF tokens, and document body fields, including nested error context.",
+        "Simulate an audit sink outage and document whether the operation fails or uses a bounded fallback under the product's audit requirements."
+      ],
+      "checks": [
+        "Reviewers can correlate a denied Bo edit with the request and unchanged D1 revision.",
+        "No raw session credential, CSRF secret, or document body appears in captured logs.",
+        "Audit sink failure follows a declared bounded policy and never grants a previously denied action."
+      ],
+      "experiment": "Attach the raw request object to an error in a local test and verify the redaction test catches credential exposure before removing that pattern.",
+      "review": "Explain which facts the audit trail must preserve and ask an agent to justify any free-text field that could contain untrusted or sensitive content.",
+      "stretch": "Add retention and access controls for the audit store as explicit operational requirements.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Bo attempts to edit D1 under request R9. The audit event records U2, tenant A, D1, action document.edit, and outcome denied. D1 remains revision 4. The event omits Bo's session cookie and the attempted document body, yet still supports investigation of the decision. If membership storage fails instead, a different safe failure code records uncertainty rather than claiming Bo was definitively an unauthorized role.",
+      "retrieval": [
+        {
+          "question": "Why not log every request body for easier debugging?",
+          "answer": "Bodies can contain sensitive content and credentials, turning logs into an unnecessary secondary data store."
+        },
+        {
+          "question": "What should an audit event distinguish about a failed permission check?",
+          "answer": "A policy denial based on known facts versus inability to evaluate permission because a dependency failed."
+        }
+      ],
+      "parentId": "effect-secure-crud-privileges"
+    },
+    {
+      "id": "effect-secure-crud-regressions",
+      "title": "Prove the security boundary after agent changes",
+      "concept": "Security regression · negative and positive cases",
+      "brief": "Review an agent-generated attachment-and-edit feature against a repeatable local authorization matrix.",
+      "explanation": "Security review is stronger when a concrete invariant is tied to an executable fixture. A generated feature may work for the happy path while exposing an alternate download route or trusting a submitted tenantId. Review changed entry points, trust transitions, and data-release paths, then run both allowed and denied cases. Keep the tests defensive and local. A passing suite establishes the tested boundaries under its fixtures; it does not justify claiming the application is universally secure or that future routes inherit protection automatically.",
+      "steps": [
+        "Give the agent Ada, Bo, Cy, D1, D2, F1, and F2 fixtures and ask for an edit-plus-attachment feature with explicit trust-boundary notes.",
+        "Run direct endpoint cases for unauthenticated access, viewer mutation, cross-tenant read, mismatched attachment parent, missing CSRF evidence, and valid editor use.",
+        "Inspect changed routes and repository methods, then retain one regression test for each discovered missing authorization or input boundary."
+      ],
+      "checks": [
+        "Every denied mutation leaves row revisions and attachment counts unchanged.",
+        "Denied reads return no document content, private metadata, or attachment bytes.",
+        "Valid same-tenant editor flows remain functional and the review records which boundaries were actually exercised."
+      ],
+      "experiment": "Remove one tenant predicate or bypass one download check in the disposable branch and verify the appropriate regression test fails for the intended reason.",
+      "review": "Ask the agent to explain the origin of each trusted fact and require evidence before accepting claims that a route is protected.",
+      "stretch": "Add route-inventory checks so newly introduced exports, previews, and background entry points receive explicit authorization review.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "The generated edit route denies Cy for D1, but its new download route fetches F1 by ID alone. The direct Cy/F1 test receives bytes and fails the confidentiality invariant even though the UI hides the link. After scoping the lookup through authorized document and tenant relationships, the same request returns no bytes, while Ada/F1 still works. The regression demonstrates both repaired denial and preserved legitimate access.",
+      "retrieval": [
+        {
+          "question": "Why test endpoints directly when the UI hides forbidden actions?",
+          "answer": "UI visibility does not prevent callers from constructing requests to those endpoints."
+        },
+        {
+          "question": "What evidence should accompany an agent's claim that authorization is complete?",
+          "answer": "An inventory of relevant entry points plus passing relationship-specific allow and deny cases, with explicit limits on what was tested."
+        }
+      ],
+      "parentId": "effect-secure-crud-privileges"
+    }
+  ]
+}

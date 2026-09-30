@@ -33,7 +33,7 @@ import {
   saveStudyPreferences,
 } from "../../db/repos/studyRepo";
 import { defaultStudyPreferences } from "../../srs/preferences";
-import { starterCardCount } from "../../data/curriculum";
+import { starterCardCount } from "../../data/curriculum-catalog";
 
 import { DataProtection } from "../../components/DataProtection";
 import { ReadingPreferences } from "../../components/ReadingPreferences";

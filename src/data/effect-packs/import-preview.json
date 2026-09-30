@@ -1,0 +1,2051 @@
+{
+  "id": "import-preview",
+  "title": "Import preview",
+  "kind": "Extend Recall",
+  "summary": "Turn an untrusted project file into a useful preview and an all-or-nothing import.",
+  "outcome": "A validated import flow with row errors, an explicit merge policy, and no partial writes.",
+  "prerequisites": "Finish the first two projects. Inspect src/db/repos/dataRepo.ts and existing backup validation before changing formats.",
+  "model": [
+    "ProjectFile: formatVersion, projects[], milestones[].",
+    "Preview: normalized records, row errors, and create/update/skip counts.",
+    "Choose one duplicate policy for IDs within a file and a separate policy for IDs already stored locally."
+  ],
+  "boundaries": "File reader → parse JSON → Schema decode → relationship checks → preview → transactional import. Preview performs no writes.",
+  "milestones": [
+    {
+      "id": "effect-import-decode",
+      "title": "Decode files and explain row errors",
+      "concept": "Schema · unknown input · error accumulation",
+      "brief": "Validate an entire project file before giving the user an import button.",
+      "explanation": "JSON.parse only checks JSON syntax. A TypeScript cast does not validate runtime data. Decode the envelope, version, and each record, then check relationships and duplicates. Bound input size and row counts so validation itself cannot freeze the interface.",
+      "steps": [
+        "Create fixtures for a valid file, broken JSON, unsupported version, duplicate ID, invalid name, and orphan milestone.",
+        "Read unknown input, decode it, and display errors with record number and field. Use a file-size limit and a documented maximum record count.",
+        "Show create/update/skip totals for valid input. Keep the confirm action unavailable when validation fails."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every malformed fixture produces an actionable error without a write."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A valid file produces accurate preview counts."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Oversized input is rejected before expensive processing."
+        }
+      ],
+      "experiment": "Put a malformed record at the end of an otherwise valid file. Verify the earlier rows have not been imported.",
+      "review": "Keep syntax, schema, and relationship failures distinguishable. Do not include raw sensitive record contents in logs.",
+      "stretch": "Offer a downloadable validation report with row numbers and messages.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-import-commit",
+      "title": "Confirm an atomic merge",
+      "concept": "Transactional services · stale-preview handling",
+      "brief": "Import the preview with an explicit duplicate policy and no partial merge.",
+      "explanation": "A preview can go stale while the user reads it. Recheck the relevant data inside the import transaction, or reject and regenerate the preview if the baseline changed. Repeating the same import should have a defined result instead of silently duplicating records.",
+      "steps": [
+        "Specify how existing IDs are treated: skip, reject, or update only when a version rule permits it. Show that policy in the confirmation UI.",
+        "Validate the final merge and write projects and milestones in one transaction. Prevent double submission and report committed counts.",
+        "Fail a write in the middle, retry, then import the same file again. Compare stored identities and relationships after each attempt."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "A mid-import failure rolls back all imported rows."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repeated import follows the displayed duplicate policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Changes made after preview trigger revalidation or a refreshed preview."
+        }
+      ],
+      "experiment": "Preview an update, edit the same project in another tab, then confirm. Verify the newer edit is not silently overwritten.",
+      "review": "Identify the point where the operation becomes durable. An optimistic success toast before commit is misleading.",
+      "stretch": "Add an import receipt containing the file digest, policy, counts, and completion time.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-import-roundtrip",
+      "title": "Prove export and restore",
+      "concept": "Boundary contracts · integration testing",
+      "brief": "Restore exported project data into an empty store and verify it through the actual interface.",
+      "explanation": "An export that downloads successfully may still omit relationships or progress. Restoration is the real test. Compare stable business fields and a complete user journey; timestamps that intentionally change during import need an explicit comparison policy.",
+      "steps": [
+        "Create a fixture with active and archived projects, ordered milestones, and linked evidence. Export it through the normal UI.",
+        "Restore into an independent empty browser store, then search, open, edit, and reopen the imported work.",
+        "Document the format version, included data, and handling of a newer unsupported file. Keep existing Recall backup compatibility intact."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Identity, relationships, ordering, and completion survive a round trip."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Restored records remain editable and exportable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "An unsupported future version fails without changing the target store."
+        }
+      ],
+      "experiment": "Remove one field from the export serializer and confirm that the round-trip test detects the lost information.",
+      "review": "Verify the restored data, not just a success message. Include migration behavior for old backups when extending the real Recall format.",
+      "stretch": "Add a fixture for the previous format and prove an explicit migration preserves its meaning.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-import-csv",
+      "title": "Handle real CSV input",
+      "concept": "Parsing boundaries · row diagnostics",
+      "brief": "Add a CSV import path that handles quoting, multiline fields, empty cells, and explicit column mapping without silently losing information.",
+      "explanation": "CSV is not reliably parsed by splitting lines and commas. Quoted fields may contain both. Parsing yields strings; decoding supplies domain meaning. An empty cell, missing column, and the literal text null are different inputs unless your contract deliberately normalizes them. Preview that normalization before a write.",
+      "steps": [
+        "Create fixtures containing commas inside names, quotes, multiline goals, blank rows, a byte-order mark, and missing headers. Declare the supported delimiter and encoding.",
+        "Use a parser with a documented dialect, map columns explicitly, then reuse the project validation boundary. Report physical or logical row numbers consistently.",
+        "Preview normalized values and confirm the transaction only after all required mappings are present. Round-trip a multiline field and compare its exact text."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Quoted commas and multiline values survive parsing."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Missing required columns block import with actionable diagnostics."
+        },
+        {
+          "id": "criterion-3",
+          "label": "CSV and JSON imports enforce the same domain validation."
+        }
+      ],
+      "experiment": "Put a line break inside a quoted goal and an invalid record after it. Verify the diagnostic identifies the intended record without shifting later values into wrong columns.",
+      "review": "Review parsing, normalization, and validation as separate stages. Document spreadsheet formula interpretation if you also export user text to CSV.",
+      "stretch": "Support a mapping preview for files whose column names differ from your application's field names.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-import-bounded",
+      "title": "Keep large imports responsive",
+      "concept": "Streams · bounded work · cancellation",
+      "brief": "Process a large file with bounded memory and progress while preserving the promised import transaction semantics.",
+      "explanation": "A stream can reduce memory use only if later stages do not collect everything again. Decide whether preview stores normalized rows in temporary storage, scans twice, or limits file size. Cancellation before commit and cancellation after commit have different consequences. Explain those boundaries instead of implying that every operation can be undone.",
+      "steps": [
+        "Set row, byte, and field-size limits using representative fixtures. Measure baseline memory and the longest interval during which the interface cannot respond.",
+        "Process bounded chunks with progress reporting and cancellation. Keep temporary staging separate from visible project data until confirmation.",
+        "Cancel during parsing, validation, and immediately before commit. Clean up abandoned staging data after restart and verify no phantom projects appear."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Large supported files stay within the recorded memory budget."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Cancellation before commit creates no visible imported projects."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Temporary data is removed after failure and restart."
+        }
+      ],
+      "experiment": "Use a file with one enormous field rather than many small rows. Verify that a row-count limit alone does not accidentally permit unbounded memory use.",
+      "review": "Show actual measurements and the commit boundary. A progress bar animated by a timer is not evidence that the main thread remains responsive.",
+      "stretch": "Move parsing to a worker and compare interaction latency before and after, including the cost of transferring messages.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-import-compatibility",
+      "title": "Maintain a versioned data contract",
+      "concept": "Schema evolution · compatibility fixtures",
+      "brief": "Support older project files through explicit migrations while rejecting unsupported future formats without any writes.",
+      "explanation": "Versioning is a promise about meaning, not just a number in JSON. Migrations should be deterministic transformations of data, followed by current validation. Keep examples of every supported format in source control and distinguish omitted optional values from required values that did not exist in an older version.",
+      "steps": [
+        "Define version 1 and version 2 fixtures with a renamed field and one new required field. Document defaulting and information-loss decisions.",
+        "Dispatch by formatVersion, migrate supported old data, and decode the final shape. Reject unknown versions before merging anything into storage.",
+        "Run old-to-new import, new export, and fresh-store restore. Compare semantic fields and preserve project/milestone identities across all transformations."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every supported historical fixture imports with the documented meaning."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unknown future versions leave the store untouched."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Migration and export preserve stable identities and relationships."
+        }
+      ],
+      "experiment": "Send a file labeled version 1 but containing a conflicting mixture of old and new fields. Decide whether it is rejected or normalized and test that exact rule.",
+      "review": "Avoid guessing a version from whichever properties happen to be present. Record the support window and how users obtain a compatible export.",
+      "stretch": "Add golden fixtures to CI and make a deliberate breaking serializer change to prove the contract test detects it.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-separate-syntax-from-row-errors",
+      "parentId": "effect-import-decode",
+      "title": "Separate syntax from row errors",
+      "concept": "Decode phases",
+      "brief": "Import malformed JSON followed by valid JSON containing one invalid project row.",
+      "explanation": "A parser failure and a domain validation failure require different locations and recovery advice.",
+      "steps": [
+        "Create a repeatable fixture: Import malformed JSON followed by valid JSON containing one invalid project row. Record the starting rows and relevant UI state before making the change.",
+        "Create distinct typed results for file parsing and row decoding.",
+        "Feed both fixtures through the same upload operation. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The malformed file reports syntax context without attempting row writes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The valid file identifies the invalid row and field precisely."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Truncate a file halfway through its final object. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Truncate a file halfway through its final object.",
+      "review": "Review the agent's proposed diff: Does the UI avoid inventing row numbers when parsing never succeeded?",
+      "stretch": "Add an editor link to the exact byte or line location when available.",
+      "minutes": 30,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-treat-decoded-input-as-unknown",
+      "parentId": "effect-import-decode",
+      "title": "Treat decoded input as unknown",
+      "concept": "Schema boundary",
+      "brief": "Import an object whose projects property is a string instead of an array.",
+      "explanation": "Static TypeScript assertions cannot establish the shape of external bytes.",
+      "steps": [
+        "Create a repeatable fixture: Import an object whose projects property is a string instead of an array. Record the starting rows and relevant UI state before making the change.",
+        "Decode the top-level envelope before iterating project records.",
+        "Try null, arrays, strings, and missing projects properties. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each invalid envelope produces a controlled structural error."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No uncaught map-is-not-a-function exception reaches the screen."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Provide a nested object with unexpected prototype-related keys. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Provide a nested object with unexpected prototype-related keys.",
+      "review": "Review the agent's proposed diff: Did the agent replace validation with a type cast?",
+      "stretch": "Add safe unknown-key handling and document strip-versus-reject behavior.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-report-multiple-row-problems",
+      "parentId": "effect-import-decode",
+      "title": "Report multiple row problems",
+      "concept": "Validation UX",
+      "brief": "Import five rows containing two empty names, one bad timestamp, and two valid projects.",
+      "explanation": "Preview should explain all independently detectable problems without changing data.",
+      "steps": [
+        "Create a repeatable fixture: Import five rows containing two empty names, one bad timestamp, and two valid projects. Record the starting rows and relevant UI state before making the change.",
+        "Collect row-specific issues while preserving original input positions.",
+        "Compare the reported issue list with a hand-written expected list. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All three invalid rows appear with useful field messages."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Valid rows are not mislabeled because earlier rows failed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Correct only one row and rerun preview. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Correct only one row and rerun preview.",
+      "review": "Review the agent's proposed diff: Are issue identities stable enough to preserve focus after correction?",
+      "stretch": "Add grouped issue summaries that still link to individual affected rows.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-normalize-identity-consistently",
+      "parentId": "effect-import-decode",
+      "title": "Normalize identity consistently",
+      "concept": "Identifier contracts",
+      "brief": "Import IDs p-1, space-p-1-space, and a numeric ID in one file.",
+      "explanation": "Identifier normalization must not accidentally merge distinct entities or admit invalid types.",
+      "steps": [
+        "Create a repeatable fixture: Import IDs p-1, space-p-1-space, and a numeric ID in one file. Record the starting rows and relevant UI state before making the change.",
+        "Specify whether surrounding spaces are rejected or normalized before collision checks.",
+        "Preview the three records and inspect their interpreted identities. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every accepted identity follows the documented string rule."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Numeric coercion never silently invents a valid project ID."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add a second normalized duplicate later in the file. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add a second normalized duplicate later in the file.",
+      "review": "Review the agent's proposed diff: Does duplicate detection run after the chosen normalization step?",
+      "stretch": "Add a diagnostic showing raw versus interpreted identifiers for ambiguous files.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-bound-diagnostic-size",
+      "parentId": "effect-import-decode",
+      "title": "Bound diagnostic size",
+      "concept": "Resource limits",
+      "brief": "Import ten thousand invalid rows each containing a megabyte-long description.",
+      "explanation": "Error reporting must not duplicate the entire invalid payload into memory or the DOM.",
+      "steps": [
+        "Create a repeatable fixture: Import ten thousand invalid rows each containing a megabyte-long description. Record the starting rows and relevant UI state before making the change.",
+        "Store concise issue codes and bounded excerpts with total counts.",
+        "Measure displayed issue count and retained diagnostic bytes. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The preview remains usable and reports the full issue total."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Raw oversized fields never appear repeatedly in error messages."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Expand the final error page and inspect its memory behavior. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Expand the final error page and inspect its memory behavior.",
+      "review": "Review the agent's proposed diff: Are diagnostics proportional to issue count rather than input-field size?",
+      "stretch": "Support streaming a compact error report to a downloadable file.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-handle-empty-input-deliberately",
+      "parentId": "effect-import-decode",
+      "title": "Handle empty input deliberately",
+      "concept": "File states",
+      "brief": "Upload a zero-byte file, an empty object, and a valid backup with no projects.",
+      "explanation": "Empty bytes and an intentionally empty dataset are different states.",
+      "steps": [
+        "Create a repeatable fixture: Upload a zero-byte file, an empty object, and a valid backup with no projects. Record the starting rows and relevant UI state before making the change.",
+        "Define distinct messages and require explicit confirmation for an empty valid import.",
+        "Preview all three fixtures without touching storage. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The valid empty dataset is recognized as a valid no-op or declared replacement."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Empty bytes never become an implicit request to erase data."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Upload whitespace-only bytes after a successful preview. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Upload whitespace-only bytes after a successful preview.",
+      "review": "Review the agent's proposed diff: Does the previous valid preview remain accidentally actionable?",
+      "stretch": "Reset preview identity whenever a new file selection begins.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-preserve-original-row-references",
+      "parentId": "effect-import-decode",
+      "title": "Preserve original row references",
+      "concept": "Diagnostics",
+      "brief": "Sort valid preview rows by name while invalid rows retain original file positions.",
+      "explanation": "An error reference should continue pointing to the source record after presentation sorting.",
+      "steps": [
+        "Create a repeatable fixture: Sort valid preview rows by name while invalid rows retain original file positions. Record the starting rows and relevant UI state before making the change.",
+        "Keep source index separate from display index and entity identity.",
+        "Sort, filter, and expand an error for source row seventeen. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The message still identifies row seventeen in the uploaded file."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Display positions are never mistaken for source positions."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Insert a correction row before the invalid source row and reparse. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Insert a correction row before the invalid source row and reparse.",
+      "review": "Review the agent's proposed diff: Does every diagnostic belong to one immutable parse snapshot?",
+      "stretch": "Show a short source excerpt beside the row reference.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-validate-finite-numbers",
+      "parentId": "effect-import-decode",
+      "title": "Validate finite numbers",
+      "concept": "Numeric schemas",
+      "brief": "Import revisions NaN-like text, 1e999, negative numbers, and a valid integer.",
+      "explanation": "Numeric fields need finite range and integer checks beyond JavaScript number type.",
+      "steps": [
+        "Create a repeatable fixture: Import revisions NaN-like text, 1e999, negative numbers, and a valid integer. Record the starting rows and relevant UI state before making the change.",
+        "Decode revisions through a bounded integer rule.",
+        "Preview numeric edge cases using JSON-valid exponential values. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only values in the documented revision range are accepted."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Infinity from oversized exponents never enters storage."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Use a fractional value that looks whole after display formatting. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Use a fractional value that looks whole after display formatting.",
+      "review": "Review the agent's proposed diff: Does the preview display enough precision to explain the rejection?",
+      "stretch": "Add maximum safe-integer checks for counters exported by other systems.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-keep-previews-free-of-side-effects",
+      "parentId": "effect-import-decode",
+      "title": "Keep previews free of side effects",
+      "concept": "Effect laziness",
+      "brief": "Select a valid backup and navigate away without pressing Commit.",
+      "explanation": "Decoding and previewing describe proposed changes but must not perform durable writes.",
+      "steps": [
+        "Create a repeatable fixture: Select a valid backup and navigate away without pressing Commit. Record the starting rows and relevant UI state before making the change.",
+        "Separate parse, plan, and commit operations with distinct service dependencies.",
+        "Instrument repository writes during file selection and preview rendering. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The preview performs zero durable mutations."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Constructing or rerendering the preview Effect never starts a commit."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Render the preview twice under development strict rendering. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Render the preview twice under development strict rendering.",
+      "review": "Review the agent's proposed diff: Does dependency construction accidentally execute insertion promises?",
+      "stretch": "Use a read-only planning service type that cannot access mutation methods.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-bind-confirmation-to-one-plan",
+      "parentId": "effect-import-commit",
+      "title": "Bind confirmation to one plan",
+      "concept": "Preview identity",
+      "brief": "Preview file A, then choose file B before the old confirmation button is pressed.",
+      "explanation": "A commit must reference the exact file and plan the user reviewed.",
+      "steps": [
+        "Create a repeatable fixture: Preview file A, then choose file B before the old confirmation button is pressed. Record the starting rows and relevant UI state before making the change.",
+        "Assign a plan identity and invalidate confirmation when input changes.",
+        "Delay file B parsing and attempt to confirm the old plan. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only the currently reviewed plan can commit."
+        },
+        {
+          "id": "criterion-2",
+          "label": "File A's stale button cannot commit file B or vice versa."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Resolve parsing promises in reverse selection order. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Resolve parsing promises in reverse selection order.",
+      "review": "Review the agent's proposed diff: Does request identity prevent obsolete previews from replacing current state?",
+      "stretch": "Include a digest and visible filename in the confirmation receipt.",
+      "minutes": 30,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-detect-changes-since-preview",
+      "parentId": "effect-import-commit",
+      "title": "Detect changes since preview",
+      "concept": "Optimistic merge",
+      "brief": "Preview an update to project P-2 at revision four, then edit it locally.",
+      "explanation": "A merge preview is stale when its assumed destination state changes.",
+      "steps": [
+        "Create a repeatable fixture: Preview an update to project P-2 at revision four, then edit it locally. Record the starting rows and relevant UI state before making the change.",
+        "Capture expected revisions in the plan and revalidate before mutation.",
+        "Commit after changing the destination to revision five. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The conflict is explained before overwriting local changes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The old preview never silently wins over the newer edit."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Rebuild the preview and compare the revised conflict choice. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Rebuild the preview and compare the revised conflict choice.",
+      "review": "Review the agent's proposed diff: Does the plan record assumptions rather than only final row values?",
+      "stretch": "Add a three-way comparison using imported, current, and preview-base values.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-make-duplicate-ids-explicit",
+      "parentId": "effect-import-commit",
+      "title": "Make duplicate IDs explicit",
+      "concept": "Merge rules",
+      "brief": "Import two rows with ID p-8 but different names and goals.",
+      "explanation": "A merge cannot choose an arbitrary winner among contradictory source identities.",
+      "steps": [
+        "Create a repeatable fixture: Import two rows with ID p-8 but different names and goals. Record the starting rows and relevant UI state before making the change.",
+        "Reject duplicates or expose a deterministic documented resolution policy.",
+        "Reverse the duplicate rows and compare the preview. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The outcome follows the written rule independently of incidental iteration."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No hidden last-write-wins behavior decides the user's data."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add an identical duplicate beside the conflicting duplicate. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add an identical duplicate beside the conflicting duplicate.",
+      "review": "Review the agent's proposed diff: Does the policy distinguish harmless repetition from conflicting content?",
+      "stretch": "Offer a source-row comparison before resolving duplicate identities.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-prove-all-or-nothing-import",
+      "parentId": "effect-import-commit",
+      "title": "Prove all-or-nothing import",
+      "concept": "Transaction boundaries",
+      "brief": "Commit twenty planned changes and fail mutation nineteen.",
+      "explanation": "An atomic import either applies the reviewed plan completely or retains prior state.",
+      "steps": [
+        "Create a repeatable fixture: Commit twenty planned changes and fail mutation nineteen. Record the starting rows and relevant UI state before making the change.",
+        "Use one storage transaction for the chosen atomic policy.",
+        "Compare every affected table before and after the injected failure. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All original rows and relationships remain unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The result never claims eighteen durable successes after rollback."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Retry the exact plan after clearing the fault. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Retry the exact plan after clearing the fault.",
+      "review": "Review the agent's proposed diff: Are relationship writes included in the same transaction as projects?",
+      "stretch": "Record a committed plan receipt for later reconciliation.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-explain-merge-versus-replace",
+      "parentId": "effect-import-commit",
+      "title": "Explain merge versus replace",
+      "concept": "Destructive semantics",
+      "brief": "Import three projects into a database containing five unrelated projects.",
+      "explanation": "Merge and replacement have different effects that must be explicit before confirmation.",
+      "steps": [
+        "Create a repeatable fixture: Import three projects into a database containing five unrelated projects. Record the starting rows and relevant UI state before making the change.",
+        "Show creates, updates, unchanged rows, and removals separately.",
+        "Preview both modes using the same source and destination fixtures. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The confirmation accurately predicts every affected ID."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Replacement cannot be selected implicitly by an empty or missing field."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Switch modes after inspecting a preview and attempt immediate commit. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Switch modes after inspecting a preview and attempt immediate commit.",
+      "review": "Review the agent's proposed diff: Does a mode change invalidate the prior confirmation plan?",
+      "stretch": "Require a recoverable backup artifact before an explicitly chosen replacement flow.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-make-repeated-commit-safe",
+      "parentId": "effect-import-commit",
+      "title": "Make repeated commit safe",
+      "concept": "Idempotent commands",
+      "brief": "Commit a plan successfully, lose the response, and press Commit again.",
+      "explanation": "Repeated delivery of one confirmed plan must not duplicate rows or increment revisions twice.",
+      "steps": [
+        "Create a repeatable fixture: Commit a plan successfully, lose the response, and press Commit again. Record the starting rows and relevant UI state before making the change.",
+        "Persist a plan receipt or stable command identity with the transaction.",
+        "Replay the same plan after an ambiguous response. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The second delivery reports the existing committed result."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Counters and audit events are not duplicated."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reload between the first commit and replay. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reload between the first commit and replay.",
+      "review": "Review the agent's proposed diff: Does command identity survive component recreation and browser restart?",
+      "stretch": "Expose recent import receipts with file digest and affected-row totals.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-validate-selected-row-imports",
+      "parentId": "effect-import-commit",
+      "title": "Validate selected-row imports",
+      "concept": "Partial planning",
+      "brief": "Select three valid rows from a preview where one references an unselected parent.",
+      "explanation": "A selected subset must still satisfy relationship closure and domain constraints.",
+      "steps": [
+        "Create a repeatable fixture: Select three valid rows from a preview where one references an unselected parent. Record the starting rows and relevant UI state before making the change.",
+        "Recompute the plan for selected IDs and display required related records.",
+        "Attempt commit with the parent excluded. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The UI identifies the missing relationship before persistence."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Selecting rows never bypasses whole-file validation assumptions."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Select the parent, then deselect it while confirmation is open. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Select the parent, then deselect it while confirmation is open.",
+      "review": "Review the agent's proposed diff: Is selection captured in the immutable confirmed plan?",
+      "stretch": "Offer automatic dependency inclusion with a visible explanation of added rows.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-keep-secrets-out-of-merge-logs",
+      "parentId": "effect-import-commit",
+      "title": "Keep secrets out of merge logs",
+      "concept": "Safe diagnostics",
+      "brief": "Import a backup whose notes contain private tokens and customer details.",
+      "explanation": "Operational logs should describe merge decisions without copying sensitive record bodies.",
+      "steps": [
+        "Create a repeatable fixture: Import a backup whose notes contain private tokens and customer details. Record the starting rows and relevant UI state before making the change.",
+        "Log plan IDs, counts, safe error categories, and redacted identifiers.",
+        "Inspect logs from success, conflict, and rollback paths. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Logs provide enough correlation to diagnose the failed operation."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Private note content never appears in exceptions or telemetry payloads."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Force schema failure inside a field containing a token. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Force schema failure inside a field containing a token.",
+      "review": "Review the agent's proposed diff: Does generic error serialization include the rejected value by default?",
+      "stretch": "Add a test that scans captured diagnostics for fixture secrets.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-review-generated-merge-code",
+      "parentId": "effect-import-commit",
+      "title": "Review generated merge code",
+      "concept": "Agentic verification",
+      "brief": "An agent proposes using object spread to overwrite each destination record with imported data.",
+      "explanation": "A safe merge needs an explicit ownership policy for immutable and local-only fields.",
+      "steps": [
+        "Create a repeatable fixture: An agent proposes using object spread to overwrite each destination record with imported data. Record the starting rows and relevant UI state before making the change.",
+        "List allowed imported fields and preserve protected local metadata.",
+        "Import an older row lacking newly added local fields. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Protected metadata and creation identity remain intact."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unknown source properties do not gain write authority."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Include id, revision, and sync receipt fields in the hostile fixture. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Include id, revision, and sync receipt fields in the hostile fixture.",
+      "review": "Review the agent's proposed diff: Can every assigned field be justified by the documented merge contract?",
+      "stretch": "Generate a field-level plan explanation before committing the reviewed patch.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-round-trip-relationships",
+      "parentId": "effect-import-roundtrip",
+      "title": "Round-trip relationships",
+      "concept": "Serialization completeness",
+      "brief": "Export a project with tasks, evidence links, and prerequisite edges into an empty database.",
+      "explanation": "A backup must preserve relationship identity as well as top-level row counts.",
+      "steps": [
+        "Create a repeatable fixture: Export a project with tasks, evidence links, and prerequisite edges into an empty database. Record the starting rows and relevant UI state before making the change.",
+        "Define canonical export ordering and compare the restored graph.",
+        "Export, clear only the isolated fixture database, restore, and inspect links. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every restored edge points to the intended restored entity."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Equal row counts cannot hide missing or misdirected relationships."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Shuffle serialized collection order before restore. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Shuffle serialized collection order before restore.",
+      "review": "Review the agent's proposed diff: Does restore depend on source order instead of an explicit dependency plan?",
+      "stretch": "Compute a canonical graph digest for round-trip comparisons.",
+      "minutes": 30,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-preserve-unicode-text",
+      "parentId": "effect-import-roundtrip",
+      "title": "Preserve Unicode text",
+      "concept": "Encoding",
+      "brief": "Export names containing emoji, combining accents, and right-to-left text.",
+      "explanation": "Text fidelity includes code points and ordering, not merely visually similar output.",
+      "steps": [
+        "Create a repeatable fixture: Export names containing emoji, combining accents, and right-to-left text. Record the starting rows and relevant UI state before making the change.",
+        "Use explicit UTF-8 encoding and avoid unintended normalization during export.",
+        "Compare stored strings before and after restore by code point. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All authored text survives byte-safe serialization and decoding."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No replacement characters or lost combining marks appear."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Open the export in a tool that adds a byte-order mark. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Open the export in a tool that adds a byte-order mark.",
+      "review": "Review the agent's proposed diff: Does the decoder handle its documented encoding variants deliberately?",
+      "stretch": "Add fixtures for newline styles and supplementary-plane characters.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-keep-timestamps-unambiguous",
+      "parentId": "effect-import-roundtrip",
+      "title": "Keep timestamps unambiguous",
+      "concept": "Time serialization",
+      "brief": "Export creation and completion timestamps around a daylight-saving transition.",
+      "explanation": "Portable instants need an explicit representation independent of the importing machine's locale.",
+      "steps": [
+        "Create a repeatable fixture: Export creation and completion timestamps around a daylight-saving transition. Record the starting rows and relevant UI state before making the change.",
+        "Serialize timestamps in a documented canonical form and validate on restore.",
+        "Restore under two different timezone settings. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both installations recover the same instants."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Locale-formatted dates are rejected rather than guessed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Import a timestamp without a zone offset. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Import a timestamp without a zone offset.",
+      "review": "Review the agent's proposed diff: Does the contract distinguish instants from date-only deadlines?",
+      "stretch": "Add round-trip tests for both field categories in one backup.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-exclude-transient-ui-state",
+      "parentId": "effect-import-roundtrip",
+      "title": "Exclude transient UI state",
+      "concept": "Backup boundaries",
+      "brief": "Export while a modal is open, a save is pending, and a search query contains private text.",
+      "explanation": "A durable backup should include intentional user data and documented progress, not arbitrary runtime state.",
+      "steps": [
+        "Create a repeatable fixture: Export while a modal is open, a save is pending, and a search query contains private text. Record the starting rows and relevant UI state before making the change.",
+        "Define exportable fields separately from component and request state.",
+        "Inspect the archive's manifest and records during a pending operation. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only committed domain data enters the durable snapshot."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Promises, error stacks, and transient search text are absent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Complete the pending save immediately after snapshot creation. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Complete the pending save immediately after snapshot creation.",
+      "review": "Review the agent's proposed diff: Does the export declare the snapshot time and inclusion boundary?",
+      "stretch": "Offer a separate explicit draft export without mixing it into canonical backups.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-verify-a-consistent-snapshot",
+      "parentId": "effect-import-roundtrip",
+      "title": "Verify a consistent snapshot",
+      "concept": "Concurrent export",
+      "brief": "Export projects while a transaction moves a task between two projects.",
+      "explanation": "A backup must represent one consistent state rather than a mixture of before and after.",
+      "steps": [
+        "Create a repeatable fixture: Export projects while a transaction moves a task between two projects. Record the starting rows and relevant UI state before making the change.",
+        "Read related tables under a supported snapshot or revision-consistency strategy.",
+        "Pause export between tables and execute the move. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The exported graph corresponds to one valid state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A task is never missing or linked to two contradictory parents."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Repeat with a deletion and its relationship cleanup. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Repeat with a deletion and its relationship cleanup.",
+      "review": "Review the agent's proposed diff: Can the chosen storage API actually guarantee the claimed snapshot?",
+      "stretch": "Retry export when observed revisions show that a stable snapshot was unavailable.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-test-malformed-restore-recovery",
+      "parentId": "effect-import-roundtrip",
+      "title": "Test malformed restore recovery",
+      "concept": "Restore failures",
+      "brief": "Restore a backup with a valid envelope but an invalid relationship near the end.",
+      "explanation": "A failed restore must preserve the current database under the advertised atomic policy.",
+      "steps": [
+        "Create a repeatable fixture: Restore a backup with a valid envelope but an invalid relationship near the end. Record the starting rows and relevant UI state before making the change.",
+        "Validate referential integrity before mutation and retain transaction safeguards.",
+        "Compare the destination snapshot before and after rejection. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All preexisting destination data remains intact."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The UI does not offer a success download receipt for a rejected restore."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Correct the relationship and rerun the restore. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Correct the relationship and rerun the restore.",
+      "review": "Review the agent's proposed diff: Does validation cover referenced IDs as well as individual row schemas?",
+      "stretch": "Provide a repair report that can be reviewed before creating a corrected file.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-export-without-hidden-omissions",
+      "parentId": "effect-import-roundtrip",
+      "title": "Export without hidden omissions",
+      "concept": "Coverage audits",
+      "brief": "Add a new evidence table to the app after the original backup exporter was written.",
+      "explanation": "Schema growth can silently make old export code incomplete.",
+      "steps": [
+        "Create a repeatable fixture: Add a new evidence table to the app after the original backup exporter was written. Record the starting rows and relevant UI state before making the change.",
+        "Maintain an explicit registry of durable tables and export policies.",
+        "Compare the registry against the backup manifest in a test. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every durable table has an intentional include-or-exclude decision."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New tables cannot disappear from backups through omission."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add a fixture row to the newest table and round-trip it. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add a fixture row to the newest table and round-trip it.",
+      "review": "Review the agent's proposed diff: Does the reviewer verify backup coverage whenever persistence changes?",
+      "stretch": "Generate a human-readable backup contents summary from the same registry.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-handle-browser-download-failures",
+      "parentId": "effect-import-roundtrip",
+      "title": "Handle browser download failures",
+      "concept": "Artifact delivery",
+      "brief": "Prepare a valid export but make the browser download action fail or get canceled.",
+      "explanation": "Creating export bytes and delivering a downloadable artifact are separate outcomes.",
+      "steps": [
+        "Create a repeatable fixture: Prepare a valid export but make the browser download action fail or get canceled. Record the starting rows and relevant UI state before making the change.",
+        "Keep the prepared artifact available for another download attempt.",
+        "Inject failure after serialization and retry without rebuilding data. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The user can retry delivery of the same snapshot."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A failed download never claims the backup was safely saved elsewhere."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Navigate away and return before retrying delivery. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Navigate away and return before retrying delivery.",
+      "review": "Review the agent's proposed diff: Does cleanup revoke object URLs only after they are no longer needed?",
+      "stretch": "Offer copying a small export to the clipboard as an explicit fallback.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-compare-semantic-equality",
+      "parentId": "effect-import-roundtrip",
+      "title": "Compare semantic equality",
+      "concept": "Verification strategy",
+      "brief": "Round-trip a backup whose objects reorder keys and whose arrays use canonical sorting.",
+      "explanation": "Equivalent domain data need not have identical incidental JSON formatting.",
+      "steps": [
+        "Create a repeatable fixture: Round-trip a backup whose objects reorder keys and whose arrays use canonical sorting. Record the starting rows and relevant UI state before making the change.",
+        "Normalize only order-insensitive structures before comparison.",
+        "Compare identities, values, relationships, and documented ordering separately. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The test accepts harmless key reordering."
+        },
+        {
+          "id": "criterion-2",
+          "label": "It still detects missing records, changed goals, and wrong dependency edges."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change one semantically meaningful order field in the restored fixture. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change one semantically meaningful order field in the restored fixture.",
+      "review": "Review the agent's proposed diff: Did normalization accidentally erase the very differences the test should detect?",
+      "stretch": "Produce a compact semantic diff for failed round-trip assertions.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-parse-quoted-commas",
+      "parentId": "effect-import-csv",
+      "title": "Parse quoted commas",
+      "concept": "CSV grammar",
+      "brief": "Import a row whose project name is quoted as Research, phase two.",
+      "explanation": "A delimiter inside a quoted field belongs to the field value.",
+      "steps": [
+        "Create a repeatable fixture: Import a row whose project name is quoted as Research, phase two. Record the starting rows and relevant UI state before making the change.",
+        "Use a parser with an explicit supported CSV dialect.",
+        "Compare the parsed row against a hand-written expected object. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The name retains its comma and remains one field."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Column counts do not drift because of naive string splitting."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add an escaped quote inside the same quoted name. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add an escaped quote inside the same quoted name.",
+      "review": "Review the agent's proposed diff: Did the agent implement a partial parser without defining its limitations?",
+      "stretch": "Add a golden fixture combining quotes, delimiters, and empty trailing fields.",
+      "minutes": 30,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-support-multiline-fields",
+      "parentId": "effect-import-csv",
+      "title": "Support multiline fields",
+      "concept": "CSV records",
+      "brief": "Import a quoted goal spanning three physical lines.",
+      "explanation": "A record number and a physical line number are not always identical.",
+      "steps": [
+        "Create a repeatable fixture: Import a quoted goal spanning three physical lines. Record the starting rows and relevant UI state before making the change.",
+        "Track logical rows and useful source-line locations in diagnostics.",
+        "Validate a later field in the multiline record. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The goal retains intended newlines as one value."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Diagnostics identify the correct logical record rather than a middle text line."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Truncate the closing quote and inspect the parse error. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Truncate the closing quote and inspect the parse error.",
+      "review": "Review the agent's proposed diff: Does the parser preserve source locations without reparsing split lines?",
+      "stretch": "Show both record and starting-line references in the error report.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-handle-byte-order-marks",
+      "parentId": "effect-import-csv",
+      "title": "Handle byte-order marks",
+      "concept": "Text decoding",
+      "brief": "Import UTF-8 CSV whose first header begins with a byte-order mark.",
+      "explanation": "Encoding markers must not become invisible characters in domain column names.",
+      "steps": [
+        "Create a repeatable fixture: Import UTF-8 CSV whose first header begins with a byte-order mark. Record the starting rows and relevant UI state before making the change.",
+        "Normalize the documented leading marker before header matching.",
+        "Compare files with and without the marker. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both map the first header to the same field."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The marker never becomes part of a saved project name."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Place the marker inside a later field to distinguish content from file metadata. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Place the marker inside a later field to distinguish content from file metadata.",
+      "review": "Review the agent's proposed diff: Does normalization operate only at the intended file boundary?",
+      "stretch": "Reject unsupported encodings with an actionable conversion instruction.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-map-headers-deliberately",
+      "parentId": "effect-import-csv",
+      "title": "Map headers deliberately",
+      "concept": "Column contracts",
+      "brief": "Import headers Project Name, goal, and an unknown extra column.",
+      "explanation": "Header mapping needs explicit aliases, duplicate detection, and unknown-column policy.",
+      "steps": [
+        "Create a repeatable fixture: Import headers Project Name, goal, and an unknown extra column. Record the starting rows and relevant UI state before making the change.",
+        "Build a preview of source-to-domain column mappings.",
+        "Try case changes, duplicate aliases, and missing required headers. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Supported aliases map predictably and required columns are identified."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Two source columns cannot silently overwrite one destination field."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Swap column order without changing the data. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Swap column order without changing the data.",
+      "review": "Review the agent's proposed diff: Does the implementation depend on positions despite claiming header-based import?",
+      "stretch": "Allow a reviewed manual mapping saved as a reusable import profile.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-protect-spreadsheet-exports",
+      "parentId": "effect-import-csv",
+      "title": "Protect spreadsheet exports",
+      "concept": "Formula interpretation",
+      "brief": "Export a project name beginning with an equals sign for use in spreadsheet software.",
+      "explanation": "Spreadsheet consumers may interpret certain text as formulas rather than literal data.",
+      "steps": [
+        "Create a repeatable fixture: Export a project name beginning with an equals sign for use in spreadsheet software. Record the starting rows and relevant UI state before making the change.",
+        "Define a spreadsheet-safe export mode with documented escaping behavior.",
+        "Open the generated CSV in the target consumer using harmless formula fixtures. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Names display as literal text in the chosen safe mode."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No formula-like text executes merely because it came from user input."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Round-trip the escaped text and inspect whether original text can be recovered. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Round-trip the escaped text and inspect whether original text can be recovered.",
+      "review": "Review the agent's proposed diff: Does the app distinguish transport escaping from modifying stored project data?",
+      "stretch": "Offer JSON for lossless backups and explain CSV's consumer-dependent behavior.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-treat-locale-numbers-explicitly",
+      "parentId": "effect-import-csv",
+      "title": "Treat locale numbers explicitly",
+      "concept": "Numeric parsing",
+      "brief": "Import a priority score written as 1,5 in a semicolon-delimited file.",
+      "explanation": "Decimal punctuation and delimiter choices require a declared import profile.",
+      "steps": [
+        "Create a repeatable fixture: Import a priority score written as 1,5 in a semicolon-delimited file. Record the starting rows and relevant UI state before making the change.",
+        "Decode numbers according to the selected profile rather than guessing per row.",
+        "Mix accepted and ambiguous numeric strings in one fixture. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Valid profile-specific values become the intended numbers."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Ambiguous values receive a precise diagnostic instead of silent reinterpretation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Switch profiles after preview and compare the changed plan. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Switch profiles after preview and compare the changed plan.",
+      "review": "Review the agent's proposed diff: Does changing the profile invalidate the previous confirmation?",
+      "stretch": "Store the selected profile in the import receipt for reproducibility.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-retain-empty-versus-missing-fields",
+      "parentId": "effect-import-csv",
+      "title": "Retain empty versus missing fields",
+      "concept": "Field semantics",
+      "brief": "Import a row with an empty goal cell and another row with too few columns.",
+      "explanation": "An explicitly empty field differs from a structurally absent column.",
+      "steps": [
+        "Create a repeatable fixture: Import a row with an empty goal cell and another row with too few columns. Record the starting rows and relevant UI state before making the change.",
+        "Preserve column positions and validate record width before domain decoding.",
+        "Preview trailing empty cells, quoted empty cells, and short rows. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Explicitly allowed empty goals remain empty."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Short rows cannot shift later values into the wrong fields."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add extra delimiters at the end of the row. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add extra delimiters at the end of the row.",
+      "review": "Review the agent's proposed diff: Does the parser or mapping layer silently trim trailing fields?",
+      "stretch": "Show source column positions beside structural row errors.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-limit-unclosed-quoted-input",
+      "parentId": "effect-import-csv",
+      "title": "Limit unclosed quoted input",
+      "concept": "Resource safety",
+      "brief": "Feed a very large CSV field whose opening quote is never closed.",
+      "explanation": "Malformed input should terminate with bounded diagnostics rather than endless accumulation.",
+      "steps": [
+        "Create a repeatable fixture: Feed a very large CSV field whose opening quote is never closed. Record the starting rows and relevant UI state before making the change.",
+        "Set file and field limits and stop parsing when a declared limit is exceeded.",
+        "Track consumed bytes and emitted errors for the malformed fixture. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The importer reports the specific limit or unmatched quote."
+        },
+        {
+          "id": "criterion-2",
+          "label": "It never freezes the interface while retaining an unbounded field buffer."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Cancel parsing near the configured limit. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Cancel parsing near the configured limit.",
+      "review": "Review the agent's proposed diff: Are limits enforced during parsing rather than after allocating everything?",
+      "stretch": "Add a worker parser with progress based on consumed bytes.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-test-delimiter-detection-ambiguity",
+      "parentId": "effect-import-csv",
+      "title": "Test delimiter detection ambiguity",
+      "concept": "Import UX",
+      "brief": "Upload a small file containing both commas and semicolons in unquoted text.",
+      "explanation": "Automatic dialect detection can be ambiguous and must expose uncertainty.",
+      "steps": [
+        "Create a repeatable fixture: Upload a small file containing both commas and semicolons in unquoted text. Record the starting rows and relevant UI state before making the change.",
+        "Score candidate dialects and require a visible selection when no clear fit exists.",
+        "Preview the same bytes under both candidate delimiters. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The user sees the resulting column interpretation before committing."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The importer never silently chooses a destructive mapping."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change the selected dialect after resolving row errors. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change the selected dialect after resolving row errors.",
+      "review": "Review the agent's proposed diff: Does the preview clearly bind its errors to the current dialect?",
+      "stretch": "Persist a trusted dialect choice only for an explicit named import source.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-chunk-validation-without-freezing",
+      "parentId": "effect-import-bounded",
+      "title": "Chunk validation without freezing",
+      "concept": "Cooperative work",
+      "brief": "Validate fifty thousand small rows while the user types in a search field.",
+      "explanation": "Large validation work needs bounded chunks so the interface remains responsive.",
+      "steps": [
+        "Create a repeatable fixture: Validate fifty thousand small rows while the user types in a search field. Record the starting rows and relevant UI state before making the change.",
+        "Process a measured chunk and yield between chunks or move parsing to a worker.",
+        "Record input responsiveness and total processed rows during validation. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Typing and cancel controls remain usable throughout the import."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Chunking never skips or validates a row twice."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Slow the validator deliberately and repeat the interaction. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Slow the validator deliberately and repeat the interaction.",
+      "review": "Review the agent's proposed diff: Is progress driven by completed work rather than a decorative timer?",
+      "stretch": "Compare worker and main-thread chunking with the same deterministic fixture.",
+      "minutes": 30,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-cancel-the-current-parse-only",
+      "parentId": "effect-import-bounded",
+      "title": "Cancel the current parse only",
+      "concept": "Request identity",
+      "brief": "Start parsing file A, select file B, and cancel the visible parse.",
+      "explanation": "Cancellation must target the active operation and prevent obsolete results from surfacing.",
+      "steps": [
+        "Create a repeatable fixture: Start parsing file A, select file B, and cancel the visible parse. Record the starting rows and relevant UI state before making the change.",
+        "Associate each parse with an identity and owned cancellation handle.",
+        "Resolve file A after file B has become current. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only file B's current status can update the preview."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A late result from A cannot resurrect its commit button."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Cancel B immediately before its completion message arrives. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Cancel B immediately before its completion message arrives.",
+      "review": "Review the agent's proposed diff: Does cleanup distinguish supersession from user-visible parse failure?",
+      "stretch": "Add a recent-file history without retaining obsolete mutable previews.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-virtualize-preview-rows-accessibly",
+      "parentId": "effect-import-bounded",
+      "title": "Virtualize preview rows accessibly",
+      "concept": "Rendering scale",
+      "brief": "Preview one hundred thousand valid records with a keyboard-navigable error list.",
+      "explanation": "Rendering cost should depend on the visible window while row identity remains stable.",
+      "steps": [
+        "Create a repeatable fixture: Preview one hundred thousand valid records with a keyboard-navigable error list. Record the starting rows and relevant UI state before making the change.",
+        "Window the table and provide an accessible route to offscreen error rows.",
+        "Jump to row ninety thousand and edit its mapping. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The selected row keeps its source identity after scrolling."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Virtualization never changes the commit target set."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change sorting while an offscreen row is selected. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change sorting while an offscreen row is selected.",
+      "review": "Review the agent's proposed diff: Does keyboard focus survive recycled DOM elements?",
+      "stretch": "Offer a paginated accessible alternative to the virtualized preview.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-bound-concurrent-enrichment",
+      "parentId": "effect-import-bounded",
+      "title": "Bound concurrent enrichment",
+      "concept": "Effect concurrency",
+      "brief": "Validate rows using an optional remote lookup limited to four simultaneous requests.",
+      "explanation": "Concurrency limits protect the dependency and must cover retries as well as initial calls.",
+      "steps": [
+        "Create a repeatable fixture: Validate rows using an optional remote lookup limited to four simultaneous requests. Record the starting rows and relevant UI state before making the change.",
+        "Use a bounded worker pool and record active-request high-water marks.",
+        "Import twenty rows with delayed lookup responses. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "At most four lookups are active at any time."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Retries cannot create extra uncounted concurrent requests."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Make one lookup hang until its timeout. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Make one lookup hang until its timeout.",
+      "review": "Review the agent's proposed diff: Does releasing a permit happen on success, failure, and interruption?",
+      "stretch": "Add per-host limits when enrichment calls multiple providers.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-report-monotonic-progress",
+      "parentId": "effect-import-bounded",
+      "title": "Report monotonic progress",
+      "concept": "Progress semantics",
+      "brief": "Parse bytes, validate rows, and commit records as three separate import phases.",
+      "explanation": "Percentages need an honest denominator and cannot imply durability before commit.",
+      "steps": [
+        "Create a repeatable fixture: Parse bytes, validate rows, and commit records as three separate import phases. Record the starting rows and relevant UI state before making the change.",
+        "Show phase-specific progress with known totals where available.",
+        "Observe progress during unknown-length parsing and a later failed commit. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Progress never decreases within a completed phase."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Validation at one hundred percent never claims data is already saved."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change estimated row count as more bytes are parsed. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change estimated row count as more bytes are parsed.",
+      "review": "Review the agent's proposed diff: Did the agent blend incomparable byte and row counts into one misleading metric?",
+      "stretch": "Add an elapsed-time estimate labeled as approximate and independent of correctness.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-release-canceled-buffers",
+      "parentId": "effect-import-bounded",
+      "title": "Release canceled buffers",
+      "concept": "Resource lifetime",
+      "brief": "Select and cancel a large import five times without reloading the app.",
+      "explanation": "Canceled operations must release buffers, listeners, and worker references they own.",
+      "steps": [
+        "Create a repeatable fixture: Select and cancel a large import five times without reloading the app. Record the starting rows and relevant UI state before making the change.",
+        "Dispose worker subscriptions and clear obsolete parse artifacts on cancellation.",
+        "Measure retained references after each cancel cycle. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Retained memory settles near the baseline after cleanup."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Old workers cannot post messages into the active preview."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Cancel while a worker transfers a large result buffer. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Cancel while a worker transfers a large result buffer.",
+      "review": "Review the agent's proposed diff: Are ownership and cleanup explicit for transferred buffers?",
+      "stretch": "Expose development counters for active parsers and retained preview plans.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-separate-validation-from-commit-batching",
+      "parentId": "effect-import-bounded",
+      "title": "Separate validation from commit batching",
+      "concept": "Atomicity tradeoffs",
+      "brief": "A million-row import cannot fit comfortably into one long transaction.",
+      "explanation": "Batching improves responsiveness but changes recovery semantics unless staged carefully.",
+      "steps": [
+        "Create a repeatable fixture: A million-row import cannot fit comfortably into one long transaction. Record the starting rows and relevant UI state before making the change.",
+        "Choose staging-plus-swap or resumable partial commit and describe its guarantees.",
+        "Fail after several batches and inspect both visible and staged records. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The visible result follows the chosen atomic or resumable contract."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The UI never describes a partially committed import as rolled back."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Restart the browser before the final batch finishes. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Restart the browser before the final batch finishes.",
+      "review": "Review the agent's proposed diff: Does the receipt support exact resumption without duplicate rows?",
+      "stretch": "Benchmark staged import space cost alongside its stronger atomic visibility.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-apply-backpressure-to-parsing",
+      "parentId": "effect-import-bounded",
+      "title": "Apply backpressure to parsing",
+      "concept": "Streams",
+      "brief": "A parser produces rows faster than asynchronous validation can consume them.",
+      "explanation": "A queue must remain bounded when downstream work is slower than upstream input.",
+      "steps": [
+        "Create a repeatable fixture: A parser produces rows faster than asynchronous validation can consume them. Record the starting rows and relevant UI state before making the change.",
+        "Pause production or use a bounded handoff between parsing and validation.",
+        "Make validation ten times slower than parsing and measure queue depth. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Buffered rows remain within the configured limit."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The importer does not accumulate the whole file in an unbounded array."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Interrupt while the producer waits for queue capacity. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Interrupt while the producer waits for queue capacity.",
+      "review": "Review the agent's proposed diff: Can both producer and consumer terminate without deadlock?",
+      "stretch": "Record queue depth and throughput to tune capacity with evidence.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-keep-error-pages-bounded",
+      "parentId": "effect-import-bounded",
+      "title": "Keep error pages bounded",
+      "concept": "Diagnostic pagination",
+      "brief": "Ten thousand rows fail the same required-field rule during a large import.",
+      "explanation": "The interface needs a count and navigable samples without mounting every error at once.",
+      "steps": [
+        "Create a repeatable fixture: Ten thousand rows fail the same required-field rule during a large import. Record the starting rows and relevant UI state before making the change.",
+        "Paginate issues with stable source indices and summary counts by code.",
+        "Navigate to the final issue page and export the full report. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every issue remains reachable or exportable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The first page does not falsely imply only its displayed issues exist."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Correct a row and rebuild the report while on a later page. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Correct a row and rebuild the report while on a later page.",
+      "review": "Review the agent's proposed diff: Does pagination clamp safely when the new issue total shrinks?",
+      "stretch": "Provide a grouped fix suggestion that still preserves each source-row association.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-reject-unknown-future-versions",
+      "parentId": "effect-import-compatibility",
+      "title": "Reject unknown future versions",
+      "concept": "Version negotiation",
+      "brief": "Import a backup marked schema version ninety-nine into a client supporting versions one through three.",
+      "explanation": "A future contract cannot be safely guessed from familiar-looking fields.",
+      "steps": [
+        "Create a repeatable fixture: Import a backup marked schema version ninety-nine into a client supporting versions one through three. Record the starting rows and relevant UI state before making the change.",
+        "Validate the version before dispatching to a version-specific decoder.",
+        "Attempt preview with the future version and otherwise valid rows. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The user receives a clear unsupported-version message."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No mutation or lossy best-effort downgrade occurs."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Remove the version marker and test the documented legacy rule. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Remove the version marker and test the documented legacy rule.",
+      "review": "Review the agent's proposed diff: Does the decoder distinguish missing legacy version from unknown future version?",
+      "stretch": "Provide an update link or export-conversion guidance appropriate to the app.",
+      "minutes": 30,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-adapt-renamed-fields",
+      "parentId": "effect-import-compatibility",
+      "title": "Adapt renamed fields",
+      "concept": "Compatibility adapters",
+      "brief": "Version one calls a field objective while version two calls it goal.",
+      "explanation": "A version adapter should translate historical meaning before current-domain validation.",
+      "steps": [
+        "Create a repeatable fixture: Version one calls a field objective while version two calls it goal. Record the starting rows and relevant UI state before making the change.",
+        "Implement a version-one adapter with an explicit field mapping.",
+        "Restore fixtures containing only old, only new, and contradictory fields. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The supported old fixture produces the expected current goal."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Ambiguous mixed fields follow a documented conflict rule."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Give the old field an invalid nonstring value. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Give the old field an invalid nonstring value.",
+      "review": "Review the agent's proposed diff: Does adaptation preserve errors rather than coercing bad data into plausible text?",
+      "stretch": "Record the original format version in the import receipt.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-keep-canonical-fixtures-immutable",
+      "parentId": "effect-import-compatibility",
+      "title": "Keep canonical fixtures immutable",
+      "concept": "Contract testing",
+      "brief": "A developer changes export formatting and updates every golden fixture automatically.",
+      "explanation": "Fixtures are useful only when changes receive semantic review against compatibility promises.",
+      "steps": [
+        "Create a repeatable fixture: A developer changes export formatting and updates every golden fixture automatically. Record the starting rows and relevant UI state before making the change.",
+        "Separate historical input fixtures from current expected export fixtures.",
+        "Run all historical imports after the exporter change. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old supported backups still restore equivalent records."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A bulk snapshot update cannot hide removed compatibility coverage."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Deliberately remove one legacy adapter and ensure a historical test fails. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Deliberately remove one legacy adapter and ensure a historical test fails.",
+      "review": "Review the agent's proposed diff: Does each fixture document the behavior it protects?",
+      "stretch": "Attach a small human-readable manifest of expected entities to every historical fixture.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-handle-added-required-fields",
+      "parentId": "effect-import-compatibility",
+      "title": "Handle added required fields",
+      "concept": "Schema evolution",
+      "brief": "Current tasks require a priority field absent from supported older backups.",
+      "explanation": "A newly required field needs a version-specific migration rule rather than arbitrary UI defaults.",
+      "steps": [
+        "Create a repeatable fixture: Current tasks require a priority field absent from supported older backups. Record the starting rows and relevant UI state before making the change.",
+        "Supply a documented historical default during adaptation.",
+        "Import old rows and compare them with freshly created current rows. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both satisfy the current domain schema with intentional values."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Missing current-version required fields are not excused as legacy data."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Label a malformed current file as old and inspect validation behavior. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Label a malformed current file as old and inspect validation behavior.",
+      "review": "Review the agent's proposed diff: Does version selection itself have a trustworthy envelope contract?",
+      "stretch": "Add provenance metadata indicating fields supplied by compatibility defaults.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-define-unknown-field-policy",
+      "parentId": "effect-import-compatibility",
+      "title": "Define unknown-field policy",
+      "concept": "Forward compatibility",
+      "brief": "Import a supported-version project row containing an extra experimental metadata property.",
+      "explanation": "Unknown fields may be rejected, preserved, or stripped, but the choice must be explicit.",
+      "steps": [
+        "Create a repeatable fixture: Import a supported-version project row containing an extra experimental metadata property. Record the starting rows and relevant UI state before making the change.",
+        "Apply the policy at the version boundary and explain any data loss in preview.",
+        "Round-trip a row with unfamiliar nested metadata. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Behavior matches the documented preserve-or-strip decision."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unknown properties never become executable configuration or unrestricted write fields."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Include an unexpected property that shadows a known method name. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Include an unexpected property that shadows a known method name.",
+      "review": "Review the agent's proposed diff: Does broad object spreading bypass the declared policy?",
+      "stretch": "Offer a raw-source attachment when preserving unknown data is useful for later migration.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-version-enum-changes",
+      "parentId": "effect-import-compatibility",
+      "title": "Version enum changes",
+      "concept": "Domain compatibility",
+      "brief": "An older backup uses task status done while the current model uses complete.",
+      "explanation": "Enum evolution needs explicit semantic mapping and rejection for unmapped values.",
+      "steps": [
+        "Create a repeatable fixture: An older backup uses task status done while the current model uses complete. Record the starting rows and relevant UI state before making the change.",
+        "Map supported historical statuses before current schema decoding.",
+        "Import done, complete, and an unknown abandoned status under each version. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only documented mappings produce current valid states."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unknown values are never coerced into a convenient default."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add a new current status and rerun old export compatibility checks. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add a new current status and rerun old export compatibility checks.",
+      "review": "Review the agent's proposed diff: Does changing a label accidentally change the persisted contract?",
+      "stretch": "Keep display labels separate from stable serialized enum values.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-preserve-stable-identities-across-conversion",
+      "parentId": "effect-import-compatibility",
+      "title": "Preserve stable identities across conversion",
+      "concept": "Migration integrity",
+      "brief": "Convert a version-one backup whose task IDs are referenced by evidence and dependencies.",
+      "explanation": "A format adapter must update all references consistently if identity representation changes.",
+      "steps": [
+        "Create a repeatable fixture: Convert a version-one backup whose task IDs are referenced by evidence and dependencies. Record the starting rows and relevant UI state before making the change.",
+        "Build an explicit identity map before translating related records.",
+        "Compare every converted reference against the resulting entity set. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All links resolve to the intended converted task."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No converter generates independent new IDs for each reference occurrence."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Include two old IDs that would collide under naive normalization. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Include two old IDs that would collide under naive normalization.",
+      "review": "Review the agent's proposed diff: Does the adapter detect collisions before producing a commit plan?",
+      "stretch": "Emit a conversion report showing identity changes without exposing private content.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-negotiate-export-targets-honestly",
+      "parentId": "effect-import-compatibility",
+      "title": "Negotiate export targets honestly",
+      "concept": "Down-conversion",
+      "brief": "A user requests a version-one export from data containing version-three-only dependency features.",
+      "explanation": "Older formats may be unable to represent newer semantics without loss.",
+      "steps": [
+        "Create a repeatable fixture: A user requests a version-one export from data containing version-three-only dependency features. Record the starting rows and relevant UI state before making the change.",
+        "List unsupported features and require an explicit loss policy before conversion.",
+        "Export a fixture containing every newer feature. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The artifact and warning accurately describe omitted or transformed data."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The app never labels a lossy export as a complete backup."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Restore the older artifact and compare the missing semantics. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Restore the older artifact and compare the missing semantics.",
+      "review": "Review the agent's proposed diff: Can the interface distinguish interoperability export from recovery backup?",
+      "stretch": "Offer a companion report preserving details the older format cannot encode.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-import-preview-review-compatibility-as-a-release-gate",
+      "parentId": "effect-import-compatibility",
+      "title": "Review compatibility as a release gate",
+      "concept": "Agent delivery",
+      "brief": "An agent refactors decoders and reports that the latest export still imports.",
+      "explanation": "Current round-trip success does not establish support for historical contracts.",
+      "steps": [
+        "Create a repeatable fixture: An agent refactors decoders and reports that the latest export still imports. Record the starting rows and relevant UI state before making the change.",
+        "Require the supported-version fixture matrix in the change review.",
+        "Run old imports, current round-trip, malformed input, and future-version rejection. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every promised version retains its documented behavior."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Removing a supported adapter fails a meaningful release check."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Introduce a renamed field without updating its old-version adapter. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Introduce a renamed field without updating its old-version adapter.",
+      "review": "Review the agent's proposed diff: Does the PR explain any intentional support-policy change?",
+      "stretch": "Generate a compatibility matrix from fixture metadata for release documentation.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ],
+  "track": "Project practice"
+}

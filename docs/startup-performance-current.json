@@ -1,0 +1,51 @@
+{
+  "measurement": "JavaScript entry and modulepreloads in production index.html; uncompressed and gzip bytes. Excludes route requests, install data, CSS, service-worker downloads, and network/runtime timing.",
+  "assets": [
+    {
+      "name": "/assets/index-DdvPhC5L.js",
+      "bytes": 23571,
+      "gzipBytes": 8147
+    },
+    {
+      "name": "/assets/rolldown-runtime-QTnfLwEv.js",
+      "bytes": 694,
+      "gzipBytes": 422
+    },
+    {
+      "name": "/assets/react-BjALQlxx.js",
+      "bytes": 232900,
+      "gzipBytes": 73770
+    },
+    {
+      "name": "/assets/dexie-Cz9_E2lT.js",
+      "bytes": 96464,
+      "gzipBytes": 31483
+    },
+    {
+      "name": "/assets/dates-ByWTD2O-.js",
+      "bytes": 1653,
+      "gzipBytes": 736
+    },
+    {
+      "name": "/assets/outbox-CbKiSTOq.js",
+      "bytes": 1293,
+      "gzipBytes": 583
+    },
+    {
+      "name": "/assets/userStateRepo-B7YybQPs.js",
+      "bytes": 1892,
+      "gzipBytes": 932
+    },
+    {
+      "name": "/assets/curriculum-catalog-BfF7oPJM.js",
+      "bytes": 50881,
+      "gzipBytes": 7790
+    }
+  ],
+  "bytes": 409348,
+  "gzipBytes": 123863,
+  "baselineBytes": 642267,
+  "reductionPercent": 36.3,
+  "baselineGzipBytes": 202334,
+  "gzipReductionPercent": 38.8
+}

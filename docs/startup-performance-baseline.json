@@ -1,0 +1,77 @@
+{
+  "measurement": "JavaScript entry and modulepreloads in production index.html; uncompressed and gzip bytes. Excludes route requests, install data, CSS, service-worker downloads, and network/runtime timing.",
+  "assets": [
+    {
+      "name": "/assets/index-CosIrb86.js",
+      "bytes": 96805,
+      "gzipBytes": 31828
+    },
+    {
+      "name": "/assets/rolldown-runtime-QTnfLwEv.js",
+      "bytes": 694,
+      "gzipBytes": 422
+    },
+    {
+      "name": "/assets/react-BjALQlxx.js",
+      "bytes": 232900,
+      "gzipBytes": 73770
+    },
+    {
+      "name": "/assets/dexie-Cz9_E2lT.js",
+      "bytes": 96464,
+      "gzipBytes": 31483
+    },
+    {
+      "name": "/assets/dates-ByWTD2O-.js",
+      "bytes": 1653,
+      "gzipBytes": 736
+    },
+    {
+      "name": "/assets/outbox-CbKiSTOq.js",
+      "bytes": 1293,
+      "gzipBytes": 583
+    },
+    {
+      "name": "/assets/workshop-lr8Lfz2Z.js",
+      "bytes": 72357,
+      "gzipBytes": 22554
+    },
+    {
+      "name": "/assets/userStateRepo-5PI2eIWb.js",
+      "bytes": 54850,
+      "gzipBytes": 17823
+    },
+    {
+      "name": "/assets/curriculum-Bf8b1si4.js",
+      "bytes": 79451,
+      "gzipBytes": 20240
+    },
+    {
+      "name": "/assets/createLucideIcon-CekGFLbF.js",
+      "bytes": 1423,
+      "gzipBytes": 797
+    },
+    {
+      "name": "/assets/cn-BKsnmNmw.js",
+      "bytes": 402,
+      "gzipBytes": 245
+    },
+    {
+      "name": "/assets/preferences-CW03zry2.js",
+      "bytes": 335,
+      "gzipBytes": 190
+    },
+    {
+      "name": "/assets/studyRepo-DORXxd_V.js",
+      "bytes": 3585,
+      "gzipBytes": 1588
+    },
+    {
+      "name": "/assets/ids-nJcx05eu.js",
+      "bytes": 55,
+      "gzipBytes": 75
+    }
+  ],
+  "bytes": 642267,
+  "gzipBytes": 202334
+}

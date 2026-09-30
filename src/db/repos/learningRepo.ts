@@ -1,6 +1,6 @@
 import { db } from "../schema";
 import { saveUserState } from "./userStateRepo";
-import { curriculum } from "../../data/curriculum";
+import { curriculum } from "../../data/curriculum-catalog";
 export interface LearningSettings {
   path: string;
   favorites: string[];

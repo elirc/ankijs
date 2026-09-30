@@ -1,0 +1,1244 @@
+[
+  {
+    "id": "effect-drill-support-desk-trace-one-ticket-through-the-stack",
+    "parentId": "effect-tickets-slice",
+    "title": "Trace one ticket through the stack",
+    "concept": "Vertical slice",
+    "brief": "Create ticket Printer offline from the browser and inspect its SQL row.",
+    "explanation": "A complete feature includes validation, durable mutation, response decoding, and rendered confirmation.",
+    "steps": [
+      "Create a repeatable fixture: Create ticket Printer offline from the browser and inspect its SQL row. Record the starting rows and relevant UI state before making the change.",
+      "Trace the request through handler, Effect operation, repository, and response adapter.",
+      "Create once and reload the detail route directly. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The same ticket identity and description survive reload.",
+      "No layer substitutes demo data for the accepted server record.",
+      "Recovery evidence: Reject the SQL insert and repeat the browser flow. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reject the SQL insert and repeat the browser flow.",
+    "review": "Review the agent's proposed diff: Can the reviewer identify the execution boundary and each dependency?",
+    "stretch": "Add request correlation from browser action to safe server diagnostics.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-validate-server-side-title-limits",
+    "parentId": "effect-tickets-slice",
+    "title": "Validate server-side title limits",
+    "concept": "Schema contracts",
+    "brief": "Submit a blank ticket title directly to the HTTP endpoint.",
+    "explanation": "Client validation improves interaction but cannot enforce the server's domain contract.",
+    "steps": [
+      "Create a repeatable fixture: Submit a blank ticket title directly to the HTTP endpoint. Record the starting rows and relevant UI state before making the change.",
+      "Decode unknown request bodies before invoking the ticket repository.",
+      "Test blank, trimmed-valid, maximum-length, and overlong titles. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Valid titles persist in the normalized form.",
+      "Invalid input performs zero SQL writes.",
+      "Recovery evidence: Disable browser validation and repeat the same cases. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Disable browser validation and repeat the same cases.",
+    "review": "Review the agent's proposed diff: Does create and rename reuse one domain rule?",
+    "stretch": "Add structured field errors that the browser maps to labeled controls.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-map-missing-tickets-separately",
+    "parentId": "effect-tickets-slice",
+    "title": "Map missing tickets separately",
+    "concept": "Typed failures",
+    "brief": "Open ticket T-404 after its record was removed from the database.",
+    "explanation": "Missing resources and unavailable storage require different recovery experiences.",
+    "steps": [
+      "Create a repeatable fixture: Open ticket T-404 after its record was removed from the database. Record the starting rows and relevant UI state before making the change.",
+      "Return typed not-found and persistence failures from the service.",
+      "Request the missing ticket and inject a database connection failure. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Missing shows a usable return-to-list path.",
+      "A database outage is never presented as proof that the ticket was deleted.",
+      "Recovery evidence: Recover the database and reload the same route. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Recover the database and reload the same route.",
+    "review": "Review the agent's proposed diff: Does the HTTP adapter preserve failure categories without leaking SQL details?",
+    "stretch": "Add a retry control for temporary read failures.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-preserve-ticket-drafts-after-failure",
+    "parentId": "effect-tickets-slice",
+    "title": "Preserve ticket drafts after failure",
+    "concept": "Form recovery",
+    "brief": "Write a detailed issue description and fail the first save with a server error.",
+    "explanation": "Failed submission must retain the user's authored report and its attachments-in-progress state.",
+    "steps": [
+      "Create a repeatable fixture: Write a detailed issue description and fail the first save with a server error. Record the starting rows and relevant UI state before making the change.",
+      "Keep draft ownership separate from request status.",
+      "Fail, retry, and reload after a successful creation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The final ticket contains the original description exactly.",
+      "The failed attempt never clears text or claims successful creation.",
+      "Recovery evidence: Change one field while the first request is pending. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change one field while the first request is pending.",
+    "review": "Review the agent's proposed diff: Which draft snapshot does each response belong to?",
+    "stretch": "Add explicit local draft persistence with a visible saved-at indicator.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-prevent-duplicate-ticket-creation",
+    "parentId": "effect-tickets-slice",
+    "title": "Prevent duplicate ticket creation",
+    "concept": "Command identity",
+    "brief": "Double-click Submit and lose the first accepted response.",
+    "explanation": "One creation intent needs stable identity across transport retries.",
+    "steps": [
+      "Create a repeatable fixture: Double-click Submit and lose the first accepted response. Record the starting rows and relevant UI state before making the change.",
+      "Use a client command ID and server-side idempotency receipt.",
+      "Deliver the same request concurrently and again after timeout. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Exactly one ticket and one creation event exist.",
+      "Repeated delivery cannot generate multiple ticket numbers.",
+      "Recovery evidence: Reuse the command ID with a different description. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reuse the command ID with a different description.",
+    "review": "Review the agent's proposed diff: Does the receiver detect inconsistent identity reuse?",
+    "stretch": "Return the existing ticket link for a valid repeated creation request.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-keep-sql-parameters-separate",
+    "parentId": "effect-tickets-slice",
+    "title": "Keep SQL parameters separate",
+    "concept": "Query boundaries",
+    "brief": "Search tickets for a string containing quotes and SQL-looking punctuation.",
+    "explanation": "User text belongs in query parameters rather than executable query structure.",
+    "steps": [
+      "Create a repeatable fixture: Search tickets for a string containing quotes and SQL-looking punctuation. Record the starting rows and relevant UI state before making the change.",
+      "Use parameterized filters and explicitly allowlisted sort fields.",
+      "Search the hostile-looking text against a seeded fixture. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only literal matching rows are returned.",
+      "The query cannot alter filters, ordering authority, or stored data.",
+      "Recovery evidence: Put the same input into a sort-field parameter. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Put the same input into a sort-field parameter.",
+    "review": "Review the agent's proposed diff: Does the query builder separate values from selectable identifiers?",
+    "stretch": "Add a contract test for every dynamic sort option.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-paginate-with-a-stable-order",
+    "parentId": "effect-tickets-slice",
+    "title": "Paginate with a stable order",
+    "concept": "List correctness",
+    "brief": "Create thirty tickets with several equal createdAt timestamps.",
+    "explanation": "A ticket list needs deterministic ordering and defined continuation behavior.",
+    "steps": [
+      "Create a repeatable fixture: Create thirty tickets with several equal createdAt timestamps. Record the starting rows and relevant UI state before making the change.",
+      "Use a unique tiebreaker and encode the complete order in cursors.",
+      "Fetch all pages and compare collected IDs with the fixture. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every expected ticket appears once.",
+      "Tied timestamps never cause page overlap or omissions.",
+      "Recovery evidence: Insert a new ticket between page requests. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Insert a new ticket between page requests.",
+    "review": "Review the agent's proposed diff: Does the contract describe whether new records enter an ongoing traversal?",
+    "stretch": "Add cursor validation and a recoverable expired-cursor state.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-preserve-immutable-ticket-fields",
+    "parentId": "effect-tickets-slice",
+    "title": "Preserve immutable ticket fields",
+    "concept": "Update patches",
+    "brief": "Rename a ticket using a payload that also includes a forged creator and creation time.",
+    "explanation": "An edit operation owns only explicitly editable fields.",
+    "steps": [
+      "Create a repeatable fixture: Rename a ticket using a payload that also includes a forged creator and creation time. Record the starting rows and relevant UI state before making the change.",
+      "Decode a narrow patch and reject or ignore reserved fields by policy.",
+      "Attempt title update with immutable-field additions. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The title changes while creator, identity, and creation time remain intact.",
+      "Client payload cannot reattribute the ticket.",
+      "Recovery evidence: Send a whole old ticket object from a legacy client. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Send a whole old ticket object from a legacy client.",
+    "review": "Review the agent's proposed diff: Did the agent spread request data directly into the SQL update?",
+    "stretch": "Add a field-ownership table to the API contract.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-make-create-errors-accessible",
+    "parentId": "effect-tickets-slice",
+    "title": "Make create errors accessible",
+    "concept": "Error presentation",
+    "brief": "Submit a ticket with two invalid fields using only the keyboard.",
+    "explanation": "Field errors need semantic associations and predictable focus for recovery.",
+    "steps": [
+      "Create a repeatable fixture: Submit a ticket with two invalid fields using only the keyboard. Record the starting rows and relevant UI state before making the change.",
+      "Map server field paths to controls and a linked error summary.",
+      "Correct one field and resubmit without using a mouse. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Focus reaches the remaining invalid field.",
+      "Stale error descriptions disappear from corrected controls.",
+      "Recovery evidence: Return a form-wide storage error after all fields become valid. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return a form-wide storage error after all fields become valid.",
+    "review": "Review the agent's proposed diff: Does the status region announce useful change without repeating every render?",
+    "stretch": "Test the form at narrow width with long translated error messages.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-define-allowed-status-transitions",
+    "parentId": "effect-tickets-workflow",
+    "title": "Define allowed status transitions",
+    "concept": "State machine",
+    "brief": "Move a ticket from open to resolved, then attempt an unsupported resolved-to-triage transition.",
+    "explanation": "Status changes need a domain transition table rather than arbitrary string assignment.",
+    "steps": [
+      "Create a repeatable fixture: Move a ticket from open to resolved, then attempt an unsupported resolved-to-triage transition. Record the starting rows and relevant UI state before making the change.",
+      "Encode allowed transitions and their required permissions.",
+      "Exercise every allowed and forbidden edge from the fixture states. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Allowed transitions record the intended resulting status.",
+      "Forbidden transitions leave status and history unchanged.",
+      "Recovery evidence: Send an unknown status through the API. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Send an unknown status through the API.",
+    "review": "Review the agent's proposed diff: Does the backend enforce the table independently of dropdown options?",
+    "stretch": "Add transition-specific required fields such as resolution notes.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-assign-only-eligible-agents",
+    "parentId": "effect-tickets-workflow",
+    "title": "Assign only eligible agents",
+    "concept": "Relationship validation",
+    "brief": "Assign a ticket to a user who belongs to another support team.",
+    "explanation": "An assignee reference must satisfy current team membership and role eligibility.",
+    "steps": [
+      "Create a repeatable fixture: Assign a ticket to a user who belongs to another support team. Record the starting rows and relevant UI state before making the change.",
+      "Validate assignee eligibility inside the assignment operation.",
+      "Try active agent, inactive agent, outsider, and unassigned choices. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only permitted assignees are stored.",
+      "A stale picker cannot assign an agent removed before submission.",
+      "Recovery evidence: Deactivate the agent between preview and mutation. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Deactivate the agent between preview and mutation.",
+    "review": "Review the agent's proposed diff: Does the command distinguish invalid identity from temporarily unavailable lookup?",
+    "stretch": "Add an explicit fallback policy when assigned agents leave the team.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-audit-status-with-the-mutation",
+    "parentId": "effect-tickets-workflow",
+    "title": "Audit status with the mutation",
+    "concept": "Atomic events",
+    "brief": "Resolve a ticket and fail insertion of its required history event.",
+    "explanation": "A committed workflow change must have the audit evidence promised by the product.",
+    "steps": [
+      "Create a repeatable fixture: Resolve a ticket and fail insertion of its required history event. Record the starting rows and relevant UI state before making the change.",
+      "Persist status and transition event in one SQL transaction.",
+      "Inject failure after status update and before event insertion. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Both changes roll back together.",
+      "The ticket cannot appear resolved without its required transition record.",
+      "Recovery evidence: Retry the original command with the same identity. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Retry the original command with the same identity.",
+    "review": "Review the agent's proposed diff: Does idempotency cover history as well as current status?",
+    "stretch": "Deliver external notifications through a transactional outbox.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-reject-stale-assignments",
+    "parentId": "effect-tickets-workflow",
+    "title": "Reject stale assignments",
+    "concept": "Optimistic concurrency",
+    "brief": "Two team leads assign the same unassigned ticket to different agents.",
+    "explanation": "A stale assignment must not silently replace an accepted newer decision.",
+    "steps": [
+      "Create a repeatable fixture: Two team leads assign the same unassigned ticket to different agents. Record the starting rows and relevant UI state before making the change.",
+      "Require expected ticket revision in the assignment command.",
+      "Submit both assignments against one revision. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "One assignment wins and advances revision once.",
+      "The loser receives current authorized assignment context.",
+      "Recovery evidence: Remove the winning agent before the loser reloads. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Remove the winning agent before the loser reloads.",
+    "review": "Review the agent's proposed diff: Does conflict recovery revalidate assignee eligibility?",
+    "stretch": "Add an explicit reassign action that records the reason for overriding a current owner.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-separate-public-replies-from-notes",
+    "parentId": "effect-tickets-workflow",
+    "title": "Separate public replies from notes",
+    "concept": "Visibility policy",
+    "brief": "An agent writes a private investigation note on a customer-visible ticket.",
+    "explanation": "Internal notes and customer replies have different audiences and delivery effects.",
+    "steps": [
+      "Create a repeatable fixture: An agent writes a private investigation note on a customer-visible ticket. Record the starting rows and relevant UI state before making the change.",
+      "Represent visibility explicitly and authorize both reads and writes.",
+      "View the ticket as customer, agent, and outsider. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Agents see permitted internal notes and customers see only public replies.",
+      "Private notes never enter customer exports or notifications.",
+      "Recovery evidence: Change a reply draft from public to private before sending. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change a reply draft from public to private before sending.",
+    "review": "Review the agent's proposed diff: Does every downstream projection honor the same visibility field?",
+    "stretch": "Require a deliberate conversion flow before publishing a previously private note.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-make-reassignment-notifications-idempotent",
+    "parentId": "effect-tickets-workflow",
+    "title": "Make reassignment notifications idempotent",
+    "concept": "Side effects",
+    "brief": "Assign a ticket successfully but time out while delivering its notification.",
+    "explanation": "Notification delivery must not duplicate the assignment or produce repeated identical messages.",
+    "steps": [
+      "Create a repeatable fixture: Assign a ticket successfully but time out while delivering its notification. Record the starting rows and relevant UI state before making the change.",
+      "Record a notification intent keyed by the assignment event.",
+      "Replay delivery after an ambiguous provider response. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "One logical assignment event remains authoritative.",
+      "Retries do not create additional assignment history entries.",
+      "Recovery evidence: Reassign the ticket again before the first notification finishes. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reassign the ticket again before the first notification finishes.",
+    "review": "Review the agent's proposed diff: Does the notification indicate the event it represents rather than current state blindly?",
+    "stretch": "Suppress or annotate obsolete notifications according to a documented policy.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-preserve-conversation-ordering",
+    "parentId": "effect-tickets-workflow",
+    "title": "Preserve conversation ordering",
+    "concept": "Concurrent comments",
+    "brief": "Two agents post replies with the same timestamp during a handoff.",
+    "explanation": "Conversation ordering needs a stable total order without inventing causal claims.",
+    "steps": [
+      "Create a repeatable fixture: Two agents post replies with the same timestamp during a handoff. Record the starting rows and relevant UI state before making the change.",
+      "Order by server timestamp and unique event sequence.",
+      "Load pages around the tied replies and compare IDs. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Both replies remain visible exactly once.",
+      "Client clock skew never places a new reply before unrelated historical messages.",
+      "Recovery evidence: Send a reply from a device whose clock is a day behind. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Send a reply from a device whose clock is a day behind.",
+    "review": "Review the agent's proposed diff: Does the server own authoritative event timing?",
+    "stretch": "Display edited markers without rewriting original conversation chronology.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-require-resolution-evidence",
+    "parentId": "effect-tickets-workflow",
+    "title": "Require resolution evidence",
+    "concept": "Workflow requirements",
+    "brief": "Resolve a ticket marked needs-reproduction without a resolution note.",
+    "explanation": "Certain transitions can require evidence beyond a target status value.",
+    "steps": [
+      "Create a repeatable fixture: Resolve a ticket marked needs-reproduction without a resolution note. Record the starting rows and relevant UI state before making the change.",
+      "Validate required resolution fields within the transition operation.",
+      "Attempt resolve with blank note, valid note, and unauthorized actor. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "A valid authorized resolution records its explanation.",
+      "Missing evidence leaves the ticket unresolved.",
+      "Recovery evidence: Delete the draft note before a delayed submit completes. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Delete the draft note before a delayed submit completes.",
+    "review": "Review the agent's proposed diff: Does the command capture the reviewed note snapshot?",
+    "stretch": "Add resolution categories with versioned reporting semantics.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-undo-a-mistaken-assignment-safely",
+    "parentId": "effect-tickets-workflow",
+    "title": "Undo a mistaken assignment safely",
+    "concept": "Conditional compensation",
+    "brief": "Undo an assignment after another lead has already reassigned the ticket.",
+    "explanation": "Undo may reverse its own unchanged result but must not overwrite later decisions.",
+    "steps": [
+      "Create a repeatable fixture: Undo an assignment after another lead has already reassigned the ticket. Record the starting rows and relevant UI state before making the change.",
+      "Store the assignment event's resulting revision in the undo receipt.",
+      "Undo before and after a subsequent reassignment. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Untouched assignments can be reversed deliberately.",
+      "A stale undo preserves the later assignee and reports conflict.",
+      "Recovery evidence: Press Undo twice after the first reversal succeeds. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Press Undo twice after the first reversal succeeds.",
+    "review": "Review the agent's proposed diff: Does compensation append history rather than deleting the original event?",
+    "stretch": "Expire undo receipts and provide a normal reassignment path afterward.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-support-desk-compose-search-filters-consistently",
+    "parentId": "effect-tickets-release",
+    "title": "Compose search filters consistently",
+    "concept": "Query semantics",
+    "brief": "Search resolved tickets assigned to agent A whose title contains login.",
+    "explanation": "Combined filters should represent one coherent predicate across count and list queries.",
+    "steps": [
+      "Create a repeatable fixture: Search resolved tickets assigned to agent A whose title contains login. Record the starting rows and relevant UI state before making the change.",
+      "Share validated filter interpretation between results and totals.",
+      "Seed tickets that each violate exactly one filter dimension. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only tickets satisfying every selected condition appear.",
+      "The total count cannot include rows excluded by the rendered list.",
+      "Recovery evidence: Clear text search while retaining status and assignee. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Clear text search while retaining status and assignee.",
+    "review": "Review the agent's proposed diff: Does resetting one control erase unrelated filter state?",
+    "stretch": "Encode the filters in a shareable URL with stable defaults.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-index-the-actual-query",
+    "parentId": "effect-tickets-release",
+    "title": "Index the actual query",
+    "concept": "Database performance",
+    "brief": "A growing ticket table slows the open-by-assignee list despite fast primary-key reads.",
+    "explanation": "Indexes should support measured query predicates and ordering.",
+    "steps": [
+      "Create a repeatable fixture: A growing ticket table slows the open-by-assignee list despite fast primary-key reads. Record the starting rows and relevant UI state before making the change.",
+      "Inspect the query plan and add a justified composite index.",
+      "Compare representative execution plans and timings before and after. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The target query uses an appropriate access path.",
+      "Write cost and unrelated queries remain within stated limits.",
+      "Recovery evidence: Use an assignee with no tickets and one with many tickets. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Use an assignee with no tickets and one with many tickets.",
+    "review": "Review the agent's proposed diff: Does the benchmark include skewed distributions rather than only uniform data?",
+    "stretch": "Document why column order matches the query's filtering and sorting needs.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-avoid-n-plus-one-assignee-reads",
+    "parentId": "effect-tickets-release",
+    "title": "Avoid N-plus-one assignee reads",
+    "concept": "Data loading",
+    "brief": "Render fifty tickets where each row separately fetches its assignee profile.",
+    "explanation": "List rendering should not scale network or SQL calls linearly for shared related data.",
+    "steps": [
+      "Create a repeatable fixture: Render fifty tickets where each row separately fetches its assignee profile. Record the starting rows and relevant UI state before making the change.",
+      "Join or batch permitted assignee fields with the list query.",
+      "Count requests for one, ten, and fifty rows. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Request count remains bounded by the documented loading strategy.",
+      "Private profile fields never enter the optimized list response.",
+      "Recovery evidence: Include many tickets sharing one assignee. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Include many tickets sharing one assignee.",
+    "review": "Review the agent's proposed diff: Does the optimization preserve authorization and missing-profile behavior?",
+    "stretch": "Cache stable public display metadata with explicit invalidation.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-restore-a-production-like-backup",
+    "parentId": "effect-tickets-release",
+    "title": "Restore a production-like backup",
+    "concept": "Recovery rehearsal",
+    "brief": "Restore a backup containing tickets, comments, assignments, and audit history into an isolated database.",
+    "explanation": "A backup is useful only if restoration preserves usable relationships and access rules.",
+    "steps": [
+      "Create a repeatable fixture: Restore a backup containing tickets, comments, assignments, and audit history into an isolated database. Record the starting rows and relevant UI state before making the change.",
+      "Write a repeatable restore procedure and verify representative workflows afterward.",
+      "Open tickets, inspect history, reassign, and create a new reply. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Restored relationships and identity sequences remain valid.",
+      "Recovery does not silently omit private notes or audit records.",
+      "Recovery evidence: Restore a backup made before the latest additive migration. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Restore a backup made before the latest additive migration.",
+    "review": "Review the agent's proposed diff: Does the rehearsal include application startup against restored schema?",
+    "stretch": "Record recovery duration and the backup's last included event time.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-check-deep-links-after-deployment",
+    "parentId": "effect-tickets-release",
+    "title": "Check deep links after deployment",
+    "concept": "Routing",
+    "brief": "Open a ticket detail URL directly after deploying the production bundle.",
+    "explanation": "Client routes require hosting behavior that serves the app shell for valid deep links.",
+    "steps": [
+      "Create a repeatable fixture: Open a ticket detail URL directly after deploying the production bundle. Record the starting rows and relevant UI state before making the change.",
+      "Configure the deployment fallback according to the app's route strategy.",
+      "Load list, detail, and nonexistent routes through fresh browser navigation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Valid deep links render the intended ticket screen.",
+      "Unknown routes show a deliberate not-found experience.",
+      "Recovery evidence: Refresh while viewing a nested ticket activity tab. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Refresh while viewing a nested ticket activity tab.",
+    "review": "Review the agent's proposed diff: Does local dev success hide production static-host routing failures?",
+    "stretch": "Add a small deployment smoke check for the main deep-link paths.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-make-rollback-compatible-with-new-data",
+    "parentId": "effect-tickets-release",
+    "title": "Make rollback compatible with new data",
+    "concept": "Release sequencing",
+    "brief": "Deploy a client that writes a new optional ticket field, then roll back the UI.",
+    "explanation": "Rollback should not cause older writers to erase newer data they do not understand.",
+    "steps": [
+      "Create a repeatable fixture: Deploy a client that writes a new optional ticket field, then roll back the UI. Record the starting rows and relevant UI state before making the change.",
+      "Use additive schema and narrow update contracts during the rollback window.",
+      "Write with the new version and edit with the old version. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The new field survives old-client updates.",
+      "Rollback never requires deleting user records.",
+      "Recovery evidence: Keep both client versions active simultaneously. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Keep both client versions active simultaneously.",
+    "review": "Review the agent's proposed diff: Does the release plan specify when compatibility support can end?",
+    "stretch": "Add a minimum writer version only after an explicit migration window.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-measure-end-to-end-loading",
+    "parentId": "effect-tickets-release",
+    "title": "Measure end-to-end loading",
+    "concept": "Performance evidence",
+    "brief": "Open a ticket list with a cold cache on a throttled connection.",
+    "explanation": "User-perceived loading includes bundle transfer, API latency, and rendering work.",
+    "steps": [
+      "Create a repeatable fixture: Open a ticket list with a cold cache on a throttled connection. Record the starting rows and relevant UI state before making the change.",
+      "Record navigation-to-usable-list milestones and inspect the critical path.",
+      "Compare a fixed fixture before and after one optimization. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The measured user-visible milestone improves under the same conditions.",
+      "A smaller query alone is not claimed as faster startup without evidence.",
+      "Recovery evidence: Repeat with a warm cache to separate caching from code improvements. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Repeat with a warm cache to separate caching from code improvements.",
+    "review": "Review the agent's proposed diff: Does the report disclose dataset, cache state, and network settings?",
+    "stretch": "Add a performance budget for the slowest supported common list view.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-handle-failed-deployment-assets",
+    "parentId": "effect-tickets-release",
+    "title": "Handle failed deployment assets",
+    "concept": "Update recovery",
+    "brief": "A cached app shell requests a JavaScript chunk removed by a new deployment.",
+    "explanation": "Asset-version mismatch needs a recoverable update experience.",
+    "steps": [
+      "Create a repeatable fixture: A cached app shell requests a JavaScript chunk removed by a new deployment. Record the starting rows and relevant UI state before making the change.",
+      "Preserve compatible assets or detect chunk-load failure and offer a controlled reload.",
+      "Serve an old shell against the new asset set in a fixture. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Users receive an actionable recovery path.",
+      "A reload loop never discards unsaved ticket drafts repeatedly.",
+      "Recovery evidence: Go offline after the chunk-load failure. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Go offline after the chunk-load failure.",
+    "review": "Review the agent's proposed diff: Does recovery distinguish unavailable network from an obsolete build?",
+    "stretch": "Retain versioned assets long enough for active sessions to finish safely.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-review-release-evidence-by-claim",
+    "parentId": "effect-tickets-release",
+    "title": "Review release evidence by claim",
+    "concept": "Agent delivery",
+    "brief": "An agent reports the support desk ready after only running a formatter.",
+    "explanation": "Release claims need evidence appropriate to changed behavior and remaining risk.",
+    "steps": [
+      "Create a repeatable fixture: An agent reports the support desk ready after only running a formatter. Record the starting rows and relevant UI state before making the change.",
+      "List concrete claims for CRUD, permissions, recovery, and loading.",
+      "Match each claim to a test, inspection, or measured result. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every readiness claim has traceable relevant evidence.",
+      "Unrun checks are described as unrun rather than implied passed.",
+      "Recovery evidence: Introduce a known failing authorization fixture. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Introduce a known failing authorization fixture.",
+    "review": "Review the agent's proposed diff: Does the review prioritize material behavior instead of counting commands?",
+    "stretch": "Create a concise release note with behavior, validation, and known limits.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-authorize-upload-intent",
+    "parentId": "effect-tickets-attachments",
+    "title": "Authorize upload intent",
+    "concept": "File boundaries",
+    "brief": "A user requests an upload URL for a ticket they cannot access.",
+    "explanation": "Temporary upload capability must be scoped by current ticket authorization.",
+    "steps": [
+      "Create a repeatable fixture: A user requests an upload URL for a ticket they cannot access. Record the starting rows and relevant UI state before making the change.",
+      "Authorize ticket and attachment intent before issuing any upload grant.",
+      "Request grants as owner, agent, viewer, and outsider. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only permitted principals receive appropriately scoped grants.",
+      "An outsider cannot reserve storage under a guessed ticket ID.",
+      "Recovery evidence: Revoke access after grant creation but before attachment finalization. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Revoke access after grant creation but before attachment finalization.",
+    "review": "Review the agent's proposed diff: Does finalization recheck the relationship and current policy?",
+    "stretch": "Give grants short lifetimes and exact object-key scope.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-verify-uploaded-object-metadata",
+    "parentId": "effect-tickets-attachments",
+    "title": "Verify uploaded object metadata",
+    "concept": "Untrusted files",
+    "brief": "The browser claims a small text file but uploads different bytes and size.",
+    "explanation": "Client-declared filename, size, and type are hints rather than authoritative facts.",
+    "steps": [
+      "Create a repeatable fixture: The browser claims a small text file but uploads different bytes and size. Record the starting rows and relevant UI state before making the change.",
+      "Inspect trusted storage metadata and allowed content policy during finalization.",
+      "Finalize files with mismatched size, type, and object identity. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only verified allowed objects become ready attachments.",
+      "A forged browser MIME type cannot bypass policy.",
+      "Recovery evidence: Upload a file whose extension disagrees with its content. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Upload a file whose extension disagrees with its content.",
+    "review": "Review the agent's proposed diff: Does preview rendering use a safe content disposition for untrusted formats?",
+    "stretch": "Add a quarantine stage before formats requiring deeper inspection are exposed.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-keep-object-keys-unguessable-and-scoped",
+    "parentId": "effect-tickets-attachments",
+    "title": "Keep object keys unguessable and scoped",
+    "concept": "Storage identity",
+    "brief": "Two tickets upload files with the same filename screenshot.png.",
+    "explanation": "User filenames should not determine globally colliding storage paths.",
+    "steps": [
+      "Create a repeatable fixture: Two tickets upload files with the same filename screenshot.png. Record the starting rows and relevant UI state before making the change.",
+      "Generate storage identity separately and retain the original name as display metadata.",
+      "Upload both files and download them through their ticket links. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each attachment resolves to its own bytes.",
+      "A filename cannot overwrite another ticket's object.",
+      "Recovery evidence: Use a filename containing path separators and traversal-looking segments. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Use a filename containing path separators and traversal-looking segments.",
+    "review": "Review the agent's proposed diff: Does the storage API treat object keys as data rather than filesystem paths?",
+    "stretch": "Partition object namespaces by tenant without exposing authorization through key secrecy alone.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-finalize-once-after-upload",
+    "parentId": "effect-tickets-attachments",
+    "title": "Finalize once after upload",
+    "concept": "Two-phase workflow",
+    "brief": "Upload succeeds, but the attachment-finalization response is lost.",
+    "explanation": "Upload and linking require an idempotent state transition with a durable identity.",
+    "steps": [
+      "Create a repeatable fixture: Upload succeeds, but the attachment-finalization response is lost. Record the starting rows and relevant UI state before making the change.",
+      "Track pending and ready states and make finalization repeatable.",
+      "Replay finalization with the same attachment identity. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "One ready attachment is linked to the ticket.",
+      "Repeated finalization never duplicates links or audit events.",
+      "Recovery evidence: Call finalization before the object is fully available. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Call finalization before the object is fully available.",
+    "review": "Review the agent's proposed diff: Does the state machine reject premature readiness without losing the upload?",
+    "stretch": "Add expiration and cleanup for abandoned pending attachment intents.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-clean-up-orphaned-uploads",
+    "parentId": "effect-tickets-attachments",
+    "title": "Clean up orphaned uploads",
+    "concept": "Resource lifecycle",
+    "brief": "A user uploads a file and closes the tab before linking it to a ticket.",
+    "explanation": "Unreferenced storage needs cleanup that cannot delete newly linked objects.",
+    "steps": [
+      "Create a repeatable fixture: A user uploads a file and closes the tab before linking it to a ticket. Record the starting rows and relevant UI state before making the change.",
+      "Mark pending ownership and age, then recheck references before deletion.",
+      "Race cleanup with finalization of the same object. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "A ready referenced attachment survives cleanup.",
+      "Expired unreferenced objects are eventually removed.",
+      "Recovery evidence: Crash after deleting storage bytes but before updating metadata. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Crash after deleting storage bytes but before updating metadata.",
+    "review": "Review the agent's proposed diff: Does cleanup remain idempotent across partial completion?",
+    "stretch": "Add a dry-run report with eligible-object count and retained-reference reasons.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-authorize-downloads-at-access-time",
+    "parentId": "effect-tickets-attachments",
+    "title": "Authorize downloads at access time",
+    "concept": "Read authority",
+    "brief": "A former team member retains an old attachment link after removal.",
+    "explanation": "A saved link must obey the declared expiry and authorization model.",
+    "steps": [
+      "Create a repeatable fixture: A former team member retains an old attachment link after removal. Record the starting rows and relevant UI state before making the change.",
+      "Use authorized download endpoints or narrowly scoped expiring grants.",
+      "Attempt access before and after membership removal. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Access follows the documented grant lifetime and current policy.",
+      "Permanent public URLs do not expose private ticket attachments.",
+      "Recovery evidence: Forward the link to an outsider during its lifetime. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Forward the link to an outsider during its lifetime.",
+    "review": "Review the agent's proposed diff: Does the product intentionally allow bearer-link sharing or require identity checks?",
+    "stretch": "Add revocable download grants for highly sensitive attachment classes.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-delete-metadata-and-bytes-safely",
+    "parentId": "effect-tickets-attachments",
+    "title": "Delete metadata and bytes safely",
+    "concept": "Distributed deletion",
+    "brief": "Delete attachment metadata successfully while object-storage deletion fails.",
+    "explanation": "Database and object storage do not share a normal transaction.",
+    "steps": [
+      "Create a repeatable fixture: Delete attachment metadata successfully while object-storage deletion fails. Record the starting rows and relevant UI state before making the change.",
+      "Record deletion intent and retry storage cleanup separately.",
+      "Fail the object delete and inspect user-visible and cleanup states. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The attachment is unavailable according to the declared deletion policy.",
+      "Cleanup failure never silently loses the obligation to remove bytes.",
+      "Recovery evidence: Retry deletion after the object has already disappeared. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Retry deletion after the object has already disappeared.",
+    "review": "Review the agent's proposed diff: Does the cleanup treat missing objects as successful idempotent completion?",
+    "stretch": "Expose retained-byte cleanup backlog in operational diagnostics.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-preview-untrusted-attachments-safely",
+    "parentId": "effect-tickets-attachments",
+    "title": "Preview untrusted attachments safely",
+    "concept": "Rendering security",
+    "brief": "Open an uploaded HTML file from a private support ticket.",
+    "explanation": "Preview must not execute untrusted content with application privileges.",
+    "steps": [
+      "Create a repeatable fixture: Open an uploaded HTML file from a private support ticket. Record the starting rows and relevant UI state before making the change.",
+      "Use download disposition or a properly isolated preview boundary.",
+      "Open HTML, SVG, and ordinary image fixtures. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Allowed previews remain usable without application-origin execution.",
+      "Uploaded scripts cannot read session state or call privileged app APIs.",
+      "Recovery evidence: Rename the same bytes with a harmless-looking extension. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Rename the same bytes with a harmless-looking extension.",
+    "review": "Review the agent's proposed diff: Does the preview decision rely on verified type rather than filename alone?",
+    "stretch": "Provide a text-only preview for formats that cannot be safely rendered inline.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-show-upload-progress-honestly",
+    "parentId": "effect-tickets-attachments",
+    "title": "Show upload progress honestly",
+    "concept": "Async UX",
+    "brief": "Upload a large file, then spend several seconds validating and linking it.",
+    "explanation": "Transferred bytes reaching one hundred percent does not mean the attachment is ready.",
+    "steps": [
+      "Create a repeatable fixture: Upload a large file, then spend several seconds validating and linking it. Record the starting rows and relevant UI state before making the change.",
+      "Separate uploading, verifying, linking, ready, and failed states.",
+      "Delay each phase and inspect visible status. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The user can distinguish transfer completion from usable attachment readiness.",
+      "The UI never exposes an unverified attachment as ready.",
+      "Recovery evidence: Cancel after upload completes but before linking. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Cancel after upload completes but before linking.",
+    "review": "Review the agent's proposed diff: Does cancellation explain whether cleanup remains pending?",
+    "stretch": "Add resume support only when storage protocol and intent identity permit it.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-support-desk-define-the-response-clock",
+    "parentId": "effect-tickets-sla",
+    "title": "Define the response clock",
+    "concept": "Service semantics",
+    "brief": "Create a high-priority ticket Friday afternoon under a business-hours response policy.",
+    "explanation": "An SLA deadline needs an explicit calendar, timezone, and eligible-time definition.",
+    "steps": [
+      "Create a repeatable fixture: Create a high-priority ticket Friday afternoon under a business-hours response policy. Record the starting rows and relevant UI state before making the change.",
+      "Represent the policy separately from ticket status and inject a clock.",
+      "Calculate the deadline across closing time and the weekend. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The deadline matches the documented business calendar.",
+      "A naive elapsed-hours calculation cannot count closed hours accidentally.",
+      "Recovery evidence: Move the clock through a daylight-saving boundary. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Move the clock through a daylight-saving boundary.",
+    "review": "Review the agent's proposed diff: Does the policy specify local calendar hours versus fixed durations?",
+    "stretch": "Add holiday calendars with versioned effective dates.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-pause-only-for-defined-states",
+    "parentId": "effect-tickets-sla",
+    "title": "Pause only for defined states",
+    "concept": "SLA state machine",
+    "brief": "Move a ticket to waiting-for-customer and later back to open.",
+    "explanation": "Paused time must follow explicit status transitions and preserve accumulated elapsed time.",
+    "steps": [
+      "Create a repeatable fixture: Move a ticket to waiting-for-customer and later back to open. Record the starting rows and relevant UI state before making the change.",
+      "Record pause and resume events with authoritative timestamps.",
+      "Pause twice, resume once, and inspect elapsed eligible time. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Repeated pause does not reset the accumulated clock.",
+      "Only documented waiting states stop the timer.",
+      "Recovery evidence: Receive an out-of-order status event. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Receive an out-of-order status event.",
+    "review": "Review the agent's proposed diff: Does calculation derive from ordered events or fragile mutable counters?",
+    "stretch": "Recompute SLA history from events and compare it with cached values.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-separate-first-response-from-resolution",
+    "parentId": "effect-tickets-sla",
+    "title": "Separate first response from resolution",
+    "concept": "Metric definitions",
+    "brief": "An agent replies quickly but resolves the ticket two days later.",
+    "explanation": "First-response and resolution goals measure different events and should not share one completion flag.",
+    "steps": [
+      "Create a repeatable fixture: An agent replies quickly but resolves the ticket two days later. Record the starting rows and relevant UI state before making the change.",
+      "Track each metric's qualifying event and deadline independently.",
+      "Post an internal note, a public reply, and a resolution. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only the qualifying public response satisfies first-response timing.",
+      "An internal note cannot falsely stop the customer's response clock.",
+      "Recovery evidence: Reopen the ticket after resolution. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reopen the ticket after resolution.",
+    "review": "Review the agent's proposed diff: Does the policy define which metrics restart on reopening?",
+    "stretch": "Display separate timing outcomes with explanations of qualifying events.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-avoid-duplicate-escalation",
+    "parentId": "effect-tickets-sla",
+    "title": "Avoid duplicate escalation",
+    "concept": "Scheduled work",
+    "brief": "Two scheduler instances discover the same overdue ticket simultaneously.",
+    "explanation": "One threshold crossing should create one logical escalation event.",
+    "steps": [
+      "Create a repeatable fixture: Two scheduler instances discover the same overdue ticket simultaneously. Record the starting rows and relevant UI state before making the change.",
+      "Claim escalation by ticket and threshold identity atomically.",
+      "Run both schedulers against the same due fixture. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "One escalation event and one delivery intent are created.",
+      "Repeated scans do not spam identical alerts.",
+      "Recovery evidence: Lose the notification acknowledgment and retry delivery. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Lose the notification acknowledgment and retry delivery.",
+    "review": "Review the agent's proposed diff: Does deduplication cover event creation and external delivery separately?",
+    "stretch": "Support multiple distinct escalation thresholds with stable identities.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-recalculate-priority-changes-deliberately",
+    "parentId": "effect-tickets-sla",
+    "title": "Recalculate priority changes deliberately",
+    "concept": "Policy transitions",
+    "brief": "Raise a ticket from normal to urgent after most of its original response window elapsed.",
+    "explanation": "Priority changes require an explicit deadline recalculation rule.",
+    "steps": [
+      "Create a repeatable fixture: Raise a ticket from normal to urgent after most of its original response window elapsed. Record the starting rows and relevant UI state before making the change.",
+      "Choose original-open-time, change-time, or retained-consumption semantics.",
+      "Apply the change at several elapsed-time points. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The new deadline follows the documented rule.",
+      "The UI cannot silently reset an overdue ticket to a fresh full window.",
+      "Recovery evidence: Lower priority after an escalation has already occurred. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Lower priority after an escalation has already occurred.",
+    "review": "Review the agent's proposed diff: Does history retain the policy and deadline used for each decision?",
+    "stretch": "Show a timeline explaining how priority changes affected the deadline.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-use-trusted-event-timestamps",
+    "parentId": "effect-tickets-sla",
+    "title": "Use trusted event timestamps",
+    "concept": "Clock authority",
+    "brief": "A client submits a reply timestamp an hour earlier than the server receives it.",
+    "explanation": "SLA evidence should use the timestamp authority defined by the service contract.",
+    "steps": [
+      "Create a repeatable fixture: A client submits a reply timestamp an hour earlier than the server receives it. Record the starting rows and relevant UI state before making the change.",
+      "Assign trusted acceptance time while retaining client time only as optional metadata.",
+      "Submit replies from clocks ahead and behind the server. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Qualifying response timing uses authoritative event time.",
+      "A forged client timestamp cannot erase a recorded breach.",
+      "Recovery evidence: Delay delivery of an offline-authored reply. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Delay delivery of an offline-authored reply.",
+    "review": "Review the agent's proposed diff: Does the product distinguish authoring time from customer-visible delivery time?",
+    "stretch": "Record both times when they support honest operational analysis.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-render-countdowns-without-excessive-work",
+    "parentId": "effect-tickets-sla",
+    "title": "Render countdowns without excessive work",
+    "concept": "UI performance",
+    "brief": "Display countdowns for one hundred tickets on the list screen.",
+    "explanation": "Countdown precision should match user needs without creating one busy timer per row.",
+    "steps": [
+      "Create a repeatable fixture: Display countdowns for one hundred tickets on the list screen. Record the starting rows and relevant UI state before making the change.",
+      "Use a shared clock tick and coarse updates where appropriate.",
+      "Measure render activity with the list visible and hidden. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Visible deadlines remain accurate within the declared display precision.",
+      "Background tabs do not perform unnecessary per-row interval work.",
+      "Recovery evidence: Cross a deadline while the tab is hidden and return. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Cross a deadline while the tab is hidden and return.",
+    "review": "Review the agent's proposed diff: Does the server remain authoritative despite client countdown presentation?",
+    "stretch": "Update near-deadline rows more frequently than distant ones.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-keep-historical-policies-stable",
+    "parentId": "effect-tickets-sla",
+    "title": "Keep historical policies stable",
+    "concept": "Versioned rules",
+    "brief": "Change business hours while reporting last month's SLA outcomes.",
+    "explanation": "Historical outcomes need the policy version that applied to their qualifying events.",
+    "steps": [
+      "Create a repeatable fixture: Change business hours while reporting last month's SLA outcomes. Record the starting rows and relevant UI state before making the change.",
+      "Store policy identity and effective dates with timing decisions.",
+      "Recompute an old ticket after changing the current calendar. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Historical reports retain their documented original semantics.",
+      "A new calendar does not silently rewrite past breach counts.",
+      "Recovery evidence: Correct an erroneous historical policy explicitly. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Correct an erroneous historical policy explicitly.",
+    "review": "Review the agent's proposed diff: Does the system distinguish a correction from an ordinary future policy change?",
+    "stretch": "Provide a recalculation preview before altering published historical reports.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-explain-breach-evidence",
+    "parentId": "effect-tickets-sla",
+    "title": "Explain breach evidence",
+    "concept": "Operational reporting",
+    "brief": "A ticket is marked breached but an agent disputes which paused interval was counted.",
+    "explanation": "A timing outcome should be explainable through source events and policy.",
+    "steps": [
+      "Create a repeatable fixture: A ticket is marked breached but an agent disputes which paused interval was counted. Record the starting rows and relevant UI state before making the change.",
+      "Expose a safe timeline of active, paused, and excluded intervals.",
+      "Compare the timeline's summed eligible time with the breach result. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The arithmetic reconciles with the displayed outcome.",
+      "Hidden rounding cannot change the classification at the boundary.",
+      "Recovery evidence: Use an event exactly at the deadline timestamp. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Use an event exactly at the deadline timestamp.",
+    "review": "Review the agent's proposed diff: Does the policy specify inclusive versus exclusive cutoff behavior?",
+    "stretch": "Export the timing breakdown for review without exposing unrelated ticket content.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-version-response-envelopes",
+    "parentId": "effect-tickets-contracts",
+    "title": "Version response envelopes",
+    "concept": "API evolution",
+    "brief": "An older client expects a ticket object while a new endpoint wraps data and metadata.",
+    "explanation": "Response-shape changes require compatibility planning rather than incidental refactoring.",
+    "steps": [
+      "Create a repeatable fixture: An older client expects a ticket object while a new endpoint wraps data and metadata. Record the starting rows and relevant UI state before making the change.",
+      "Define supported versions or an additive envelope strategy.",
+      "Run old and new client decoders against the proposed responses. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every supported client receives a decodable contract.",
+      "A deployment cannot silently return a different top-level shape.",
+      "Recovery evidence: Return an unexpected extra metadata field. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return an unexpected extra metadata field.",
+    "review": "Review the agent's proposed diff: Does the decoder's unknown-field policy match the evolution strategy?",
+    "stretch": "Maintain consumer fixtures for each supported client contract.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-keep-error-codes-stable",
+    "parentId": "effect-tickets-contracts",
+    "title": "Keep error codes stable",
+    "concept": "Failure contracts",
+    "brief": "Rename a human-readable conflict message while clients branch on its text.",
+    "explanation": "Clients should depend on stable machine codes and structured fields.",
+    "steps": [
+      "Create a repeatable fixture: Rename a human-readable conflict message while clients branch on its text. Record the starting rows and relevant UI state before making the change.",
+      "Expose a typed error code separately from localized message text.",
+      "Change message wording and rerun client recovery behavior. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Conflict recovery still triggers through the stable code.",
+      "Localization cannot turn a conflict into an unrecognized generic error.",
+      "Recovery evidence: Return a new unknown code to an older client. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return a new unknown code to an older client.",
+    "review": "Review the agent's proposed diff: Does the client provide a safe fallback without treating it as success?",
+    "stretch": "Document retryability as explicit metadata or a stable code mapping.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-specify-patch-nullability",
+    "parentId": "effect-tickets-contracts",
+    "title": "Specify patch nullability",
+    "concept": "Request semantics",
+    "brief": "A ticket patch omits assigneeId while another explicitly sets it to null.",
+    "explanation": "Omitted, cleared, and invalid values are separate contract states.",
+    "steps": [
+      "Create a repeatable fixture: A ticket patch omits assigneeId while another explicitly sets it to null. Record the starting rows and relevant UI state before making the change.",
+      "Decode field presence and nullability before constructing the update.",
+      "Send omitted, null, empty, and valid assignee values. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Omission preserves assignment and null clears it when allowed.",
+      "An empty string is not silently accepted as a valid identity.",
+      "Recovery evidence: Combine an allowed clear with an invalid title. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Combine an allowed clear with an invalid title.",
+    "review": "Review the agent's proposed diff: Does the whole patch fail atomically on validation error?",
+    "stretch": "Add examples for every nullable editable field.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-validate-pagination-cursors",
+    "parentId": "effect-tickets-contracts",
+    "title": "Validate pagination cursors",
+    "concept": "Opaque inputs",
+    "brief": "A client sends a malformed or old-version cursor to the ticket list endpoint.",
+    "explanation": "A cursor is untrusted input with a versioned decoding contract.",
+    "steps": [
+      "Create a repeatable fixture: A client sends a malformed or old-version cursor to the ticket list endpoint. Record the starting rows and relevant UI state before making the change.",
+      "Decode and validate cursor fields before building the query.",
+      "Test corrupted, expired, wrong-filter, and valid cursors. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Valid cursors continue the documented list traversal.",
+      "Invalid cursors produce a recoverable typed response.",
+      "Recovery evidence: Reuse a cursor with different authorization scope. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reuse a cursor with different authorization scope.",
+    "review": "Review the agent's proposed diff: Does the cursor bind to all query dimensions required for correctness?",
+    "stretch": "Sign cursors when integrity is required without exposing private query details.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-keep-optional-fields-additive",
+    "parentId": "effect-tickets-contracts",
+    "title": "Keep optional fields additive",
+    "concept": "Compatibility",
+    "brief": "Add a lastReplyAt field that is absent on older stored tickets.",
+    "explanation": "An additive field should not make old records or clients unusable unexpectedly.",
+    "steps": [
+      "Create a repeatable fixture: Add a lastReplyAt field that is absent on older stored tickets. Record the starting rows and relevant UI state before making the change.",
+      "Define null or omission semantics and update both server and client decoders.",
+      "Read old fixtures and new responses with each supported client. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Old tickets remain renderable with the documented empty value.",
+      "Missing new data never crashes a date formatter.",
+      "Recovery evidence: Receive an invalid nonnull timestamp in the new field. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Receive an invalid nonnull timestamp in the new field.",
+    "review": "Review the agent's proposed diff: Does permissive compatibility still validate present values?",
+    "stretch": "Add contract fixtures for absence, null, valid, and malformed values.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-constrain-enum-expansion",
+    "parentId": "effect-tickets-contracts",
+    "title": "Constrain enum expansion",
+    "concept": "Client robustness",
+    "brief": "The server introduces a waiting-for-vendor ticket status unknown to an older client.",
+    "explanation": "Clients need a deliberate unknown-enum behavior while preserving server truth.",
+    "steps": [
+      "Create a repeatable fixture: The server introduces a waiting-for-vendor ticket status unknown to an older client. Record the starting rows and relevant UI state before making the change.",
+      "Render an unsupported-status fallback and prevent invalid assumed transitions.",
+      "Decode and display the new status using the old client fixture. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The ticket remains readable with an honest unknown-state indicator.",
+      "The client never rewrites the unfamiliar status to open by default.",
+      "Recovery evidence: Attempt an unrelated title edit from the old client. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Attempt an unrelated title edit from the old client.",
+    "review": "Review the agent's proposed diff: Does the patch preserve server fields the client cannot interpret?",
+    "stretch": "Expose supported transitions from the server where appropriate.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-test-handlers-through-real-serialization",
+    "parentId": "effect-tickets-contracts",
+    "title": "Test handlers through real serialization",
+    "concept": "Boundary tests",
+    "brief": "A unit test passes a Date object directly to a client decoder that receives JSON in production.",
+    "explanation": "Contract tests must exercise the actual serialized representation.",
+    "steps": [
+      "Create a repeatable fixture: A unit test passes a Date object directly to a client decoder that receives JSON in production. Record the starting rows and relevant UI state before making the change.",
+      "Serialize server responses and parse them before client decoding.",
+      "Round-trip dates, optional fields, and typed error payloads. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The client accepts precisely the documented wire shape.",
+      "In-memory object types cannot conceal JSON conversion differences.",
+      "Recovery evidence: Serialize a large numeric identifier beyond safe integer range. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Serialize a large numeric identifier beyond safe integer range.",
+    "review": "Review the agent's proposed diff: Does the contract use strings for values that cannot round-trip safely as numbers?",
+    "stretch": "Add a small end-to-end contract fixture against the HTTP adapter.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-document-idempotency-lifetime",
+    "parentId": "effect-tickets-contracts",
+    "title": "Document idempotency lifetime",
+    "concept": "Command contracts",
+    "brief": "A client retries ticket creation after the server's idempotency receipt retention expires.",
+    "explanation": "Idempotency guarantees have a scope and retention window that clients need to understand.",
+    "steps": [
+      "Create a repeatable fixture: A client retries ticket creation after the server's idempotency receipt retention expires. Record the starting rows and relevant UI state before making the change.",
+      "Specify key scope, payload consistency, expiry, and replay response behavior.",
+      "Test replay before expiry, after expiry, and with changed payload. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Behavior matches the documented retention contract.",
+      "The UI does not promise unlimited duplicate protection.",
+      "Recovery evidence: Restart the server while durable receipts remain stored. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Restart the server while durable receipts remain stored.",
+    "review": "Review the agent's proposed diff: Does receipt cleanup preserve the stated minimum retention period?",
+    "stretch": "Offer a lookup by stable client command identity for long-lived ambiguous outcomes.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-support-desk-review-breaking-changes-deliberately",
+    "parentId": "effect-tickets-contracts",
+    "title": "Review breaking changes deliberately",
+    "concept": "Release governance",
+    "brief": "An agent removes a deprecated field because current app code no longer reads it.",
+    "explanation": "A public contract may have consumers outside the current repository.",
+    "steps": [
+      "Create a repeatable fixture: An agent removes a deprecated field because current app code no longer reads it. Record the starting rows and relevant UI state before making the change.",
+      "Require evidence of support policy and migration before removing fields.",
+      "Run supported consumer fixtures against the candidate API. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "No promised consumer breaks without an explicit version transition.",
+      "Unused-in-this-repo is not treated as proof of global obsolescence.",
+      "Recovery evidence: Add a fixture representing an older mobile client. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add a fixture representing an older mobile client.",
+    "review": "Review the agent's proposed diff: Does the release note identify affected consumers and their recovery path?",
+    "stretch": "Track deprecation usage through privacy-conscious aggregate diagnostics.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  }
+]

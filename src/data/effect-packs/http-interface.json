@@ -1,0 +1,839 @@
+{
+  "id": "http-interface",
+  "title": "HTTP and UI foundations lab",
+  "summary": "Build a small issue tracker while tracing requests, defining resource contracts, designing accessible forms, and reconciling browser and server state.",
+  "outcome": "A usable HTTP CRUD interface with explicit error semantics, conflict handling, cache validation, and integration evidence.",
+  "prerequisites": "Basic React, TypeScript, and an existing Effect service/repository seam. Complete a simple local CRUD slice first.",
+  "model": [
+    "Issue I1: title Printer offline, status open, revision 7; I2: title Replace toner, status closed, revision 2.",
+    "Routes: /issues for collection reads and creation; /issues/:id for individual reads and edits.",
+    "Browser state includes selected issue, unsaved draft, pending request, and errors; persisted issue state belongs to the server."
+  ],
+  "boundaries": "Browser event → HTTP request decoder → Effect issue operation → repository → explicit response encoder → browser response decoder. Run effects at request boundaries and keep UI interaction state distinct from durable records.",
+  "resources": [
+    {
+      "label": "MDN HTTP status codes",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status"
+    },
+    {
+      "label": "MDN conditional requests",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests"
+    },
+    {
+      "label": "MDN client-side form validation",
+      "url": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Form_validation"
+    },
+    {
+      "label": "MDN HTTP reference",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference"
+    }
+  ],
+  "kind": "Standalone app",
+  "track": "Fundamentals",
+  "milestones": [
+    {
+      "id": "effect-http-interface-lifecycle",
+      "title": "Trace one request through the system",
+      "concept": "Request lifecycle · resource semantics",
+      "brief": "Create an issue from the browser and account for every transformation between a click and durable confirmation.",
+      "explanation": "A browser action starts a request, but a response is not proof of durability unless the server defines success after the required commit. Separate transport parsing, domain validation, dependency execution, persistence, response encoding, and rendering. Each boundary can fail differently. Keep the Effect operation independent of HTTP objects so its domain meaning remains testable, while the route adapter chooses transport semantics. A request identifier helps correlate evidence but should not become the resource's identity or a substitute for verifying the stored row.",
+      "steps": [
+        "Seed an empty issue table; submit title Printer offline to POST /issues and trace a request identifier through the handler and repository.",
+        "Decode input, run the create operation once at the handler boundary, await persistence, and encode the stored identity in the response.",
+        "Render the returned record, navigate directly to its detail URL, and reload to prove that the view comes from a server read."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The created issue has the same identifier in the response, detail route, and persisted row."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The success response occurs only after the required write commits."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A fresh browser visit reconstructs the issue without relying on the original component's memory."
+        }
+      ],
+      "experiment": "Fail persistence after decoding succeeds; verify the UI retains the draft and never displays durable success for an uncommitted issue.",
+      "review": "Explain each boundary to a reviewer and ask an agent to show the exact location where the Effect is executed rather than merely constructed.",
+      "stretch": "Add safe correlation to structured server diagnostics while keeping user content out of routine request logs.",
+      "stage": "Build independently",
+      "minutes": 75,
+      "workedExample": "The browser sends title Printer offline with request ID R17. Input decoding produces a valid command; the repository inserts issue I1 and commits. The handler returns I1, and the browser navigates to /issues/I1. A reload sends a separate read R18 and obtains I1 from storage. R17 and R18 differ because they identify requests; I1 remains stable because it identifies the resource.",
+      "retrieval": [
+        {
+          "question": "Why does constructing an Effect not prove the write happened?",
+          "answer": "It describes a computation; execution at the chosen boundary and successful completion are required for the side effect."
+        },
+        {
+          "question": "Which identity should survive a page reload?",
+          "answer": "The issue identifier, because it names durable state independently of any individual request or component instance."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-contracts",
+      "title": "Decode both sides of the boundary",
+      "concept": "Schema contracts · unknown input · output DTOs",
+      "brief": "Define an issue contract that remains reliable when callers bypass the form or the database adds private columns.",
+      "explanation": "TypeScript annotations disappear at runtime and cannot establish that network data matches a type. Treat incoming bodies and received responses as unknown until decoded. Separate creation input from stored records and public output: clients do not get to choose server-owned identity or revision, and internal columns do not become public by accident. Reuse domain rules intentionally while allowing transport-specific representation, such as timestamp strings, to differ from internal values. Prefer the installed Effect Schema conventions rather than guessing APIs from another version.",
+      "steps": [
+        "Define create input with trimmed title length 1-100, output with id, title, status, and revision, and a structured error contract.",
+        "Decode direct requests containing numbers, whitespace-only title, oversized title, unknown fields, and valid text according to an explicit unknown-field policy.",
+        "Encode output from an allowlisted DTO and decode it again in the browser before adding the record to server-state cache."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Invalid inputs reach no repository write, including requests sent outside the browser."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The server owns identity and revision regardless of submitted extra fields."
+        },
+        {
+          "id": "criterion-3",
+          "label": "An internal privateNote column never appears in response snapshots."
+        }
+      ],
+      "experiment": "Return revision as a string from a faulty adapter and verify response decoding produces a controlled contract failure instead of corrupting cache state.",
+      "review": "Explain static types versus runtime evidence and ask an agent to identify every unchecked cast at a network boundary.",
+      "stretch": "Add a compatibility fixture representing an older client and document additive versus breaking contract changes.",
+      "stage": "Build independently",
+      "minutes": 75,
+      "workedExample": "A caller sends {title:'  Printer offline  ', revision:999}. Under a reject-unknown-fields policy the extra revision is rejected; under a documented strip policy only title reaches the command. The valid command contains Printer offline. Storage creates I1 with revision 1, and the public response includes that server revision. A browser decoder rejects revision:'1' because a compile-time annotation cannot turn a string into a number.",
+      "retrieval": [
+        {
+          "question": "What protects a route when a caller skips client validation?",
+          "answer": "The server's runtime decoder and domain operation, followed by durable storage invariants."
+        },
+        {
+          "question": "Why avoid returning a database row directly?",
+          "answer": "Storage may contain internal or sensitive fields and representation details that are not part of the public contract."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-forms",
+      "title": "Build a recoverable accessible form",
+      "concept": "Labels · focus · field errors · submission state",
+      "brief": "Create an issue form that remains usable by keyboard and preserves a failed submission.",
+      "explanation": "Forms communicate relationships as well as visual layout. A label names a control, help text explains requirements, and an associated error tells the user what needs correction. Pending state should prevent accidental duplicate interaction without erasing entered values or trapping focus. Server validation remains authoritative even when client validation is immediate. Model form states explicitly enough that a field error, transport failure, and successful submission produce different user experiences and assistive-technology announcements.",
+      "steps": [
+        "Build a labeled title input with requirement text, associated field error, submit button, and a status region for pending and success feedback.",
+        "Implement idle, submitting, field-error, transport-error, and success states while keeping the draft through recoverable failures.",
+        "Use keyboard-only navigation to submit a blank title, correct it, simulate an outage, and finally create Printer offline."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every control has an accessible name and errors are programmatically connected to affected fields."
+        },
+        {
+          "id": "criterion-2",
+          "label": "An outage leaves Printer offline editable with a clear retry path."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Success announces completion and moves or retains focus according to a documented navigation decision."
+        }
+      ],
+      "experiment": "Delay the server for three seconds and submit via Enter repeatedly; verify one active form submission and visible pending feedback.",
+      "review": "Explain where focus goes after each outcome and ask an agent to inspect semantic controls rather than only screenshot appearance.",
+      "stretch": "Add an error summary linking to invalid controls for a form with several fields.",
+      "stage": "Make it reliable",
+      "minutes": 75,
+      "workedExample": "The user types Printer offline and submits. The form enters submitting and announces Saving. A simulated 503 returns it to a transport-error state while preserving the exact title. The retry succeeds with I1, announces Created, and navigates to its detail heading according to the chosen focus policy. A blank-title response instead points to the title field and never replaces the draft with a generic empty page.",
+      "retrieval": [
+        {
+          "question": "Why are red borders alone insufficient error feedback?",
+          "answer": "They convey neither a reliable accessible relationship nor a textual explanation and may be invisible to some users."
+        },
+        {
+          "question": "Should failed submission reset the form?",
+          "answer": "Usually no; preserving valid input lets the user correct or retry without reconstructing their work."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-state",
+      "title": "Separate drafts from server truth",
+      "concept": "UI state · server state · cache keys",
+      "brief": "Let a user edit an issue while background refresh keeps the server cache current.",
+      "explanation": "An unsaved draft is local user intent, whereas a cached issue is a recent observation of server state. Copying every refreshed server value over a dirty form destroys work. Conversely, treating a draft as already persisted misleads other views. Track the baseline revision and whether fields are dirty; show newer server state as a reconciliation choice. Cache keys must include the resource identity and relevant query scope. Model loading, empty, stale, and failed states separately rather than using an empty array for all of them.",
+      "steps": [
+        "Load I1 revision 7 into server cache and initialize a separate editable draft with its baseline revision.",
+        "Change the draft title locally, then deliver background I1 revision 8 with another staff member's title.",
+        "Keep the draft intact, update cached server truth, and show a conflict notice that supports discarding or comparing changes."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Background refresh never silently overwrites a dirty title."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Another read-only view displays revision 8 while the editor clearly labels its unsaved draft."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Switching from I1 to I2 does not reuse I1's draft or errors accidentally."
+        }
+      ],
+      "experiment": "Bind the input directly to refreshed cache data and deliver revision 8 while typing; record the lost characters before restoring separation.",
+      "review": "Teach back which values belong to interaction state and which represent server observations, then inspect an agent's state ownership choices.",
+      "stretch": "Persist drafts locally with an explicit resource key and a clear recovery message after reload.",
+      "stage": "Make it reliable",
+      "minutes": 75,
+      "workedExample": "I1 revision 7 says Printer offline. The user types Printer offline upstairs into a draft. Background refresh returns revision 8, Printer repaired. The cache now stores revision 8, but the input still shows the unsaved upstairs text with baseline 7. The UI can compare both values before submission rather than overwriting either meaning. A save against revision 7 must still pass the server's concurrency check.",
+      "retrieval": [
+        {
+          "question": "Why is a dirty draft not the same thing as cached server data?",
+          "answer": "The draft records uncommitted intent; the cache records an observed persisted representation."
+        },
+        {
+          "question": "Does preserving a draft bypass concurrency protection?",
+          "answer": "No. Its baseline remains stale and the server must still validate the write precondition."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-validators",
+      "title": "Use validators for reads and writes",
+      "concept": "ETag · If-None-Match · If-Match",
+      "brief": "Reduce unchanged transfers and prevent stale writes using distinct HTTP conditional request paths.",
+      "explanation": "A validator identifies a representation version for conditional requests. If-None-Match supports efficient reads: an unchanged representation can produce 304 without a response body, allowing reuse of the cached body. If-Match protects mutations: a stale precondition produces 412 instead of overwriting newer data. Use strong validators for the write-precondition design and make the comparison atomic with mutation. Cache policy and validator identity are related but separate: a validator does not by itself decide who may cache private content or for how long.",
+      "steps": [
+        "Return I1 revision 7 with a strong ETag such as quoted issue-I1-r7 and a deliberate cache policy.",
+        "Repeat the read with If-None-Match, then update I1 using If-Match tied to an atomic revision predicate.",
+        "Have a second client advance I1 to revision 8 and verify the stale revision-7 mutation receives 412 with a reconciliation path."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "An unchanged conditional read returns 304 and the client reuses its previously cached body."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A stale write changes no fields and returns a precondition failure."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A successful mutation returns a representation and validator corresponding to the committed revision."
+        }
+      ],
+      "experiment": "Compare the tag before an unconditional write in separate steps and force another update between them; observe the lost-update race.",
+      "review": "Explain read validation versus write preconditions and ask an agent to show the SQL predicate that makes If-Match enforceable.",
+      "stretch": "Define behavior for a mutation missing If-Match, including whether the API requires a precondition.",
+      "stage": "Own the outcome",
+      "minutes": 75,
+      "workedExample": "Client A reads I1 revision 7 with ETag \"issue-I1-r7\". Its unchanged read with If-None-Match receives 304 and keeps the cached body. Client B then updates the issue to revision 8. A's edit with If-Match \"issue-I1-r7\" fails with 412 because the atomic write predicate no longer matches. The server does not silently convert A's stale request into an unconditional update.",
+      "retrieval": [
+        {
+          "question": "Why does a 304 response need an existing cached representation?",
+          "answer": "It carries no replacement body and tells the client to reuse the matching representation it already has."
+        },
+        {
+          "question": "What makes a write precondition race-safe?",
+          "answer": "Checking the expected version as part of the same atomic mutation, not in a detached earlier read."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-integration",
+      "title": "Prove the route-to-storage contract",
+      "concept": "Integration tests · observable behavior",
+      "brief": "Exercise real request decoding, response mapping, and repository persistence in one bounded test suite.",
+      "explanation": "Unit tests of the operation cannot prove that a route parses input correctly, encodes errors, or commits through the real adapter. Integration tests should cross the boundary whose wiring can fail while keeping external systems controlled. Use a disposable database or an equivalent isolated test store with representative constraints. Assert observable responses and durable state, not the private sequence of helper calls. Include failure and reload paths because an optimistic screen can appear correct even when nothing persisted.",
+      "steps": [
+        "Create an isolated fixture with I1, then issue real HTTP requests for create, read, invalid edit, stale edit, and missing resource.",
+        "Verify public response shapes and status policy, query storage after each mutation, and decode successful responses with the browser contract.",
+        "Add a browser-level create-and-reload scenario plus one recoverable failure scenario with deterministic fault injection."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Invalid input produces the documented error and leaves row counts unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A successful create survives a fresh request and browser reload."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A stale edit preserves the winning record, and a storage outage is not reported as not-found."
+        }
+      ],
+      "experiment": "Deliberately remove a response field or disconnect the real repository binding; ensure the suite detects the broken integration.",
+      "review": "Ask an agent to explain which seam each test crosses and which failure it would miss if replaced with a mocked success response.",
+      "stretch": "Run the same small contract suite against the production adapter in an isolated environment before release.",
+      "stage": "Own the outcome",
+      "minutes": 75,
+      "workedExample": "The suite begins with one row, I1. POSTing a blank title returns the lab's 422 error and leaves one row. POSTing Printer offline returns new I2 and raises the count to two. GET /issues/I2 after a new request returns the same title and identity. A stale If-Match edit affects zero rows and returns 412. These observations prove routing, decoding, persistence, and error translation together.",
+      "retrieval": [
+        {
+          "question": "Why is a test that mocks the entire HTTP response insufficient here?",
+          "answer": "It bypasses the route and repository wiring whose correctness the integration test is meant to establish."
+        },
+        {
+          "question": "Why inspect durable state after an error response?",
+          "answer": "A handler could return an error after accidentally committing a write; response assertions alone would miss that side effect."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-methods",
+      "title": "Choose methods from semantics",
+      "concept": "GET · POST · PUT · PATCH · DELETE",
+      "brief": "Write a small route contract before implementing generic CRUD handlers.",
+      "explanation": "HTTP methods communicate expectations beyond handler names. GET retrieves a representation and should not intentionally perform a state-changing action. POST commonly creates a subordinate resource or invokes an operation. PUT expresses replacement of the target representation and is idempotent in its intended effect; PATCH describes partial modification and is not automatically idempotent. DELETE removes the target association and is idempotent in intended effect even when repeated responses differ. These semantics affect retries, caching, link navigation, and infrastructure behavior.",
+      "steps": [
+        "Define GET /issues/I1, POST /issues, PATCH /issues/I1, and DELETE /issues/I1 with example request and response shapes.",
+        "Implement a title-setting patch whose command means set title to Repaired, and distinguish it from an increment-counter operation.",
+        "Exercise repeated requests and verify both returned responses and final resource state rather than assuming identical responses define idempotence."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "GET requests never close, rename, or delete issues as an intentional route effect."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Applying the same title-setting command twice leaves title Repaired."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Deleting twice leaves the issue absent under a documented second-response policy."
+        }
+      ],
+      "experiment": "Implement a temporary GET link that closes an issue, then explain why prefetching or a crawler would make that design unsafe before removing it.",
+      "review": "Teach back intended effect versus response equality and review any agent proposal that treats PATCH as inherently safe to retry.",
+      "stretch": "Specify PUT semantics for omitted fields before adding that route; decide whether omission removes or defaults a value.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "I1 begins open with title Printer offline. Two identical set-title patches leave title Repaired after both; they do not append text twice. Deleting I1 succeeds, and a second delete may return a different status while the final state remains absent. By contrast, a patch meaning increment reopenCount changes a counter on every application and requires a separate replay strategy before automatic retry is safe.",
+      "retrieval": [
+        {
+          "question": "Can an idempotent request return different statuses on repetition?",
+          "answer": "Yes. Idempotence concerns intended server effect, not identical response bytes or status codes."
+        },
+        {
+          "question": "Why is a state-changing GET problematic even behind a button?",
+          "answer": "GET can be followed, prefetched, or cached under retrieval assumptions; the UI control does not change the method's semantics."
+        }
+      ],
+      "parentId": "effect-http-interface-lifecycle",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-statuses",
+      "title": "Make errors actionable without leaking internals",
+      "concept": "Status codes · typed failure mapping",
+      "brief": "Give malformed input, a missing issue, and unavailable storage distinct transport outcomes.",
+      "explanation": "A useful HTTP adapter maps a small domain failure vocabulary into documented responses. Malformed syntax differs from a well-formed command violating a field rule. A missing resource differs from unavailable storage, because an outage cannot establish that the resource is absent. Choose and document a consistent status policy rather than claiming every application must use the same validation code. Preserve safe diagnostic correlation for unexpected failures while returning a stable public error shape to callers.",
+      "steps": [
+        "Define fixtures for malformed JSON, a blank title, missing I404, stale I1 revision, and a simulated database outage.",
+        "Map them to a documented policy such as 400, 422, 404, 412 when a precondition fails, and 503 for temporary unavailability.",
+        "Encode a stable error code and optional field errors; decode them in the browser into recovery paths without displaying raw SQL messages."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Missing I404 offers a return-to-list action while storage unavailability offers retry."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Blank-title errors attach to the title field and do not perform a write."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unexpected internals remain in restricted diagnostics linked by a safe correlation identifier."
+        }
+      ],
+      "experiment": "Replace every failure with 404 and run the outage fixture; show how the UI would falsely claim deletion and lose a useful recovery path.",
+      "review": "Ask an agent to enumerate every operation error and prove that the adapter handles it deliberately rather than via one success-shaped catch.",
+      "stretch": "Document when 409 represents a business conflict distinct from an HTTP If-Match precondition failure.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "GET /issues/I404 returns 404 with code IssueMissing because an authorized lookup completed and found nothing. The same lookup during database failure returns 503 with code TemporarilyUnavailable because existence is unknown. A blank title returns 422 under this lab's policy and fields.title = Required. The browser can now choose three different recoveries from explicit meaning rather than guessing from an English message.",
+      "retrieval": [
+        {
+          "question": "Why should a storage outage not be mapped to not-found?",
+          "answer": "The system could not determine existence; reporting absence asserts a fact it does not know."
+        },
+        {
+          "question": "Should the browser branch on a database error message?",
+          "answer": "No. It should use a stable public error contract while server diagnostics retain implementation details."
+        }
+      ],
+      "parentId": "effect-http-interface-lifecycle",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-absence",
+      "title": "Distinguish omitted, null, and empty values",
+      "concept": "Partial updates · field presence",
+      "brief": "Implement a description update without accidentally clearing fields that a caller omitted.",
+      "explanation": "Partial updates need a presence model, not just optional-looking TypeScript properties. An omitted field often means leave unchanged, null may mean explicitly clear, and an empty string may be a valid present value or normalize to absence. Choose a policy per field and preserve it through decoding. Destructuring defaults or broad object spreading can erase these distinctions. Keep the operation's update command explicit so the repository receives only intended changes rather than a partly trusted body.",
+      "steps": [
+        "Seed I1 description = Check cable; define omitted description as unchanged, null as clear, and nonempty string as replacement.",
+        "Implement a decoder that preserves field presence and constructs an explicit patch command rather than spreading request data into a row.",
+        "Send {}, {description:null}, and {description:'Inspect port'} against reset fixtures and compare final values."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "An empty patch does not clear Check cable or increment revision under the lab's documented no-op policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Null explicitly clears the field while replacement stores the provided valid text."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unknown fields cannot update identity, revision, or internal owner information."
+        }
+      ],
+      "experiment": "Use description ?? null in the adapter and show that omission is now incorrectly converted into an instruction to clear.",
+      "review": "Explain the three meanings without relying on JavaScript truthiness and ask an agent to test an empty string separately.",
+      "stretch": "Define how whitespace-only descriptions normalize and make that normalization visible in returned data.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "I1 starts with Check cable. Applying {} leaves the description intact because the command contains no description operation. Applying {description:null} stores absence and advances the revision because it is an explicit edit. Applying {description:'Inspect port'} stores that text. Treating all three inputs as falsy or optional would collapse distinct caller intentions and make an apparently harmless partial update destructive.",
+      "retrieval": [
+        {
+          "question": "Why is field presence different from field value?",
+          "answer": "Presence says whether the caller requested a change; the value says what that change should be."
+        },
+        {
+          "question": "Can a generic object spread safely implement authorization for writable fields?",
+          "answer": "No. The operation must allowlist fields and preserve the update semantics explicitly."
+        }
+      ],
+      "parentId": "effect-http-interface-contracts",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-dates",
+      "title": "Specify timestamp and number representations",
+      "concept": "Serialization · units · timezone boundaries",
+      "brief": "Keep due times and revision numbers consistent between browser controls, JSON, and storage.",
+      "explanation": "A wire contract must state representation and units, not merely call a value a date or number. An instant identifies a point on the timeline, while a calendar date represents a day without a timezone. Browser controls may produce local values that need an explicit interpretation. JSON has no native date type and numeric coercion can hide invalid strings. Validate the accepted format at the boundary and keep display formatting separate from storage and ordering semantics.",
+      "steps": [
+        "Give I1 a dueAt instant 2026-10-01T16:00:00Z and define revision as a nonnegative integer.",
+        "Render dueAt in a chosen local timezone while preserving the original instant for updates and round trips.",
+        "Reject invalid timestamps, fractional revisions, and numeric strings unless the contract explicitly permits a conversion."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reloading in another timezone changes display text but not the persisted instant."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A date-only field is not silently converted to local midnight and shifted to a different calendar day."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Revision '7' and 7.5 are handled according to documented decoding rules before repository access."
+        }
+      ],
+      "experiment": "Parse a date-only string using an implicit timezone and compare displays in two zones; record the unexpected day shift.",
+      "review": "Teach back instant versus calendar date and review an agent's use of implicit Date parsing at the HTTP boundary.",
+      "stretch": "Add daylight-saving transition fixtures and decide how ambiguous local input is resolved.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "dueAt = 2026-10-01T16:00:00Z is one instant. A Los Angeles display can show 09:00 while a UTC display shows 16:00; both serialize back to the same Z timestamp. A separate dueDate = 2026-10-01 means the calendar day itself and should remain October 1 in either locale. Revision 7 is a concurrency number, not a timestamp or a string to concatenate.",
+      "retrieval": [
+        {
+          "question": "Why not use display-formatted dates as cache keys or database ordering values?",
+          "answer": "Locale and timezone change presentation; a stable canonical representation must carry identity and ordering."
+        },
+        {
+          "question": "What extra information does a local datetime need before becoming an instant?",
+          "answer": "A timezone or explicit offset and a policy for ambiguous or nonexistent local times."
+        }
+      ],
+      "parentId": "effect-http-interface-contracts",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-error-focus",
+      "title": "Make validation reachable by keyboard",
+      "concept": "Error association · focus management",
+      "brief": "Connect a server-side title error to its control without repeatedly stealing focus while someone types.",
+      "explanation": "Error presentation needs both discovery and continuity. After a submitted form fails, an error summary or first invalid control can provide a useful starting point. During ordinary typing, moving focus on every validation pass disrupts the user. Associate errors with controls using the platform's semantic mechanisms, retain labels, and avoid relying on placeholder text. Distinguish an announced status update from an actionable field problem. Test actual keyboard order because a visually correct arrangement can still produce confusing interaction.",
+      "steps": [
+        "Add title and description inputs; submit title blank and description beyond the chosen maximum to obtain two server errors.",
+        "Render an error summary with links to each input and associate each message with its control.",
+        "Focus the summary after failed submission, follow each link using the keyboard, and correct fields without moving focus on each keystroke."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both invalid controls remain reachable and retain their entered values."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Following the title error link places focus in the title control."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Correcting one field does not remove the other field's error or restart focus navigation."
+        }
+      ],
+      "experiment": "Replace labels with placeholders and repeat navigation after entering values; document which information disappears and restore persistent labels.",
+      "review": "Ask a reviewer to complete the correction flow without a mouse and explain the difference between focus and an announcement.",
+      "stretch": "Test the form with a screen reader available in your environment and record what it announces at each transition.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "Submission returns title = Required and description = Too long. Focus moves once to the summary, which contains links to Title and Description. Activating Title focuses that input; typing Printer offline clears only its applicable error under the chosen policy. Description remains invalid and its value remains present. The user follows the second link and fixes it without being bounced back to the summary.",
+      "retrieval": [
+        {
+          "question": "Why not focus the first invalid field on every render?",
+          "answer": "Renders can occur while typing; repeated focus changes interrupt editing and navigation."
+        },
+        {
+          "question": "What does error association add beyond visible proximity?",
+          "answer": "It exposes the relationship between the control and explanation to assistive technology and other nonvisual interaction."
+        }
+      ],
+      "parentId": "effect-http-interface-forms",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-submission",
+      "title": "Handle duplicate clicks and uncertain outcomes",
+      "concept": "Pending state · request identity · replay semantics",
+      "brief": "Prevent duplicate issue creation when the browser loses the response after a committed write.",
+      "explanation": "Disabling a submit button prevents some repeated gestures in one component, but it does not solve retries after a lost response, a reopened tab, or network uncertainty. A failed response delivery does not prove the server failed to commit. For create commands that need replay safety, define an idempotency key bound to the caller and request payload, persist its result atomically with creation, and reuse that key only for the same attempt. Changing input creates a new attempt with a new identity.",
+      "steps": [
+        "Submit Printer offline with attempt key A17 and commit issue I1 plus the recorded outcome under the server's scoped replay policy.",
+        "Drop the response after commit, keep the draft and A17, then retry the exact same payload.",
+        "Reject reuse of A17 with a different title and create a fresh key when the user deliberately starts a new issue."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Two deliveries of the same scoped attempt return I1 and create only one row."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Reusing the key with changed content produces an explicit conflict instead of returning a misleading old success."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The pending UI prevents simultaneous gestures while still recovering after response loss."
+        }
+      ],
+      "experiment": "Generate a new key on every retry and observe duplicate creation after a dropped success response.",
+      "review": "Explain why a button lock and server replay protection solve different problems; ask an agent to identify the atomic persistence boundary.",
+      "stretch": "Define key retention and expiry behavior so very old retries have a documented contract.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "A17 with Printer offline commits I1, but the response is lost. The browser cannot know whether creation happened, so it retries A17 with identical content. The server finds the committed attempt result and returns I1 without inserting again. A17 with Replace toner is rejected because it changes the meaning of the recorded attempt. A deliberate new issue uses A18 and may create I2.",
+      "retrieval": [
+        {
+          "question": "Does a network error prove no record was created?",
+          "answer": "No. The write may have committed before the response was interrupted."
+        },
+        {
+          "question": "Why bind an idempotency key to payload and caller?",
+          "answer": "To prevent unrelated commands or users from accidentally reusing another attempt's recorded outcome."
+        }
+      ],
+      "parentId": "effect-http-interface-forms",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-races",
+      "title": "Ignore stale search responses",
+      "concept": "Request ordering · cancellation · state ownership",
+      "brief": "Keep the issue list aligned with the latest search when responses arrive out of order.",
+      "explanation": "Network responses need not arrive in the order requests were sent. Canceling obsolete work can reduce wasted effort, but cancellation alone is not proof that an earlier response can never be delivered. Associate results with the query or request generation that produced them and only publish them into the matching state. Cache keys should include normalized search inputs. Keep loading status scoped to the current query so completion of an older request cannot falsely declare the new search finished.",
+      "steps": [
+        "Type p, then printer; arrange for the p response to take 600 ms and printer to take 100 ms.",
+        "Store results under their query keys and gate visible state by the currently selected query or request generation.",
+        "Cancel obsolete work where supported, then repeat the test with cancellation intentionally ignored by the test adapter."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The visible query remains printer and displays only its matching results after both responses arrive."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The late p response cannot clear printer's error or loading state incorrectly."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Clearing search produces the documented full-list state without inheriting old filtered results."
+        }
+      ],
+      "experiment": "Use one shared results variable with no request identity and observe the broader p response replacing the newer search.",
+      "review": "Explain why cancellation and response identity are complementary, then ask an agent to trace ownership of every state update.",
+      "stretch": "Debounce input and test that it changes request frequency without changing correctness under reordered delivery.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "Request Q1 searches p and starts first. Q2 searches printer and finishes after 100 ms with I1. The UI displays I1 for printer. Q1 later returns I1, I2, and I3, but those results belong to key p and do not replace the selected printer view. Even if aborting Q1 fails, key ownership prevents stale publication. Correctness does not depend on favorable response timing.",
+      "retrieval": [
+        {
+          "question": "Why is aborting the older fetch insufficient as the only safeguard?",
+          "answer": "The response may already have completed or an adapter may ignore cancellation; state publication still needs identity checks."
+        },
+        {
+          "question": "Does debouncing eliminate response races?",
+          "answer": "No. It reduces request frequency, but overlapping requests can still complete out of order."
+        }
+      ],
+      "parentId": "effect-http-interface-state",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-optimistic-ui",
+      "title": "Reconcile an optimistic status change",
+      "concept": "Optimistic update · rollback ownership",
+      "brief": "Close I1 immediately in the UI while preserving later changes if the request fails.",
+      "explanation": "Optimistic rendering predicts a successful server result before confirmation. It improves responsiveness but creates temporary state that must be distinguished from confirmed truth. A naive rollback to an old whole-list snapshot can erase unrelated updates that arrived meanwhile. Scope optimistic changes to their mutation identity and record, then reconcile with the server response or refresh. Start with a pessimistic implementation when conflict handling is unclear; optimism should add a controlled prediction, not weaken the persistence contract.",
+      "steps": [
+        "Seed I1 open at revision 7 and I2 open at revision 2; optimistically mark I1 closed for mutation M1.",
+        "While M1 is pending, deliver a confirmed title update for I2, then fail M1.",
+        "Undo only M1's predicted change or refetch authoritative state while preserving I2's confirmed update and explaining the failed close."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "I1 returns to its authoritative status after failure and shows a recoverable message."
+        },
+        {
+          "id": "criterion-2",
+          "label": "I2's newer title survives the rollback of I1."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A successful close reconciles to the returned revision rather than retaining a fabricated local revision."
+        }
+      ],
+      "experiment": "Restore an entire old list snapshot on failure and observe that I2's unrelated update disappears.",
+      "review": "Explain what evidence distinguishes optimistic from confirmed state and ask an agent to identify rollback ownership for overlapping mutations.",
+      "stretch": "Test two rapid edits to I1 and define whether they queue, supersede, or require reconciliation.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "The cache begins I1 open and I2 titled Replace toner. M1 predicts I1 closed. A separate confirmed update changes I2 to Toner ordered. When M1 fails, undoing only I1's prediction restores I1 open and leaves Toner ordered intact. Replacing the whole cache with the pre-M1 snapshot would incorrectly revert I2, even though its update succeeded and has no causal connection to M1.",
+      "retrieval": [
+        {
+          "question": "Why can whole-snapshot rollback lose valid updates?",
+          "answer": "The snapshot predates other confirmed changes and overwrites them along with the failed prediction."
+        },
+        {
+          "question": "What should determine the final revision after optimistic success?",
+          "answer": "The server's returned representation or a fresh authoritative read, not an assumed local increment."
+        }
+      ],
+      "parentId": "effect-http-interface-state",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-cache-scope",
+      "title": "Scope private caches correctly",
+      "concept": "Cache-Control · identity · invalidation",
+      "brief": "Prevent issue data from one signed-in account appearing after switching accounts.",
+      "explanation": "Application caches and HTTP caches have different controls but share a need for correct identity scope. A query key containing only /issues can accidentally reuse data across users if the cache survives logout. Private HTTP responses need deliberate cache directives; do not assume an ETag makes a response public or a browser cache equivalent to a shared proxy. Clear or partition application state on identity changes and revalidate according to the product's freshness policy. Authorization still runs on every server request.",
+      "steps": [
+        "Seed Ada with issue A1 and Bo with B1; load Ada's collection into the browser cache.",
+        "Log out, switch to Bo, and partition or clear identity-scoped cache entries, drafts, and pending responses.",
+        "Set and inspect an explicit private-response cache policy, then test a delayed Ada response arriving after Bo becomes current."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Bo's first render never shows A1 as a temporary loading placeholder."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A late Ada response cannot publish into Bo's selected collection."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The HTTP cache policy matches the intended private-data behavior and is documented separately from application query keys."
+        }
+      ],
+      "experiment": "Use a global /issues cache key and keep it on logout; reproduce the stale-account display with only the local fixture.",
+      "review": "Explain why a server authorization check does not erase already cached client data and review the agent's identity-transition cleanup.",
+      "stretch": "Test browser back navigation and a second tab after logout under the chosen privacy expectations.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Ada loads A1 under identity scope Ada. After logout, the active identity becomes Bo and Bo's collection begins loading. Ada's delayed response still belongs to Ada's old scope, so it cannot populate Bo's view. Bo's successful response contains B1. Clearing or partitioning cache state prevents a flash of A1, while the server separately enforces that Bo cannot retrieve A1 by guessing its URL.",
+      "retrieval": [
+        {
+          "question": "Does an ETag grant permission to reuse a representation across users?",
+          "answer": "No. Authorization and cache scope still govern who can receive and retain the representation."
+        },
+        {
+          "question": "Why test delayed responses during logout?",
+          "answer": "Old requests can finish after identity changes and repopulate state unless publication is scoped or invalidated."
+        }
+      ],
+      "parentId": "effect-http-interface-validators",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-invalidate",
+      "title": "Refresh every affected view after mutation",
+      "concept": "Derived views · invalidation · read-your-write",
+      "brief": "Keep a filtered issue list and detail view consistent after closing an issue.",
+      "explanation": "A mutation can change membership in several derived queries, not only the detail record it edits. Closing an issue changes the open list, closed list, counters, and detail state. Identify dependencies explicitly and choose whether to update exact cached records, invalidate queries, or refetch. A successful mutation response should support an immediate coherent view, but avoid inventing totals when pagination hides unknown rows. Distinguish confirmed mutation success from a later refresh failure so the user does not repeat a write that already committed.",
+      "steps": [
+        "Load open-list [I1,I3], closed-list [I2], openCount 2, and I1 detail at revision 7.",
+        "Close I1 and use the returned revision 8 to update its detail, then invalidate or reconcile affected lists and counters.",
+        "Fail the subsequent list refresh and show stale-data feedback while preserving the fact that closing I1 succeeded."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "I1 detail shows closed at revision 8 immediately after confirmed success."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Affected filtered queries are refreshed or explicitly marked stale rather than left silently contradictory."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A refresh failure does not report the committed close as a failed mutation or invite accidental repeat creation."
+        }
+      ],
+      "experiment": "Invalidate only the detail key and observe I1 lingering in the cached open list; use the fixture to enumerate missed dependencies.",
+      "review": "Explain which cached values are direct records and which are derived queries, then ask an agent to justify each invalidation.",
+      "stretch": "Add a paginated list and avoid filling its missing slot with a guessed record after removing I1.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "The open list starts [I1,I3] and its count is two. Closing I1 commits revision 8. The detail becomes closed, and the open list must stop claiming that I1 is open or clearly mark its observation stale. If a refetch fails, the UI can say Saved; list refresh unavailable. Reporting Save failed would confuse a secondary read failure with the completed write and encourage an unnecessary retry.",
+      "retrieval": [
+        {
+          "question": "Why can updating one detail cache entry leave the screen inconsistent?",
+          "answer": "Lists, filters, and counts are separate derived observations that may still contain the old state."
+        },
+        {
+          "question": "What should a refresh failure after commit communicate?",
+          "answer": "The write succeeded, but some displayed observations could not be refreshed and may be stale."
+        }
+      ],
+      "parentId": "effect-http-interface-validators",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-fault-matrix",
+      "title": "Test failures at distinct lifecycle points",
+      "concept": "Fault injection · uncertain commit · recovery",
+      "brief": "Differentiate failure before mutation, after commit, and during refresh in the browser's recovery behavior.",
+      "explanation": "Failure timing changes what the application knows. Before execution, there is no committed write from that attempt. After commit but before response delivery, the client has an uncertain outcome. After a confirmed success, a failed refresh only affects freshness of a view. Testing all three as a generic rejected promise hides these distinctions. Inject faults at explicit seams and assert both storage state and user messaging. Effect dependencies provide a useful seam for controlled failures without replacing the domain operation itself.",
+      "steps": [
+        "Add deterministic test hooks for pre-write rejection, post-commit response loss, and post-success list refresh failure.",
+        "Create one fixture per hook, recording attempt identity, row count, response evidence, and visible recovery action.",
+        "Use replay-safe retry for the uncertain create case and ordinary refetch for the confirmed-success refresh case."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Pre-write failure leaves no new row and preserves the draft."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Post-commit response loss does not create a duplicate when the same attempt is retried."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Refresh failure retains a confirmed-success message and marks only the dependent view stale."
+        }
+      ],
+      "experiment": "Route all three hooks into one Save failed message and observe which cases would encourage incorrect repeat writes.",
+      "review": "Teach back what the browser knows at each seam and ask an agent to avoid inferring server state solely from fetch rejection.",
+      "stretch": "Add cancellation during navigation and document whether the command can continue on the server after the browser stops waiting.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Case A fails before insertion, leaving zero new issues. Case B inserts I2 but drops the response; the browser has uncertainty, and retrying the same attempt resolves to I2. Case C receives I2 successfully, then cannot reload the list; creation remains confirmed even though the list is stale. The same visible network exception can therefore require three different recovery decisions depending on lifecycle evidence.",
+      "retrieval": [
+        {
+          "question": "Why can identical error messages hide different correctness risks?",
+          "answer": "They may arise before or after commit, which changes whether retrying can duplicate a completed operation."
+        },
+        {
+          "question": "What evidence resolves an uncertain create safely?",
+          "answer": "A server-recorded attempt result or another designed reconciliation mechanism, rather than assuming rejection means rollback."
+        }
+      ],
+      "parentId": "effect-http-interface-integration",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-http-interface-agent-review",
+      "title": "Review an agent-generated CRUD slice",
+      "concept": "Evidence-based review · contract regressions",
+      "brief": "Evaluate a proposed route and form diff against explicit HTTP and interaction invariants.",
+      "explanation": "An agent can generate plausible CRUD code that compiles while violating resource semantics or losing user work. Review from a concrete contract and adversarial fixtures rather than from coding style alone. Ask the agent to identify its assumptions, changed boundaries, and evidence for each behavior. Keep acceptance independent of implementation details so a different correct design can pass. Focus human attention on irreversible effects, authorization seams, concurrency, and recovery decisions; compilation cannot establish these properties.",
+      "steps": [
+        "Give the agent the I1 revision-7 fixture and a task to implement title editing with preserved drafts and conditional writes.",
+        "Review the generated diff for runtime decoding, atomic revision checks, explicit error mapping, accessible feedback, and affected-cache handling.",
+        "Run a stale-edit race, malformed response, and failed submission against the proposed change; record evidence beside each acceptance requirement."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "A proposed success path is rejected if its stale-edit fixture overwrites revision 8."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Failed submission retains the draft and exposes a reachable recovery action."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The review names any untested assumptions rather than claiming complete correctness from compilation alone."
+        }
+      ],
+      "experiment": "Introduce a deliberate unchecked response cast or detached version read and verify that your review procedure catches the meaningful regression.",
+      "review": "Explain which findings require domain judgment and which automated evidence can settle, then ask the agent to revise only the failing behavior.",
+      "stretch": "Turn one discovered regression into a durable contract test with a failure message that explains the violated user guarantee.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "The proposed diff reads I1 revision 7, checks it in memory, then performs an unconditional update. During review, client B commits revision 8 between those steps. Client A still succeeds and overwrites it, so the stale-write requirement fails despite a passing typecheck. Replacing the mutation with an atomic revision predicate makes A return 412 and preserve its draft. The review now has behavioral evidence rather than reassurance.",
+      "retrieval": [
+        {
+          "question": "Why is a passing typecheck insufficient for concurrency correctness?",
+          "answer": "Both race-prone and atomic implementations can satisfy the same static types while behaving differently under interleaving."
+        },
+        {
+          "question": "What makes an agent review request concrete?",
+          "answer": "A stated invariant, reproducible fixture, expected observable outcome, and evidence that the proposed diff preserves it."
+        }
+      ],
+      "parentId": "effect-http-interface-integration",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ]
+}

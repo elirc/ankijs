@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { createCard } from "../../db/repos/cardRepo";
@@ -7,6 +7,7 @@ import { captureNote } from "../../db/repos/noteRepo";
 import { db, resetDatabaseForTests } from "../../db/schema";
 import { curriculum, type DeckInfo } from "../../data/curriculum";
 import { HomeScreen } from "./HomeScreen";
+import * as studyRepo from "../../db/repos/studyRepo";
 
 function renderHome() {
   return render(
@@ -19,6 +20,34 @@ function renderHome() {
 describe("HomeScreen", () => {
   beforeEach(async () => {
     await resetDatabaseForTests();
+  });
+
+  it("uses dashboard counts until a focused learning path requires its own queue", async () => {
+    const focusedQueue = vi.spyOn(studyRepo, "loadStudy");
+    try {
+      renderHome();
+      await screen.findByRole(
+        "heading",
+        { name: "Paths" },
+        { timeout: 10_000 },
+      );
+      expect(focusedQueue).not.toHaveBeenCalled();
+      await db.sync_meta.put({
+        key: "learning_settings",
+        value: JSON.stringify({ path: "Start here" }),
+      });
+      await waitFor(
+        () =>
+          expect(focusedQueue).toHaveBeenCalledWith(
+            undefined,
+            expect.any(Date),
+            "Start here",
+          ),
+        { timeout: 10_000 },
+      );
+    } finally {
+      focusedQueue.mockRestore();
+    }
   });
 
   it("invites the user to get started when there are no decks", async () => {

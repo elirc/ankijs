@@ -1,0 +1,1244 @@
+[
+  {
+    "id": "effect-drill-approval-workflow-partial-draft",
+    "parentId": "effect-approval-drafts",
+    "title": "Save an incomplete request",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Save equipment request with title but no justification.",
+    "explanation": "Draft validation must permit intentionally unfinished work. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Separate draft schema from submission requirements. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Draft persists.",
+      "Submission explains missing justification.",
+      "Entered title survives."
+    ],
+    "experiment": "Reload after partial save. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Show completeness without blocking drafts. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-snapshot-edit",
+    "parentId": "effect-approval-drafts",
+    "title": "Freeze the submitted request",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Submit laptop request then change draft price.",
+    "explanation": "A reviewer decides on a fixed content revision. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Store an immutable submission snapshot. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Reviewer sees submitted price.",
+      "Draft shows changed price.",
+      "Snapshot identifier is visible."
+    ],
+    "experiment": "Edit while submission transaction runs. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Show draft-versus-submission differences. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-double-submit",
+    "parentId": "effect-approval-drafts",
+    "title": "Deduplicate submission commands",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Double-submit revision 7 under slow network.",
+    "explanation": "One intent creates one review instance. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Bind submission to operation identity and revision. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One submission exists.",
+      "Both responses identify it.",
+      "Reviewer has one assignment."
+    ],
+    "experiment": "Lose response after commit. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Retain retry identity across reload. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-withdraw-edit",
+    "parentId": "effect-approval-drafts",
+    "title": "Withdraw before replacing active review",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Withdraw request while reviewer has it open.",
+    "explanation": "Editing cannot silently invalidate a reviewer's evidence. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Implement explicit conditional withdrawal. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Review becomes withdrawn.",
+      "Decision attempt is rejected.",
+      "New draft remains editable."
+    ],
+    "experiment": "Race withdrawal against approval. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Define which transition wins atomically. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-draft-conflict",
+    "parentId": "effect-approval-drafts",
+    "title": "Recover simultaneous draft edits",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Two tabs edit different fields at revision 2.",
+    "explanation": "A stale draft save cannot erase another editor's changes. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Compare revisions and preserve unsaved local text. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "First save commits.",
+      "Second sees conflict.",
+      "Its text remains recoverable."
+    ],
+    "experiment": "Delay first save response. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Add explicit field-level merge preview. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-attachment-snapshot",
+    "parentId": "effect-approval-drafts",
+    "title": "Bind review attachments to versions",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Submit quote.pdf then upload a replacement.",
+    "explanation": "A filename alone cannot identify reviewed evidence. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Reference immutable attachment version in snapshot. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Reviewer opens original quote.",
+      "New draft uses new version.",
+      "Deleted content has explicit status."
+    ],
+    "experiment": "Replace attachment during submission. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Verify attachment digest at submit. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-submission-accessibility",
+    "parentId": "effect-approval-drafts",
+    "title": "Make submission confirmation keyboard usable",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Submit a long equipment request without a mouse.",
+    "explanation": "A confirmation must expose the exact reviewed scope. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Provide focusable summary and clear final action. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Summary is reachable.",
+      "Validation returns to field.",
+      "Closing restores focus."
+    ],
+    "experiment": "Return storage failure after confirmation. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Test confirmation at 200 percent zoom. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-request-clone",
+    "parentId": "effect-approval-drafts",
+    "title": "Clone content without copying decisions",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Clone an approved monitor request.",
+    "explanation": "A copied request starts a new approval lifecycle. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Copy allowed draft fields into new identity. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "New request is draft.",
+      "Old decisions remain only on original.",
+      "Requester ownership is current."
+    ],
+    "experiment": "Clone another user's private request. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Add authorized template creation. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-submission-rollback",
+    "parentId": "effect-approval-drafts",
+    "title": "Roll back incomplete submission setup",
+    "concept": "Draft commands · immutable review snapshots",
+    "brief": "Fail reviewer-assignment insert during submit.",
+    "explanation": "A submitted state requires its snapshot and assignments. Draft flexibility and review certainty require different models. A submission captures exactly what the reviewer receives, while later editing must produce an explicit new revision rather than altering accepted evidence.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Commit snapshot status and assignment atomically. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Draft remains editable.",
+      "No orphan snapshot is active.",
+      "Retry creates one complete submission."
+    ],
+    "experiment": "Crash after snapshot insert. Record persisted state and a recovery action.",
+    "review": "Ask the agent to identify mutable and immutable fields. Verify snapshot behavior through repository calls as well as the visible review screen.",
+    "stretch": "Add transactional notification intent. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-approval-workflow-self-approval",
+    "parentId": "effect-approval-policy",
+    "title": "Reject requester self-approval",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Assign requester U1 accidentally as reviewer.",
+    "explanation": "An assigned reviewer cannot approve their own request. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Enforce separation-of-duty policy at decision time. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Decision is denied.",
+      "Submission stays pending.",
+      "Denial explains permitted recovery."
+    ],
+    "experiment": "Forge a different actor in body. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Add administrator reassignment workflow. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-revoked-role",
+    "parentId": "effect-approval-policy",
+    "title": "Recheck roles on stale screens",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Remove reviewer role after page load.",
+    "explanation": "Loaded UI permissions do not survive revocation. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Authorize command using current role state. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Stale approval fails.",
+      "No decision is written.",
+      "Refresh updates available actions."
+    ],
+    "experiment": "Revoke during a delayed request. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Document authorization transaction timing. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-unassigned-reviewer",
+    "parentId": "effect-approval-policy",
+    "title": "Require actual review assignment",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Reviewer U3 opens U4's assignment URL.",
+    "explanation": "A general reviewer role grants no universal decision rights. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Resolve assignment within policy evaluation. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "U3 cannot decide.",
+      "U4 still can.",
+      "Error reveals no restricted notes."
+    ],
+    "experiment": "Guess another submission identifier. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Add permitted read-only oversight. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-threshold-policy",
+    "parentId": "effect-approval-policy",
+    "title": "Apply monetary approval thresholds exactly",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Submit requests at 99999 and 100000 cents.",
+    "explanation": "Boundary amounts must choose a deterministic policy. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use integer thresholds and versioned policy. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Below threshold has standard reviewer.",
+      "Boundary needs senior reviewer.",
+      "Currency is explicit."
+    ],
+    "experiment": "Change amount after draft preview. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Define policy for mixed currencies. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-team-policy",
+    "parentId": "effect-approval-policy",
+    "title": "Scope reviewer authority to teams",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Engineering reviewer attempts Finance approval.",
+    "explanation": "Role alone cannot authorize another team's requests. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Verify current assignment and team scope. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Cross-team action fails.",
+      "Valid team action succeeds.",
+      "Audit records policy version."
+    ],
+    "experiment": "Move requester teams mid-review. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Choose snapshot versus current team policy. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-policy-explanation",
+    "parentId": "effect-approval-policy",
+    "title": "Explain denied actions consistently",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Show pending request to expired delegate.",
+    "explanation": "Friendly UI reasons must reflect service denials. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Map typed denial to actionable explanation. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "UI and API agree.",
+      "Reason does not leak private roles.",
+      "Keyboard can reach help."
+    ],
+    "experiment": "Change delegation after render. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Localize structured denial codes. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-admin-bypass",
+    "parentId": "effect-approval-policy",
+    "title": "Make overrides explicit and attributable",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Admin approves an exceptional purchase.",
+    "explanation": "Administrator authority must not masquerade as normal review. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use a distinct reasoned override command. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Override records real actor.",
+      "Reason is required.",
+      "Ordinary approval policy stays intact."
+    ],
+    "experiment": "Submit blank override reason through API. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Require a second override reviewer. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-policy-table",
+    "parentId": "effect-approval-policy",
+    "title": "Turn an eligibility table into checks",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Enumerate requester reviewer delegate and inactive actors.",
+    "explanation": "Policy coverage must include combinations of conditions. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Implement table-driven service cases. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Each row has an outcome.",
+      "Conflicting roles follow precedence.",
+      "Missing context denies safely."
+    ],
+    "experiment": "Remove one role source from fixture. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Add generated combinations with explicit oracle. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-agent-policy-review",
+    "parentId": "effect-approval-policy",
+    "title": "Find authorization duplicated in UI",
+    "concept": "Eligibility services · current authorization",
+    "brief": "Agent hides Approve but leaves command unguarded.",
+    "explanation": "A generated interface condition cannot secure the endpoint. Eligibility depends on verified identity and current request state. Express denials as domain outcomes, use one policy source across entry points, and avoid treating a visible button as enforcement.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Add direct-command regression and central policy use. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Direct bypass fails.",
+      "Legitimate approval works.",
+      "UI displays matching denial."
+    ],
+    "experiment": "Call command without loading the page. Record persisted state and a recovery action.",
+    "review": "Trace every policy input to its trusted source. Review stale-page and direct-command behavior before accepting a change to role checks.",
+    "stretch": "Audit alternate batch endpoints. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-opposing-decisions",
+    "parentId": "effect-approval-decisions",
+    "title": "Race approve against reject",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Send approve and reject for submission S4 concurrently.",
+    "explanation": "Contradictory commands cannot both finalize one state. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Guard pending state and revision in one transaction. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One terminal outcome exists.",
+      "Losing command reports conflict.",
+      "Audit matches winner."
+    ],
+    "experiment": "Pause both after policy evaluation. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Compare behavior across two server instances. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-decision-retry",
+    "parentId": "effect-approval-decisions",
+    "title": "Return a committed decision on retry",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Retry approved operation O5 after timeout.",
+    "explanation": "Lost responses must not duplicate review evidence. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Store idempotent operation result. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Same decision returns.",
+      "Audit has one approval.",
+      "State remains final."
+    ],
+    "experiment": "Restart before receiving retry. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Define receipt retention behavior. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-payload-reuse",
+    "parentId": "effect-approval-decisions",
+    "title": "Reject changed operation content",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Reuse O5 with a changed decision reason.",
+    "explanation": "An operation ID cannot approve and reject different payloads. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Compare a canonical command fingerprint. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Conflict is explicit.",
+      "Original decision stays intact.",
+      "Changed reason is not silently accepted."
+    ],
+    "experiment": "Change only insignificant whitespace. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Document command normalization. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-superseded-submission",
+    "parentId": "effect-approval-decisions",
+    "title": "Reject decisions on old submissions",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Approve S2 after S3 becomes active.",
+    "explanation": "A decision cannot target content superseded by resubmission. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Check active submission identity atomically. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "S2 is rejected.",
+      "S3 remains pending.",
+      "Reviewer's reason survives."
+    ],
+    "experiment": "Race resubmit with final approval. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Expose a link to current snapshot. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-two-reviewers",
+    "parentId": "effect-approval-decisions",
+    "title": "Require distinct reviewer decisions",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Configure two required approvals for S8.",
+    "explanation": "Two approvals from one person do not satisfy two reviewers. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Count eligible distinct assignment decisions. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One reviewer leaves pending.",
+      "Second finalizes.",
+      "Duplicate first approval changes nothing."
+    ],
+    "experiment": "Race both final approvals. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Add a quorum larger than two. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-rejection-policy",
+    "parentId": "effect-approval-decisions",
+    "title": "Apply explicit rejection precedence",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "One reviewer approves while another rejects.",
+    "explanation": "Multi-review workflows need a defined rejection outcome. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Implement declared terminal rejection policy. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Final state follows policy.",
+      "Earlier approval remains historical.",
+      "Remaining assignments close consistently."
+    ],
+    "experiment": "Deliver rejection after quorum completion. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Define late-decision behavior. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-reason-draft",
+    "parentId": "effect-approval-decisions",
+    "title": "Preserve rejected decision text",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Write a long reason then submit stale revision.",
+    "explanation": "A recoverable conflict must not erase review reasoning. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Retain local text while showing current review state. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Reason remains available.",
+      "No implicit resubmit happens.",
+      "New revision is identified."
+    ],
+    "experiment": "Return network failure after validation. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Offer explicit draft export. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-decision-audit-rollback",
+    "parentId": "effect-approval-decisions",
+    "title": "Commit decision and evidence together",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Fail audit insert after approval update.",
+    "explanation": "A final state without its decision record is invalid. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use transactional finalization. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Request stays pending.",
+      "No partial decision survives.",
+      "Retry can finish normally."
+    ],
+    "experiment": "Crash between update and audit write. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Add consistency reconciliation. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-decision-shortcuts",
+    "parentId": "effect-approval-decisions",
+    "title": "Prevent accidental keyboard approvals",
+    "concept": "Decision transactions · revision receipts",
+    "brief": "Press a shortcut while editing rejection reason.",
+    "explanation": "Keyboard shortcuts must respect focus and confirmation. A decision changes a specific review state and must remain explainable after retries. Protect the state comparison, decision evidence, and operation receipt together so concurrent commands cannot silently contradict one another.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Limit shortcut scope and require deliberate action. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Typing does not approve.",
+      "Focused action is labeled.",
+      "Successful decision is announced."
+    ],
+    "experiment": "Repeat key during slow submit. Record persisted state and a recovery action.",
+    "review": "Inspect the transaction condition and unique constraints. Show actual final rows for racing commands instead of relying solely on HTTP status assertions.",
+    "stretch": "Add accessible shortcut documentation. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-future-window",
+    "parentId": "effect-approval-delegation",
+    "title": "Reject delegation before its start",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "Delegation starts tomorrow at 09:00.",
+    "explanation": "A future grant does not authorize present decisions. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Evaluate inclusive start using trusted time. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Today is denied.",
+      "Start instant follows policy.",
+      "Grant stays visible as scheduled."
+    ],
+    "experiment": "Set browser clock forward. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Show effective start in both zones. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-expiry-window",
+    "parentId": "effect-approval-delegation",
+    "title": "Stop delegation at expiration",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "Submit one second after delegation end.",
+    "explanation": "Starting a form before expiry grants no lasting authority. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Check interval during decision command. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Expired decision fails.",
+      "Reason remains drafted.",
+      "No decision row appears."
+    ],
+    "experiment": "Pause request across expiry. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Document commit-time interpretation. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-revoke-open-page",
+    "parentId": "effect-approval-delegation",
+    "title": "Revoke authority from stale pages",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "Delegate opens S7 then grant is revoked.",
+    "explanation": "Revocation must affect subsequent commands immediately under policy. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Read active grant during decision authorization. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Approval is denied.",
+      "Original reviewer retains rights.",
+      "Revocation appears in history."
+    ],
+    "experiment": "Revoke between preview and submit. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Add revocation cache invalidation. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-scope-category",
+    "parentId": "effect-approval-delegation",
+    "title": "Limit grants to allowed request categories",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "Delegate has equipment-only scope.",
+    "explanation": "Equipment delegation cannot approve travel requests. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Match submission category against grant scope. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Equipment request works.",
+      "Travel request fails.",
+      "Unscoped grant input is rejected."
+    ],
+    "experiment": "Change draft category after submission. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Version delegated scope rules. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-actor-provenance",
+    "parentId": "effect-approval-delegation",
+    "title": "Store the acting delegate honestly",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "Delegate U8 acts for U2.",
+    "explanation": "A delegated decision cannot claim the delegator clicked approve. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Persist actor and delegation identifier separately. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "U8 is decision actor.",
+      "U2 is authority source.",
+      "Timeline explains relationship."
+    ],
+    "experiment": "Deactivate U2 afterward. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Retain minimal historical attribution. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-delegation-cycle",
+    "parentId": "effect-approval-delegation",
+    "title": "Reject circular authority chains",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "Create A to B then B to A.",
+    "explanation": "A cycle cannot manufacture effective approval power. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Validate allowed chain graph before saving. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Cycle is rejected.",
+      "Existing grant stays valid.",
+      "Error identifies permitted correction."
+    ],
+    "experiment": "Race reciprocal grant creation. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Bound chain depth. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-redelegation-policy",
+    "parentId": "effect-approval-delegation",
+    "title": "Control whether delegates can delegate",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "B attempts to pass A's grant to C.",
+    "explanation": "Delegated authority is not automatically transferable. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Enforce explicit redelegation policy. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Forbidden chain fails.",
+      "Direct valid grant works.",
+      "Provenance remains complete."
+    ],
+    "experiment": "Forge original delegator in body. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Add constrained redelegation support. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-overlapping-grants",
+    "parentId": "effect-approval-delegation",
+    "title": "Explain overlapping delegation sources",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "U5 holds two valid grants for S9.",
+    "explanation": "Multiple grants must not duplicate review obligations. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Resolve one decision identity with authority provenance. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One decision is stored.",
+      "Eligible source is recorded.",
+      "Revoking one preserves only remaining rights."
+    ],
+    "experiment": "Expire both grants simultaneously. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Define deterministic grant selection. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-grant-editor-a11y",
+    "parentId": "effect-approval-delegation",
+    "title": "Validate delegation intervals accessibly",
+    "concept": "Scoped authority · delegation provenance",
+    "brief": "Enter an end before start using keyboard.",
+    "explanation": "Time-bound permission errors need understandable field feedback. Delegation grants bounded authority without changing who actually acts. Keep scope and time rules explicit, re-evaluate them at command time, and retain both the real actor and the authority chain.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Connect interval errors with date and time inputs. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Error is announced.",
+      "Values remain editable.",
+      "Valid interval can be saved."
+    ],
+    "experiment": "Return permission denial after form validation. Record persisted state and a recovery action.",
+    "review": "Review whether the delegate can gain unrelated privileges or impersonate the delegator. Use a controllable clock to prove boundaries and revocation behavior.",
+    "stretch": "Test localized date input ambiguity. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-same-time-history",
+    "parentId": "effect-approval-audit",
+    "title": "Order events sharing a timestamp",
+    "concept": "Protected history · deterministic projections",
+    "brief": "Submit delegate and approve within one clock tick.",
+    "explanation": "A review timeline needs a stable total order. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use durable sequence or stable tie-breaker. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Reload order is stable.",
+      "Pagination has no duplicates.",
+      "Causal links stay understandable."
+    ],
+    "experiment": "Append another equal-time event. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Separate event time from receipt time. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-snapshot-links",
+    "parentId": "effect-approval-audit",
+    "title": "Open the exact reviewed revision",
+    "concept": "Protected history · deterministic projections",
+    "brief": "View approval of S1 after S2 is drafted.",
+    "explanation": "Timeline links cannot resolve to mutable latest content. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Link decision evidence to immutable submission. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "S1 content opens.",
+      "Draft changes are excluded.",
+      "Decision reason matches S1."
+    ],
+    "experiment": "Rename request after approval. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Add adjacent revision comparison. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-actor-deleted",
+    "parentId": "effect-approval-audit",
+    "title": "Render history after user removal",
+    "concept": "Protected history · deterministic projections",
+    "brief": "Remove display profile for former reviewer.",
+    "explanation": "Profile deletion cannot remove decision accountability silently. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Render durable actor reference with safe fallback. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Decision remains readable.",
+      "No null crash occurs.",
+      "Identity is not replaced by current user."
+    ],
+    "experiment": "Delete optional avatar metadata. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Define anonymized actor labels. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-history-scope",
+    "parentId": "effect-approval-audit",
+    "title": "Protect direct audit queries",
+    "concept": "Protected history · deterministic projections",
+    "brief": "User B opens private request A history endpoint.",
+    "explanation": "Knowing an event ID does not grant request access. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Scope audit reads through request authorization. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Body is denied.",
+      "Count leaks no private transitions.",
+      "Owner can still read."
+    ],
+    "experiment": "Use pagination cursor from another request. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Bind cursors to request scope. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-projection-rebuild",
+    "parentId": "effect-approval-audit",
+    "title": "Rebuild a missing timeline projection",
+    "concept": "Protected history · deterministic projections",
+    "brief": "Delete disposable timeline rows for approved S6.",
+    "explanation": "Projection repair must not create new business decisions. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Rebuild from authoritative events or decisions. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Same history reappears.",
+      "No provider messages resend.",
+      "Decision count stays fixed."
+    ],
+    "experiment": "Interrupt rebuild halfway. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Add resumable projection generation. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-redacted-reason",
+    "parentId": "effect-approval-audit",
+    "title": "Redact content without inventing history",
+    "concept": "Protected history · deterministic projections",
+    "brief": "Remove sensitive text from a rejection reason.",
+    "explanation": "Required redaction must preserve that a decision occurred. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Represent redaction with actor and policy evidence. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Decision outcome remains.",
+      "Redaction is visible.",
+      "Original text is inaccessible by policy."
+    ],
+    "experiment": "Inspect exports after redaction. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Separate retention and access rules. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-audit-export",
+    "parentId": "effect-approval-audit",
+    "title": "Export a reconstructable history",
+    "concept": "Protected history · deterministic projections",
+    "brief": "Export a withdrawn and resubmitted request.",
+    "explanation": "A timeline export must retain relationships and ordering. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Include event IDs revisions actors and schema version. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Both submissions are distinguishable.",
+      "Sequence is stable.",
+      "Export excludes unauthorized fields."
+    ],
+    "experiment": "Export while another event commits. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Define export snapshot boundary. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-missing-evidence",
+    "parentId": "effect-approval-audit",
+    "title": "Detect final state without evidence",
+    "concept": "Protected history · deterministic projections",
+    "brief": "Seed finalized request missing one required approval.",
+    "explanation": "Final approval requires supporting decision records. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Build read-only consistency check. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Anomaly is identified.",
+      "Healthy request passes.",
+      "Checker does not fabricate approval."
+    ],
+    "experiment": "Remove audit projection only. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Distinguish projection loss from source loss. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-agent-audit-review",
+    "parentId": "effect-approval-audit",
+    "title": "Catch misleading generated history labels",
+    "concept": "Protected history · deterministic projections",
+    "brief": "Agent labels all events as requester actions.",
+    "explanation": "UI labels must describe the actual actor and transition. A timeline should explain accepted transitions without becoming a second contradictory source of truth. Link events to authoritative revisions, preserve stable order, and apply the request access policy before serialization.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use mixed-actor lifecycle fixtures. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Reviewer is named correctly.",
+      "Delegate provenance is shown.",
+      "System events have explicit source."
+    ],
+    "experiment": "Include missing user display names. Record persisted state and a recovery action.",
+    "review": "Reconstruct one lifecycle from underlying records and compare it with the screen. Flag missing provenance separately from a harmless missing display name.",
+    "stretch": "Add review rubric for historical claims. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-approval-workflow-old-policy",
+    "parentId": "effect-approval-release",
+    "title": "Preserve the meaning of earlier submissions",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Add second reviewer while S3 is pending.",
+    "explanation": "New approval rules cannot silently reinterpret past consent. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Bind submission to an explicit policy version. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "S3 follows declared old policy.",
+      "New submission uses new rules.",
+      "UI explains requirement count."
+    ],
+    "experiment": "Approve S3 during deployment. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Document mixed-version support. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-notification-failure",
+    "parentId": "effect-approval-release",
+    "title": "Keep decisions despite provider outage",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Approve S4 while email provider is unavailable.",
+    "explanation": "External delivery failure cannot undo a valid decision. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Commit decision and outbox intent before delivery. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Approval remains committed.",
+      "Intent remains retryable.",
+      "UI distinguishes delivery status."
+    ],
+    "experiment": "Restart after first failed attempt. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Add outage recovery evidence. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-obsolete-message",
+    "parentId": "effect-approval-release",
+    "title": "Suppress notifications for withdrawn reviews",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Withdraw S5 before worker sends assignment notice.",
+    "explanation": "Delayed assignment mail cannot imply an active obligation. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Recheck relevance before delivery. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Obsolete mail is skipped.",
+      "Job has a reason.",
+      "New submission gets distinct intent."
+    ],
+    "experiment": "Resubmit before old job runs. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Define historical informational notices. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-payload-upgrade",
+    "parentId": "effect-approval-release",
+    "title": "Read old notification payloads",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Deploy v2 with v1 review-notice jobs pending.",
+    "explanation": "Queued work may outlive the code that created it. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Decode supported payload versions explicitly. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "V1 still sends correctly.",
+      "V2 uses new fields.",
+      "Unknown version quarantines."
+    ],
+    "experiment": "Roll back after v2 jobs exist. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Set a compatibility window. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-restore-provenance",
+    "parentId": "effect-approval-release",
+    "title": "Restore in-flight approval evidence",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Restore delegated partially approved request.",
+    "explanation": "A restore must retain who can decide and why. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Validate snapshots assignments decisions and grants together. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Prior decision survives.",
+      "Remaining reviewer can act.",
+      "Delegation provenance remains."
+    ],
+    "experiment": "Omit one referenced assignment. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Produce a preflight dependency report. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-rollback-status",
+    "parentId": "effect-approval-release",
+    "title": "Keep old code able to interpret state",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Deploy new NeedsInfo status then revert code.",
+    "explanation": "Code rollback is unsafe when new statuses are unreadable. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Rehearse declared backward-compatible handling. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Old build handles new state safely.",
+      "No request vanishes.",
+      "Operator sees unsupported actions."
+    ],
+    "experiment": "Rollback with active NeedsInfo records. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Use expand-and-contract migration. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-canary-workflow",
+    "parentId": "effect-approval-release",
+    "title": "Release using representative workflows",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Canary draft submit delegate reject and resubmit flows.",
+    "explanation": "A healthy homepage cannot prove approval correctness. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Run bounded synthetic workflow checks. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Every transition matches policy.",
+      "History is complete.",
+      "Provider calls stay isolated."
+    ],
+    "experiment": "Fail one migration fixture. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Set an explicit rollout stop condition. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-outbox-duplicates",
+    "parentId": "effect-approval-release",
+    "title": "Prevent repeated final-decision notices",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Retry approval after an accepted commit.",
+    "explanation": "One business transition should have stable message intent. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use transition-derived notification identity. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One intent exists.",
+      "Decision retry is stable.",
+      "Delivery retry follows provider contract."
+    ],
+    "experiment": "Crash after provider acceptance. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Record uncertain delivery separately. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-approval-workflow-release-runbook",
+    "parentId": "effect-approval-release",
+    "title": "Recover stranded review assignments",
+    "concept": "Workflow upgrades · recoverable delivery",
+    "brief": "Deploy faulty policy hiding ten pending assignments.",
+    "explanation": "Recovery must identify affected requests before mutation. Release safety includes requests already midway through review. Version policy and payload assumptions deliberately, keep notifications downstream of durable decisions, and rehearse recovery with realistic intermediate states.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Create scoped diagnosis and reviewed repair plan. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Affected IDs are explicit.",
+      "Repair restores eligibility.",
+      "Historical decisions stay unchanged."
+    ],
+    "experiment": "Interrupt repair after five requests. Record persisted state and a recovery action.",
+    "review": "Compare migrated records with the declared compatibility policy. Require observed evidence for rollback and provider behavior rather than relying on a migration succeeding syntactically.",
+    "stretch": "Add resumable repair receipts. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  }
+]

@@ -6,7 +6,7 @@ import {
   studyLink,
 } from "../../db/repos/learningRepo";
 import { loadStudy } from "../../db/repos/studyRepo";
-import type { Track } from "../../data/curriculum";
+import type { Track } from "../../data/curriculum-catalog";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -27,9 +27,9 @@ import { Button } from "../../components/Button";
 import { DeckCard } from "../../components/DeckCard";
 import { getDashboard } from "../../db/repos/dashboardRepo";
 import { listInbox } from "../../db/repos/noteRepo";
-import { getDeckInfo, curriculum } from "../../data/curriculum";
+import { getDeckInfo, curriculum } from "../../data/curriculum-catalog";
 import { dotnetDecks } from "../../data/dotnet-path";
-import { engineeringMissions } from "../../data/engineering-missions";
+import engineeringChecks from "../../data/engineering-completion-checks.json";
 import { useNow } from "../../lib/useNow";
 import { CreateDeckDialog } from "../decks/CreateDeckDialog";
 
@@ -78,6 +78,13 @@ const basePaths: Pathway[] = [
     text: `${keepGoingCount} decks on TypeScript, Python, debugging, testing, accessibility, APIs, SQL, security, and delivery.`,
   },
   {
+    to: "/effect-lab",
+    icon: Code2,
+    label: "Effect & agentic CRUD",
+    text: "Build CRUD apps, reinforce JavaScript and Effect fundamentals, and practice system design. Learn through worked examples, recall questions, failure drills, and saved evidence.",
+    isNew: true,
+  },
+  {
     to: "/dotnet",
     icon: Code2,
     label: "C# & .NET",
@@ -87,7 +94,7 @@ const basePaths: Pathway[] = [
     to: "/practice",
     icon: Hammer,
     label: "Engineering practice",
-    text: `${engineeringMissions.length} hands-on missions with a journal for your evidence.`,
+    text: `${Object.keys(engineeringChecks).length} hands-on missions with a journal for your evidence.`,
   },
 ];
 
@@ -97,11 +104,9 @@ export function HomeScreen() {
   const learning = useLiveQuery(getLearningSettings, [], learningDefaults);
   const focused = useLiveQuery(
     () =>
-      loadStudy(
-        undefined,
-        now,
-        learning.path ? (learning.path as Track) : undefined,
-      ),
+      learning.path
+        ? loadStudy(undefined, now, learning.path as Track)
+        : undefined,
     [now.getTime(), learning.path],
   );
   const data = useLiveQuery(() => getDashboard(now), [now.getTime()]);

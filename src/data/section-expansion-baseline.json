@@ -579,5 +579,19 @@
     "track": "Build real apps",
     "cardCount": 20,
     "contentHash": "91cd8835eb7e1f8e07cf2374544c1bdbd3075e0a4b11d8a40e84946074c18aae"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007009",
+    "name": "29 · Data modeling and migrations",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "8205199be8aa2f6724745527cae3089adae2640db57e1dff6b0818f1b277bcd5"
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000007010",
+    "name": "30 · Performance and caching basics",
+    "track": "Build real apps",
+    "cardCount": 20,
+    "contentHash": "a146a7f91ae75896b782e9f7b25c9ea6eceab716a94f609d4f465a7531f70618"
   }
 ]

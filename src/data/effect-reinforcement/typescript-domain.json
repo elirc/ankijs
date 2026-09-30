@@ -1,0 +1,637 @@
+{
+  "project": {
+    "id": "typescript-domain",
+    "title": "TypeScript foundations: model a trustworthy task domain",
+    "kind": "Standalone app",
+    "track": "Fundamentals",
+    "summary": "Build a typed CRUD domain by turning untrusted input into explicit commands, valid states, and narrow repository contracts.",
+    "outcome": "A small task service whose boundary decoding, state transitions, patch semantics, and repository interfaces prevent common category mistakes.",
+    "prerequisites": "JavaScript objects, functions, arrays, and promises; complete the JavaScript foundations lab or demonstrate equivalent ownership and async behavior. Start with strict compiler checking enabled.",
+    "model": [
+      "Task: {id:string,title:string,status:'open'|'done',note:string|null,revision:number}. Decode outside values before treating them as domain tasks.",
+      "CreateTask supplies title; PatchTask distinguishes absent fields from explicit null. IDs and revisions come from trusted application boundaries.",
+      "Result and editor-state unions use literal tags. Repository functions expose the smallest capabilities their callers require."
+    ],
+    "boundaries": "unknown transport value → decoder → domain command → operation → repository contract → response mapper. Type annotations describe checked code; runtime validation protects external data.",
+    "resources": [
+      {
+        "label": "TypeScript handbook: narrowing",
+        "url": "https://www.typescriptlang.org/docs/handbook/2/narrowing.html"
+      },
+      {
+        "label": "TypeScript handbook: generics",
+        "url": "https://www.typescriptlang.org/docs/handbook/2/generics.html"
+      }
+    ],
+    "milestones": [
+      {
+        "id": "effect-typescript-domain-decode-boundary",
+        "title": "Earn a domain value from unknown input",
+        "concept": "unknown, runtime checks, and validation",
+        "brief": "Implement decodeCreateTask(raw:unknown) for JSON, form, and agent-generated inputs. A successful result contains a trimmed nonempty title of at most 80 characters; invalid values never reach storage.",
+        "explanation": "A type annotation describes what checked code may assume; it does not examine a network response at runtime. unknown means the value can be anything and operations require evidence first. A decoder gathers that evidence by checking shape and field constraints, then returns either a trustworthy command or a structured issue. A cast merely tells the compiler to accept a claim and cannot replace those checks.",
+        "steps": [
+          "Start with raw values null, [], {title:7}, {title:'   '}, and {title:' Read '}. Write the expected outcome and issue path for each before coding.",
+          "Check non-null object shape, reject arrays for this command, check title is a string, trim it, and validate length. Return a tagged success or failure result.",
+          "Call the decoder from a create operation whose repository spy counts writes. Only a successful command may be passed into the write branch."
+        ],
+        "checks": [
+          "The valid fixture becomes a command with title Read and causes one write.",
+          "Null, arrays, non-string titles, blank titles, and 81-character titles produce explicit validation results with zero writes.",
+          "The operation accepts unknown directly and contains no as CreateTask assertion that bypasses validation."
+        ],
+        "experiment": "Replace the decoder with raw as CreateTask and send {title:7}. Observe that the compiler claim does not prevent the runtime failure or malformed write.",
+        "review": "Teach back the difference between a type claim and runtime evidence. Review an agent-generated decoder for array and null cases as well as the familiar happy path.",
+        "stretch": "Add multiple field issues while keeping the valid command unavailable until all required checks succeed.",
+        "stage": "Build independently",
+        "minutes": 70,
+        "workedExample": "Raw {title:' Read '} first passes the object check, then the string check. Trimming produces Read, whose length is 4, so the decoder returns {_tag:'Valid',value:{title:'Read'}}. Raw {title:7} fails before trim and returns an issue at title; the repository call count remains zero.",
+        "retrieval": [
+          {
+            "question": "Why does unknown help at a boundary?",
+            "answer": "It requires narrowing before use, making unproven assumptions visible in checked code."
+          },
+          {
+            "question": "Does an as assertion validate incoming JSON?",
+            "answer": "No. Assertions affect compiler interpretation and do not add runtime checks."
+          }
+        ]
+      },
+      {
+        "id": "effect-typescript-domain-state-union",
+        "title": "Represent only meaningful editor states",
+        "concept": "Discriminated unions and state machines",
+        "brief": "Replace loading, hasError, and saved booleans with a tagged editor state that preserves the draft through failure. Define legal transitions before implementing the view.",
+        "explanation": "Independent booleans allow combinations with no clear meaning, such as saving and saved and failed all being true. A discriminated union lists meaningful alternatives and associates each with its required data. A state machine adds rules for how events move between those alternatives. The type shape prevents some invalid combinations, while transition functions enforce which changes are allowed.",
+        "steps": [
+          "Define Editing with draft, Saving with submitted command and draft revision, Failed with draft and message, and Saved with the stored task. Explain every field's ownership.",
+          "Implement submit, succeeded, failed, and edit transitions as functions. Reject or ignore a second submit during Saving according to a documented policy.",
+          "Drive the fixture from Editing Read through Saving, Failed quota, back to Editing Study, then Saved t1. Render each state by its tag."
+        ],
+        "checks": [
+          "A failed save still contains the draft needed to retry or edit.",
+          "A Saving state always includes the submitted command and cannot simultaneously claim a saved result.",
+          "An out-of-order success event with the wrong request identity cannot replace a newer edit state."
+        ],
+        "experiment": "Add a convenience loading boolean alongside the union and deliberately let it disagree. Remove the duplicate representation after showing which value the view trusted.",
+        "review": "Teach back the difference between a list of possible states and a transition policy. Review an agent's reducer for events accepted in states where they make no sense.",
+        "stretch": "Add a conflict state carrying local draft and current remote revision rather than overloading a generic error string.",
+        "stage": "Build independently",
+        "minutes": 70,
+        "workedExample": "Editing({title:'Read'}) receives submit request r1 and becomes Saving({requestId:'r1',command:{title:'Read'}}). Failure for r1 becomes Failed with the same draft. Editing the title produces Editing({title:'Study'}). A late success for another request cannot be accepted simply because it carries a valid task.",
+        "retrieval": [
+          {
+            "question": "What does a discriminant do?",
+            "answer": "A literal tag identifies the union variant so the compiler can narrow to that variant's fields."
+          },
+          {
+            "question": "Do union types alone enforce event ordering?",
+            "answer": "No. Transition logic must decide which events are legal in the current state."
+          }
+        ]
+      },
+      {
+        "id": "effect-typescript-domain-exhaustive-handling",
+        "title": "Make a new domain case demand a decision",
+        "concept": "Narrowing, never, and exhaustiveness",
+        "brief": "Handle create results Success, InvalidTitle, DuplicateTitle, and StorageUnavailable in a view mapper. Ensure adding a new variant creates a compiler obligation.",
+        "explanation": "Narrowing refines a union using evidence such as a literal tag. After all variants have been handled, the remaining value can have type never, meaning no member should reach that point. Assigning the remaining value to never creates an exhaustiveness check. A broad default message may look robust but can hide newly added domain outcomes that require distinct user behavior.",
+        "steps": [
+          "Define a CreateResult union whose success contains Task and whose failures contain only their relevant data. Render each variant through a switch on _tag.",
+          "Use a never assignment or assertNever helper at the unreachable remainder. Explain why the helper signals a programmer assumption rather than a user-correctable validation result.",
+          "Add a PermissionDenied variant and observe the compile error. Add a deliberate message and recovery policy, then remove the temporary error."
+        ],
+        "checks": [
+          "Success accesses task only after narrowing to the success variant.",
+          "DuplicateTitle exposes a title correction path, while StorageUnavailable preserves the draft for retry.",
+          "Adding PermissionDenied breaks exhaustive handling until its behavior is explicitly implemented."
+        ],
+        "experiment": "Replace exhaustive handling with default:'Something went wrong'. Add the new variant again and show that the compiler no longer prompts a product decision.",
+        "review": "Teach back what never proves inside this checked union and what it cannot prove about unvalidated runtime input. Review an agent's use of as never to silence the diagnostic.",
+        "stretch": "Make a table-driven renderer using a typed mapping and compare its exhaustiveness guarantees with the switch.",
+        "stage": "Build independently",
+        "minutes": 70,
+        "workedExample": "Before PermissionDenied exists, the switch consumes all four tags and the remainder is never. After adding it, the remainder can be PermissionDenied, so assigning it to never fails. Handling that case restores the proof. Casting the remainder as never would only hide the missing branch, not supply its behavior.",
+        "retrieval": [
+          {
+            "question": "Why does a never check catch a missing variant?",
+            "answer": "The remaining unhandled variant cannot be assigned to a type representing no possible value."
+          },
+          {
+            "question": "Can exhaustive TypeScript handling validate arbitrary JSON?",
+            "answer": "No. It is sound only after the value has earned membership in the modeled union."
+          }
+        ]
+      },
+      {
+        "id": "effect-typescript-domain-capability-contract",
+        "title": "Depend on the repository capability a command needs",
+        "concept": "Structural typing and interface boundaries",
+        "brief": "Make renameTask depend on get and update capabilities while a list screen depends only on list. Implement a memory adapter without inheritance or a shared base class.",
+        "explanation": "TypeScript generally compares object types by their required structure. An object with compatible methods can satisfy an interface without explicitly inheriting from it. Small interfaces express the capability an operation actually needs and make replacement easier. Structural compatibility does not prove behavioral correctness: an update method can have the right signature while violating revision or persistence rules.",
+        "steps": [
+          "Define TaskReader with get(id) and TaskWriter with update(task). Compose their requirements for renameTask and define a separate TaskLister for the list view.",
+          "Implement a memory adapter object satisfying those shapes. Pass a list-only object to the list view and confirm it cannot be passed to renameTask.",
+          "Write behavioral examples for missing ID and successful rename, documenting whether the adapter returns copies and what update completion means."
+        ],
+        "checks": [
+          "The list view compiles with only a list capability and cannot call update through its declared dependency.",
+          "renameTask receives the methods it requires without constructing a concrete adapter internally.",
+          "A missing task produces the documented result and a successful rename updates the intended ID."
+        ],
+        "experiment": "Give the fake adapter an update method that resolves without changing its map. Show that type compatibility passes while the behavioral contract fails.",
+        "review": "Teach back the difference between shape compatibility and semantic substitutability. Review an agent's proposal to pass the entire application container into a small operation.",
+        "stretch": "Split read and write adapters across a remote boundary and state which consistency assumptions the operation now requires.",
+        "stage": "Make it reliable",
+        "minutes": 70,
+        "workedExample": "A value {list: async () => [t1]} satisfies TaskLister because it has the required method. It lacks get and update, so it cannot satisfy the rename capability. A larger memory adapter may satisfy both interfaces structurally. Neither relationship proves that its returned rows are durable; that guarantee requires an explicit contract and evidence.",
+        "retrieval": [
+          {
+            "question": "Must an adapter extend a base class to satisfy an interface?",
+            "answer": "No. Compatible required structure is generally sufficient in TypeScript."
+          },
+          {
+            "question": "What do narrow capability interfaces improve?",
+            "answer": "They expose the caller's actual dependencies and reduce unnecessary coupling to unrelated operations."
+          }
+        ]
+      },
+      {
+        "id": "effect-typescript-domain-patch-semantics",
+        "title": "Give absent, null, and empty distinct update meanings",
+        "concept": "Optional properties and patch contracts",
+        "brief": "Implement PATCH for title and note. An absent field preserves its old value, note:null clears the note, and note:'' stores an intentionally empty note.",
+        "explanation": "An optional property means a field may be absent from the object's shape; a nullable property means null is an allowed value when present. These meanings are different from a field whose value is undefined. JSON cannot carry undefined as a property value, but in-process callers can, so the operation needs a documented policy. A patch is a command about changes, not a partly valid saved entity.",
+        "steps": [
+          "Define PatchTask with optional title:string and optional note:string|null. At the unknown boundary, detect field presence explicitly and reject a present undefined value under this lab's contract.",
+          "Apply {}, {note:null}, {note:''}, and {title:' Study '} to t1 whose note is Call Sam. Normalize only fields that are actually present.",
+          "Construct the next complete Task by preserving untouched fields and replacing validated present fields. Keep id and revision ownership outside the patch payload."
+        ],
+        "checks": [
+          "An empty patch preserves title and note and follows the documented no-change write policy.",
+          "note:null clears Call Sam, while note:'' persists the empty string.",
+          "A present undefined value is rejected for direct callers instead of accidentally clearing or ignoring the field."
+        ],
+        "experiment": "Use patch.note ?? old.note and observe that explicit null no longer clears the note. Replace defaulting with a presence-aware branch.",
+        "review": "Teach back the distinction between absent property and explicit clearing intent. Review an agent's use of Partial<Task> for a public patch and identify fields it accidentally exposes.",
+        "stretch": "Enable exactOptionalPropertyTypes in a focused example and compare compiler assistance with the runtime checks still required.",
+        "stage": "Make it reliable",
+        "minutes": 70,
+        "workedExample": "Old note is Call Sam. Patch {} has no note key, so the result remains Call Sam. Patch {note:null} has the key and requests clearing, so the result is null. Patch {note:''} requests a real empty string. The expression patch.note ?? old.note collapses the first two cases and violates the clearing contract.",
+        "retrieval": [
+          {
+            "question": "Why is Partial<Task> often too broad for an update API?",
+            "answer": "It can expose fields such as identity and revision that ordinary callers should not control."
+          },
+          {
+            "question": "Which observation distinguishes preserve from clear?",
+            "answer": "Whether the property is absent or explicitly present with the contract's clearing value, here null."
+          }
+        ]
+      },
+      {
+        "id": "effect-typescript-domain-boundary-service",
+        "title": "Assemble a typed CRUD service without type escape hatches",
+        "concept": "Contracts from transport to persistence",
+        "brief": "Connect decodeCreate, decodePatch, state transitions, and narrow repository interfaces into one task service. Keep transport objects, domain commands, and saved entities distinct.",
+        "explanation": "A boundary contract says what enters, what leaves, and which failures callers must handle. Different layers need different types because they own different facts: transport begins as unknown, decoded commands express intent, and saved entities include trusted identity and revision. Separating these forms reduces the temptation to cast incomplete objects into complete domain types or to expose persistence fields to callers.",
+        "steps": [
+          "Implement create, get, patch, complete, and archive operations using the earlier decoders and transition policies. Return a tagged result union for expected domain failures.",
+          "Seed t1 revision 2. Apply a valid title patch with expectedRevision 2 and make the repository enforce the revision precondition when writing, returning revision 3.",
+          "Exercise malformed input, missing ID, stale revision, invalid transition, and storage unavailability. Map each result to a deliberate caller behavior without broad any or as Task escapes."
+        ],
+        "checks": [
+          "Malformed commands perform zero writes and return field issues.",
+          "A matching revision updates once to revision 3; a stale revision returns Conflict and preserves the current row.",
+          "Every result variant is handled exhaustively, and the domain service never constructs the concrete repository itself."
+        ],
+        "experiment": "Have an agent validate revision in a separate read and then issue an unconditional update. Interleave another writer and show why the adapter contract needs an atomic precondition.",
+        "review": "Teach back which layer earns each assumption in the successful patch path. Identify a guarantee supplied by the compiler and one that requires repository behavior.",
+        "stretch": "Add an HTTP adapter with explicit status mapping while preserving the same domain result union and input decoder.",
+        "stage": "Own the outcome",
+        "minutes": 70,
+        "workedExample": "Raw {title:' Study ',expectedRevision:2} decodes to a normalized command. The operation targets t1, and the repository atomically checks revision 2 before replacing it with title Study at revision 3. Replaying expectedRevision 2 returns Conflict. TypeScript describes that outcome; the atomic adapter behavior is what prevents the lost update.",
+        "retrieval": [
+          {
+            "question": "Why use separate command and entity types?",
+            "answer": "Commands express caller intent, while entities include facts owned by trusted application and persistence boundaries."
+          },
+          {
+            "question": "Can a type signature alone make compare-and-set atomic?",
+            "answer": "No. The repository implementation must enforce the precondition as one indivisible write operation."
+          }
+        ]
+      }
+    ]
+  },
+  "drills": [
+    {
+      "id": "effect-typescript-domain-decode-nested",
+      "title": "Report the exact failing field in imported tasks",
+      "concept": "Recursive boundary validation",
+      "brief": "Import a list containing t1 with a valid title and t2 with details.estimate set to 'soon'. Return an issue for the second row's nested field without saving a partially decoded batch.",
+      "explanation": "Checking that the outer value is an array proves nothing about its elements or their nested objects. Validation follows the shape of the data, earning each deeper assumption separately. An issue path communicates where evidence failed. Batch atomicity is a separate policy; in this lab the decoder must finish the entire batch successfully before the operation starts any writes.",
+      "steps": [
+        "Define an import command containing tasks with id, title, and details.estimate. Require estimate to be a finite nonnegative number and IDs to be unique within the batch.",
+        "Decode each row from unknown, collecting paths such as tasks[1].details.estimate. Keep decoded rows local until the complete batch passes.",
+        "Pass the mixed fixture to the import operation and inspect both returned issues and repository call count. Repair 'soon' to 15 and repeat."
+      ],
+      "checks": [
+        "The malformed batch reports tasks[1].details.estimate and performs zero writes.",
+        "After repair, both rows are available as validated domain values with numeric estimates.",
+        "A duplicate t1 ID produces a batch-level uniqueness issue rather than silently replacing a row."
+      ],
+      "experiment": "Validate only Array.isArray(raw.tasks), then cast its elements. Send a null second row and locate the unearned property access.",
+      "review": "Explain each piece of evidence needed before reading estimate. Review an agent's issue formatting for useful location without echoing an entire potentially sensitive imported record.",
+      "stretch": "Compare all-or-nothing validation with a deliberate partial-import mode that returns accepted and rejected rows separately.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "The first row decodes to t1 estimate 0. The second row reaches details successfully but finds a string where a number is required. Its issue path includes index 1. Although one local decoded value exists, no import command is returned and no repository call occurs; validation success of one row does not authorize the batch.",
+      "retrieval": [
+        {
+          "question": "Does an array check validate its elements?",
+          "answer": "No. Every element still needs checks appropriate to the expected row shape."
+        },
+        {
+          "question": "Why keep decoded rows local until the batch passes?",
+          "answer": "It prevents partial persistence under the lab's all-or-nothing validation policy."
+        }
+      ],
+      "parentId": "effect-typescript-domain-decode-boundary"
+    },
+    {
+      "id": "effect-typescript-domain-normalization-contract",
+      "title": "Make normalization part of the boundary contract",
+      "concept": "Canonical values and validation order",
+      "brief": "Specify whether title length applies before or after trimming, then decode 80 letters surrounded by spaces. Every caller must receive the same canonical command.",
+      "explanation": "Normalization transforms an accepted representation into the representation the domain actually uses. Validation must measure the intended representation consistently. If the form checks one value while the operation stores another, clients disagree about the rules. Normalization is not permission to silently repair arbitrary malformed data: converting a number into a string changes the accepted contract and should be a deliberate choice.",
+      "steps": [
+        "Write a contract that accepts strings only, trims surrounding whitespace, and measures the resulting JavaScript string length from 1 through 80. State that grapheme-aware counting is outside this lab.",
+        "Decode 80 letters with surrounding spaces, 81 letters, whitespace only, and the number 42. Record both normalized output and failure reason.",
+        "Invoke the same operation from a form-like object and an agent-like JSON payload, proving that neither caller can skip the shared boundary rules."
+      ],
+      "checks": [
+        "The padded 80-letter value is accepted and stored without surrounding spaces.",
+        "The 81-letter and whitespace-only values fail before repository access.",
+        "The number 42 fails as a wrong type rather than becoming the string '42'."
+      ],
+      "experiment": "Validate raw length before trimming in one adapter. Demonstrate disagreement for the padded 80-letter case, then remove the duplicate rule.",
+      "review": "Teach back which values are representations of valid titles and which are rejected types. Ask an agent to explain any coercion it adds instead of treating coercion as harmless convenience.",
+      "stretch": "Implement a separate Unicode-aware policy and show examples where code-unit length and user-perceived character count differ.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "Let raw.title be two spaces, 80 A characters, then two spaces. Raw length is 84; trimmed length is 80. The contract measures the latter, so the result contains exactly 80 A characters. A whitespace-only title trims to length 0 and fails. The same sequence runs regardless of which caller supplied the object.",
+      "retrieval": [
+        {
+          "question": "Why specify the order of trimming and validation?",
+          "answer": "The order changes which inputs are accepted and what value the domain guarantees."
+        },
+        {
+          "question": "Why avoid automatically stringifying every input?",
+          "answer": "It broadens the accepted contract and can hide a caller's malformed payload."
+        }
+      ],
+      "parentId": "effect-typescript-domain-decode-boundary"
+    },
+    {
+      "id": "effect-typescript-domain-request-state",
+      "title": "Associate asynchronous outcomes with their request",
+      "concept": "Typed events and request ownership",
+      "brief": "Model two save attempts r1 and r2 so an old r1 failure cannot replace r2's success. Put request identity in events and pending state.",
+      "explanation": "A success value and its relevance to the current editor are different facts. A typed event can require the fields needed to decide relevance, such as requestId. The reducer compares that identity against the pending state's request identity before transitioning. This makes stale-result handling a visible part of the domain rather than an ad hoc condition scattered across callbacks.",
+      "steps": [
+        "Define SaveSucceeded and SaveFailed events that both require requestId; require Saving to carry the same identifier. Make an event with no requestId fail type checking.",
+        "Drive Saving r1, then the lab's explicit supersede transition to Saving r2. Deliver success r2 followed by failure r1.",
+        "Return the unchanged state for irrelevant outcomes, and document whether they are logged for diagnosis without becoming visible editor errors."
+      ],
+      "checks": [
+        "Success r2 yields Saved with t2's returned value.",
+        "Failure r1 delivered afterward leaves that Saved state unchanged.",
+        "Both outcome variants require identity, so an agent cannot construct an anonymous failure event accidentally."
+      ],
+      "experiment": "Guard only SaveSucceeded and let every SaveFailed transition to Failed. Replay the trace to expose the missing symmetric ownership rule.",
+      "review": "Explain why checking a task ID alone is insufficient when two attempts edit the same task. Review the event model for the minimum data needed to justify every transition.",
+      "stretch": "Add cancellation as a separate event and decide whether superseding a request cancels its work or merely discards its eventual outcome.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "Pending r2 carries {taskId:'t1',requestId:'r2'}. The r2 success matches and produces Saved. The later r1 failure has the same taskId but a different requestId; it belongs to an older attempt. Ignoring it preserves the newer result without pretending that the old request never failed.",
+      "retrieval": [
+        {
+          "question": "Why include request identity when task identity already exists?",
+          "answer": "Several concurrent or successive attempts can target the same task but own different outcomes."
+        },
+        {
+          "question": "Does ignoring a stale event cancel its underlying work?",
+          "answer": "No. Result ownership and cancellation are separate mechanisms."
+        }
+      ],
+      "parentId": "effect-typescript-domain-state-union"
+    },
+    {
+      "id": "effect-typescript-domain-transition-table",
+      "title": "Separate allowed commands from display state",
+      "concept": "Domain transitions and explicit rejection",
+      "brief": "Model completing and reopening a task with status open or done. Add archived as a terminal status and require an explicit rejection when a command violates the policy.",
+      "explanation": "A union of status strings describes possible values but does not state which commands are valid for each value. A transition table makes policy inspectable: complete moves open to done, reopen moves done to open, and archived rejects both. Representing rejection as data keeps an invalid command from quietly looking like a successful no-op.",
+      "steps": [
+        "Write a table for three statuses crossed with complete and reopen. Choose and explain whether complete on done is idempotent success or an invalid transition.",
+        "Implement transition(task,command) returning either an updated task or InvalidTransition containing status and command. Preserve the original task on rejection.",
+        "Run the table against t1 open, t2 done, and t3 archived; connect only successful results to repository update."
+      ],
+      "checks": [
+        "Open plus complete returns done and produces the documented single update.",
+        "Archived plus reopen returns InvalidTransition and performs no write.",
+        "Every table cell has a defined result, including repeated complete on an already done task."
+      ],
+      "experiment": "Add a default branch returning the original task as success. Show how an archived reopen now falsely appears accepted to the caller.",
+      "review": "Teach back the difference between idempotency and silently swallowing an invalid command. Ask an agent to cite the policy cell behind each implementation branch.",
+      "stretch": "Add an authorized restore command for archived records and decide which previous status it restores.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "For t1 status open, complete returns a new task with status done. For t3 archived, reopen returns {_tag:'InvalidTransition',status:'archived',command:'reopen'}. No new task is returned, so the write branch has nothing to persist. The rejection is a domain result rather than an exception caused by property access.",
+      "retrieval": [
+        {
+          "question": "What does a status union leave unspecified?",
+          "answer": "The legal transitions and command behavior between those status values."
+        },
+        {
+          "question": "Why return an explicit invalid-transition result?",
+          "answer": "It lets callers distinguish a rejected command from a successful update or deliberately idempotent action."
+        }
+      ],
+      "parentId": "effect-typescript-domain-state-union"
+    },
+    {
+      "id": "effect-typescript-domain-narrow-null",
+      "title": "Narrow values with the evidence the rule needs",
+      "concept": "Null checks, typeof, and truthiness traps",
+      "brief": "Implement a task-note renderer where null means no note and an empty string means an intentionally empty note. Preserve those meanings instead of using one truthy check.",
+      "explanation": "Narrowing follows runtime checks, but the chosen check must match the domain question. A truthy check combines multiple cases, including null and empty string, so it may erase distinctions the feature needs. typeof value === 'object' also admits null in JavaScript. Explicit equality and shape checks provide more precise evidence than relying on a broad language category.",
+      "steps": [
+        "Define note as string | null. Render null as No note, empty string as Empty note, and nonempty strings as their exact text.",
+        "Implement a decoder for an optional metadata object using both a null exclusion and an object check. Reject an array if the contract expects a plain record shape.",
+        "Run note values null, '', and 'Call Sam', plus metadata null and {color:'blue'}, and record which branch each enters."
+      ],
+      "checks": [
+        "An empty note is not rendered as No note.",
+        "The metadata decoder never reads a property from null.",
+        "The compiler permits string operations only in branches where the value has been narrowed to string."
+      ],
+      "experiment": "Change note === null to !note. Demonstrate the collapsed empty-string behavior, then explain why it violates this particular domain contract.",
+      "review": "Teach back the evidence established by each condition. Review an agent's non-null assertion and ask which executed check makes that assertion safe.",
+      "stretch": "Add undefined at the transport boundary and normalize it deliberately before constructing the domain note value.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "For note = '', note === null is false, so the string branch remains available and can identify length 0 as Empty note. For note = null, the first branch handles absence directly. Separately, typeof null evaluates to object, which is why an object-category check alone cannot authorize reading metadata.color.",
+      "retrieval": [
+        {
+          "question": "Why is a truthy check too broad for this note field?",
+          "answer": "It groups the valid empty string with null even though the domain assigns them different meanings."
+        },
+        {
+          "question": "What extra check is needed before reading properties after typeof x === 'object'?",
+          "answer": "Exclude null, and validate any additional shape requirements such as rejecting arrays."
+        }
+      ],
+      "parentId": "effect-typescript-domain-exhaustive-handling"
+    },
+    {
+      "id": "effect-typescript-domain-honest-guards",
+      "title": "Keep type predicates accountable to runtime behavior",
+      "concept": "User-defined guards and unsound claims",
+      "brief": "Review isTask(raw): raw is Task for a persisted row. A predicate that checks only id must not certify title, status, note, and revision.",
+      "explanation": "A user-defined type predicate tells the compiler that a successful boolean result proves a type. The compiler does not derive the full proof from the predicate's implementation. An incomplete guard therefore creates false confidence inside every narrowed branch. A decoder that constructs a validated value can make the evidence more visible, but it still needs complete checks for the promised contract.",
+      "steps": [
+        "Define the complete persisted Task shape and list each invariant, including finite nonnegative integer revision and legal status literals.",
+        "Feed a weak guard {id:'t1',title:7,status:'mystery',note:[],revision:-1}. Observe that its true result permits unsafe downstream assumptions.",
+        "Replace it with complete validation or a decoder returning explicit issues. Include one malformed fixture per field and a valid t1 control case."
+      ],
+      "checks": [
+        "The malformed row is rejected before title.toUpperCase or repository update can run.",
+        "Every field promised by the Task type has corresponding runtime evidence.",
+        "The valid row decodes without assertions that conceal unchecked fields."
+      ],
+      "experiment": "Temporarily remove the status-literal check while retaining typeof status === 'string'. Send mystery and demonstrate the gap between string and the narrower status union.",
+      "review": "Teach back why a predicate signature is a promise authored by the programmer. Ask an agent reviewer to find a counterexample that passes the implementation but violates the promised type.",
+      "stretch": "Separate structural shape validation from cross-field invariants such as completedAt being required when status is done.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "The weak guard sees a string id and returns true. TypeScript then treats title as a string, but the runtime value remains 7, so title.toUpperCase fails. A correct decoder reaches title, reports a type issue, and never creates a Task value. No annotation can retroactively change the number into valid title data.",
+      "retrieval": [
+        {
+          "question": "Does TypeScript verify that a type predicate checks every field?",
+          "answer": "No. The predicate's declared narrowing promise can be stronger than its implementation."
+        },
+        {
+          "question": "Why is checking status is a string insufficient?",
+          "answer": "The domain permits only specific literal strings, so arbitrary strings do not prove membership."
+        }
+      ],
+      "parentId": "effect-typescript-domain-exhaustive-handling"
+    },
+    {
+      "id": "effect-typescript-domain-generic-preservation",
+      "title": "Use generics to preserve relationships instead of erasing them",
+      "concept": "Type parameters and constraints",
+      "brief": "Implement indexById for both Task and Project arrays. Preserve each record's concrete fields so looking up a Task still exposes title and status.",
+      "explanation": "A generic type parameter represents a relationship between inputs and outputs. A constraint such as T extends {id:string} states the minimum capability the implementation needs while retaining the caller's more specific type. Replacing T with the constraint itself erases extra information. A generic signature is useful when that relationship matters, not merely because it looks reusable.",
+      "steps": [
+        "Define indexById<T extends {id:string}>(rows:readonly T[]) returning a tagged success containing Map<string,T> or a DuplicateId failure. Use the constraint only to read each row's id.",
+        "Call it with Task rows and Project rows containing goal. Confirm the task lookup retains Task | undefined and the project lookup retains Project | undefined.",
+        "Choose a duplicate-ID policy. For this lab, return a duplicate result rather than silently keeping whichever row was visited last."
+      ],
+      "checks": [
+        "A task lookup permits status after checking for undefined; a project lookup permits goal after the same check.",
+        "Passing rows without string IDs produces a compiler error.",
+        "Duplicate t1 rows follow the explicit duplicate policy instead of silently overwriting an earlier value."
+      ],
+      "experiment": "Change the return type to Map<string,{id:string}>. Observe the lost title and goal information, then explain why a cast is not the right repair.",
+      "review": "Teach back the input-output relationship represented by T. Review an agent's generic helper for type parameters that appear only once and preserve no useful relationship.",
+      "stretch": "Generalize the key selector separately while retaining a clear collision policy and avoiding an unnecessary universal repository abstraction.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "For tasks = [{id:'t1',title:'Read',status:'open',note:null,revision:0}], T is inferred as the task record shape. The map value type keeps those fields because it is T, not merely {id:string}. get('t1') still includes undefined because the map cannot promise the key exists; generics preserve information without inventing existence guarantees.",
+      "retrieval": [
+        {
+          "question": "What does the constraint on T permit the implementation to do?",
+          "answer": "It permits reading the required id field while preserving the caller's fuller type."
+        },
+        {
+          "question": "Why does Map.get still return undefined as a possibility?",
+          "answer": "The type of stored values does not prove that a particular key is present."
+        }
+      ],
+      "parentId": "effect-typescript-domain-capability-contract"
+    },
+    {
+      "id": "effect-typescript-domain-extra-fields",
+      "title": "Distinguish assignability from an exact boundary shape",
+      "concept": "Excess properties and transport allowlists",
+      "brief": "Prevent a create payload from choosing its own revision or archived status. Demonstrate that a structurally assignable object can contain additional runtime fields.",
+      "explanation": "Structural typing usually permits values to carry more properties than a target interface requires. Fresh object literals receive useful excess-property checks in many contexts, but that is not a universal exact-object guarantee. Spreading a caller's object into a saved entity can therefore smuggle unintended fields into storage even when the parameter type looks narrow. Boundary construction should select the accepted fields explicitly.",
+      "steps": [
+        "Define CreateTask with title only. Compare passing a fresh object literal with revision against passing a variable that contains title and revision; inspect the compiler behavior.",
+        "Create the domain task from explicitly selected normalized title plus trusted id, status, and revision values. Never spread the untrusted object into the entity.",
+        "Send {title:'Read',revision:999,status:'archived'} through the runtime boundary and apply a documented reject-extra-fields or ignore-extra-fields policy."
+      ],
+      "checks": [
+        "The stored task has trusted revision 0 and status open regardless of extra caller fields.",
+        "The boundary's extra-field policy is documented and applied consistently.",
+        "No correctness claim relies solely on fresh-object excess-property diagnostics."
+      ],
+      "experiment": "Replace explicit construction with {...raw,id} after a weak title check. Show revision 999 entering storage, then restore allowlisted construction.",
+      "review": "Teach back why assignable does not mean exact. Review an agent's convenient object spread for ownership of each persisted field.",
+      "stretch": "Add an explicit admin import command if trusted callers genuinely need to supply revisions, keeping it distinct from ordinary create.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "const payload = {title:'Read',revision:999} can be structurally compatible with a title-only parameter because it contains the required title. At runtime revision still exists. Building {id:'t1',title:decoded.title,status:'open',note:null,revision:0} chooses trusted fields deliberately and makes the surplus revision irrelevant under an ignore-extra-fields policy.",
+      "retrieval": [
+        {
+          "question": "Does a narrow parameter type remove extra runtime properties?",
+          "answer": "No. Type annotations do not transform the actual object."
+        },
+        {
+          "question": "Why construct saved entities from selected fields?",
+          "answer": "It makes each field's source explicit and prevents unintended caller fields from being persisted."
+        }
+      ],
+      "parentId": "effect-typescript-domain-capability-contract"
+    },
+    {
+      "id": "effect-typescript-domain-optional-migration",
+      "title": "Decode old records before applying new defaults",
+      "concept": "Versioned data and missing fields",
+      "brief": "Load a version-1 task with no note field into a version-2 domain where note is required and nullable. Make the migration explicit instead of scattering fallbacks through the UI.",
+      "explanation": "Persisted data can outlive the TypeScript definition that originally described it. Adding a required property to an interface does not modify old rows. A version-aware decoder converts old representations into the current domain, using a documented default only when the old format permits absence. The current domain can then stay simpler because every successfully loaded task has the required field.",
+      "steps": [
+        "Define old fixture {version:1,id:'t1',title:'Read',status:'open',revision:0} and current fixture with version:2 and note:null. State that missing version-1 note becomes null.",
+        "Decode by version, validate the version-specific shape, and construct a current Task. Reject a version-2 row missing note instead of silently treating it as old.",
+        "Pass both accepted records through the same note renderer and patch operation, keeping migration logic out of those consumers."
+      ],
+      "checks": [
+        "The version-1 fixture becomes a current task with note:null.",
+        "A malformed version-2 row missing note produces a data issue with its record ID.",
+        "The renderer and patch operation can rely on note always being string or null after successful decoding."
+      ],
+      "experiment": "Remove the version check and default every missing note to null. Show that a corrupt version-2 write is now hidden as if it were a legitimate migration.",
+      "review": "Explain the difference between compatibility with an old contract and masking violations of the current contract. Review an agent patch that adds optional chaining everywhere instead of repairing the read boundary.",
+      "stretch": "Add a write-back migration policy and decide whether decoding alone or an explicit migration command changes persisted rows.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "The version-1 row has no note because that format never required one. Its decoder constructs note:null in the current value. A version-2 row promises the new field, so absence contradicts its declared format and is rejected. Both decisions depend on version evidence, not on the renderer guessing what missing data probably means.",
+      "retrieval": [
+        {
+          "question": "Does updating an interface migrate existing storage?",
+          "answer": "No. Runtime records require explicit decoding or migration."
+        },
+        {
+          "question": "Why reject missing note in version 2 but accept it in version 1?",
+          "answer": "The formats make different promises; only the old contract legitimately omitted the field."
+        }
+      ],
+      "parentId": "effect-typescript-domain-patch-semantics"
+    },
+    {
+      "id": "effect-typescript-domain-patch-agent-review",
+      "title": "Challenge a generated update with a semantic matrix",
+      "concept": "Contract-focused agent review",
+      "brief": "Review an agent's applyPatch helper using a matrix of absent, null, empty, valid, and invalid values. Require evidence for each field's meaning before accepting the change.",
+      "explanation": "A generated helper can be concise and well typed while collapsing distinct user intentions. A semantic matrix makes the operation's meaning testable before implementation details dominate discussion. Each cell describes the old value, supplied representation, expected new value, and whether storage is allowed. This is more precise than asking an agent to handle edge cases without defining them.",
+      "steps": [
+        "Write matrix rows for note absent, null, '', and 'Later', plus title absent, blank, and padded Study. Start every case from title Read and note Call Sam.",
+        "Run the helper that uses {...old,...patch} without decoding. Observe blank titles and present undefined values entering the candidate entity.",
+        "Ask for a repair that decodes first and applies only allowed fields. Check the diff against every matrix row, including zero-write behavior for invalid commands."
+      ],
+      "checks": [
+        "Absent fields preserve their old values and note:null clears only the note.",
+        "Blank title rejects the entire patch, so a simultaneous note change is not partially saved.",
+        "Padded Study normalizes to Study and valid patches preserve identity while advancing revision according to the operation's policy."
+      ],
+      "experiment": "Send {title:'   ',note:null}. A helper that clears the note before validating title reveals a partial update; restore all-or-nothing command validation.",
+      "review": "Teach back one matrix row that a spread expression cannot decide correctly by itself. Require the agent to distinguish representation decoding from application of an already valid patch.",
+      "stretch": "Add a concurrency precondition to the matrix and separate a valid patch with stale revision from a malformed patch.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Starting from Read and Call Sam, {title:'   ',note:null} contains a valid clearing instruction but an invalid title. The operation first decodes the whole command and returns InvalidTitle. The stored title remains Read and note remains Call Sam. Applying fields incrementally before validating the complete command would violate that atomic command contract.",
+      "retrieval": [
+        {
+          "question": "Why validate the whole patch before applying any field?",
+          "answer": "An invalid command must not partially change the record under this contract."
+        },
+        {
+          "question": "What does a semantic matrix contribute to an agent review?",
+          "answer": "It supplies concrete expected meanings that can reveal errors hidden by compact syntax or passing types."
+        }
+      ],
+      "parentId": "effect-typescript-domain-patch-semantics"
+    },
+    {
+      "id": "effect-typescript-domain-contract-fake",
+      "title": "Make the fake obey the same promises as the adapter",
+      "concept": "Behavioral substitutability",
+      "brief": "Create a memory repository contract check for get, create, and conditional update. Make it return detached snapshots and enforce revision conflicts like the real adapter is expected to.",
+      "explanation": "A fake is useful only when its behavior matches the guarantees an operation relies on. Structural typing checks method shapes but cannot ensure that reads return isolated snapshots or updates enforce revision preconditions. A contract check states observable behavior shared by implementations. It should avoid depending on internal maps or implementation-specific timing so the same assertions remain meaningful for another adapter.",
+      "steps": [
+        "Create t1 revision 0, read it, and mutate the returned object's title locally. Read again and require the repository value to remain Read.",
+        "Issue two updates expecting revision 0. Permit the first to produce revision 1 and require the second to return Conflict.",
+        "Run missing-ID get and update examples, then describe how the same contract cases would execute against a durable adapter without inspecting its internals."
+      ],
+      "checks": [
+        "Mutating a returned snapshot cannot change stored data without an update call.",
+        "Exactly one of the sequential expectedRevision 0 updates succeeds.",
+        "Missing and conflict results have the same meanings the domain service handles, rather than fake-specific thrown strings."
+      ],
+      "experiment": "Make the fake return its internal object directly. Watch a read-only consumer mutate storage accidentally and repair snapshot ownership at the adapter boundary.",
+      "review": "Explain why a permissive fake can make incorrect service code look correct. Review an agent's tests for assumptions about internals instead of public guarantees.",
+      "stretch": "Add a controlled concurrent schedule when evaluating a real adapter's atomic update behavior; distinguish that from this sequential fake check.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "The map stores t1 title Read at revision 0. get returns a separate object, so changing returned.title to Local leaves the next read as Read. Updating with expectedRevision 0 stores Study at revision 1. A second update expecting 0 sees the mismatch and returns Conflict without changing Study.",
+      "retrieval": [
+        {
+          "question": "Why should a fake avoid returning mutable internal records?",
+          "answer": "That would allow callers to bypass the update contract through ordinary object mutation."
+        },
+        {
+          "question": "What can a sequential conflict check establish?",
+          "answer": "It verifies stale revision behavior, but not the real adapter's atomicity under concurrent execution."
+        }
+      ],
+      "parentId": "effect-typescript-domain-boundary-service"
+    },
+    {
+      "id": "effect-typescript-domain-explain-contract",
+      "title": "Deliver an evidence-backed domain walkthrough",
+      "concept": "Agent handoff and boundary reasoning",
+      "brief": "Prepare a walkthrough that another developer can use to extend the service with a new task status. Include one successful operation and one rejected operation with values at each boundary.",
+      "explanation": "A good handoff preserves the reasoning behind types and policies, not just the names of files. It identifies what the compiler enforces, what decoders establish at runtime, and what repository behavior must guarantee. This separation helps an agent extend the code without weakening a boundary to make a new example compile. A concrete trace is inspectable evidence rather than a general claim of type safety.",
+      "steps": [
+        "Trace a valid create from raw padded title through decoded command to saved t1 revision 0, naming every owner-supplied field.",
+        "Trace a stale patch against t1 revision 1 with expectedRevision 0. Show why decoding can succeed while the operation still returns Conflict and performs no replacement.",
+        "Propose adding blocked status. List the union, transition table, decoder, exhaustive renderer, and persisted-version decisions that need review before accepting an agent diff."
+      ],
+      "checks": [
+        "The walkthrough includes exact raw, normalized, saved, and failure values rather than only a layer diagram.",
+        "It distinguishes malformed input from a well-formed command rejected by current state.",
+        "The extension checklist catches missing branches without using assertions to suppress compiler feedback."
+      ],
+      "experiment": "Ask the agent to add blocked only to the status union. Use the decoder and transition examples to expose incomplete runtime and policy coverage.",
+      "review": "Teach back the strongest guarantee at each boundary and one limitation of that guarantee. Explain why passing type checking is necessary evidence here but insufficient evidence of persistence correctness.",
+      "stretch": "Have a reviewer reconstruct the operation from the handoff alone and record any unstated assumption they need to ask about.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Raw {title:' Read '} becomes CreateTask {title:'Read'}, then the shell supplies id t1 and the repository stores revision 0. Later a syntactically valid patch expecting revision 0 targets a row already at revision 1. Decoding succeeds because the command is well formed; conditional persistence returns Conflict because its precondition is false.",
+      "retrieval": [
+        {
+          "question": "Can a validly decoded command still fail in the domain?",
+          "answer": "Yes. Current state, existence, permissions, or revision preconditions may reject well-formed intent."
+        },
+        {
+          "question": "Why revisit decoders when extending a union?",
+          "answer": "Runtime data must also be checked against the revised set of permitted cases; compiler declarations do not update those checks automatically."
+        }
+      ],
+      "parentId": "effect-typescript-domain-boundary-service"
+    }
+  ]
+}

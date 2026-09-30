@@ -1,0 +1,669 @@
+{
+  "project": {
+    "id": "effect-runtime",
+    "title": "Effect runtime foundations: a controlled CRUD service",
+    "kind": "Standalone app",
+    "track": "Fundamentals",
+    "summary": "Build a task service while learning execution, typed failures, dependency provision, cleanup, interruption, and bounded retries from observable behavior.",
+    "outcome": "A version-checked Effect CRUD workflow with replaceable services, explicit resource ownership, controlled concurrency, and deterministic failure evidence.",
+    "prerequisites": "JavaScript promises and ownership plus TypeScript unions and boundary validation. Complete the two language foundations labs first. Record the installed Effect major version before copying any API syntax.",
+    "model": [
+      "Task: {id:string,title:string,revision:number}. Create commands carry a stable operationId; repository fixtures expose call counts, gates, and an event log.",
+      "Examples use version-independent Effect<A,E,R> semantics and name v3 APIs where stated. Use explicit /v3 documentation for Effect 3; consult /v4 and installed declarations for Effect 4. Do not mix Context.Tag and Context.Service patterns across versions.",
+      "Separate expected failures such as InvalidTitle, NotFound, Conflict, and TransientStorage from defects. A successful result does not by itself establish remote durability or exactly-once execution."
+    ],
+    "boundaries": "Unknown input → validated command → Effect operation requiring services → composed Layer/runtime at the app edge → repository adapter. Resource scopes and cancellation ownership follow actual application lifetimes.",
+    "resources": [
+      {
+        "label": "Effect v3: running effects",
+        "url": "https://effect.website/docs/v3/getting-started/running-effects"
+      },
+      {
+        "label": "Effect v3: expected errors",
+        "url": "https://effect.website/docs/v3/error-management/expected-errors"
+      },
+      {
+        "label": "Effect v3: unexpected errors",
+        "url": "https://effect.website/docs/v3/error-management/unexpected-errors"
+      },
+      {
+        "label": "Effect v3: services",
+        "url": "https://effect.website/docs/v3/requirements-management/services"
+      },
+      {
+        "label": "Effect v3: layers",
+        "url": "https://effect.website/docs/v3/requirements-management/layers"
+      },
+      {
+        "label": "Effect v3: scopes",
+        "url": "https://effect.website/docs/v3/resource-management/scope"
+      },
+      {
+        "label": "Effect v3: concurrency",
+        "url": "https://effect.website/docs/v3/concurrency/basic-concurrency"
+      },
+      {
+        "label": "Effect v3: retrying",
+        "url": "https://effect.website/docs/v3/error-management/retrying"
+      },
+      {
+        "label": "Effect v3: test clock",
+        "url": "https://effect.website/docs/v3/testing/testclock"
+      },
+      {
+        "label": "Effect v4: runtime and version comparison",
+        "url": "https://effect.website/docs/v4/runtime"
+      }
+    ],
+    "milestones": [
+      {
+        "id": "effect-effect-runtime-describe-run",
+        "title": "Separate a program description from its execution",
+        "concept": "Laziness and Effect<A,E,R>",
+        "brief": "Describe creating t1 Read as an Effect and prove that constructing the value does not write. Read its success, expected-error, and service-requirement types before providing dependencies or running it.",
+        "explanation": "An Effect describes work that a runtime can execute. Its A type describes success, E describes expected failures, and R describes required capabilities. These parameters are not three runtime arguments. Laziness applies to work placed inside an appropriate constructor; ordinary JavaScript expressions passed to a constructor still evaluate normally. Running the same uncached description twice can perform the underlying work twice.",
+        "steps": [
+          "Record the installed Effect version from the package and lockfile, then open its matching official documentation. Build a repository fixture with a write counter initially zero.",
+          "Wrap the write inside the documented lazy constructor and annotate the operation as producing Task, failing with InvalidTitle or StorageError, and requiring TaskRepository.",
+          "Inspect the counter after construction, provide a memory service at the edge, and execute once through the installed version's runPromise API. Execute again deliberately and record the second call."
+        ],
+        "checks": [
+          "Constructing the operation leaves writeCount at zero.",
+          "One execution returns t1 Read and increments the counter once; a second execution increments it again in the non-idempotent fixture.",
+          "The operation cannot run with unresolved TaskRepository requirements without explicitly satisfying or incorrectly escaping its type contract."
+        ],
+        "experiment": "Call the repository before wrapping its result in an Effect. Observe the write during construction and explain why the wrapper cannot undo already-started JavaScript work.",
+        "review": "Teach back A, E, and R using this operation's concrete result, failures, and dependency. Review an agent patch for runPromise calls buried inside reusable domain operations.",
+        "stretch": "Add an idempotent repository command and distinguish executing twice from creating two persistent entities.",
+        "stage": "Build independently",
+        "minutes": 80,
+        "workedExample": "The description has type Effect<Task,InvalidTitle|StorageError,TaskRepository>. Before execution, writeCount is 0. Provision supplies the repository requirement; execution returns {id:'t1',title:'Read',revision:0} and makes writeCount 1. Running the uncached description again makes it 2. The type documents possible behavior; it does not memoize that behavior.",
+        "retrieval": [
+          {
+            "question": "What does R represent in Effect<A,E,R>?",
+            "answer": "Capabilities the computation requires before it can execute as a fully provided program."
+          },
+          {
+            "question": "Does wrapping an already-started promise make the original work lazy?",
+            "answer": "No. Laziness requires delaying the operation that creates or starts the work."
+          }
+        ]
+      },
+      {
+        "id": "effect-effect-runtime-failure-channels",
+        "title": "Separate recoverable outcomes from broken assumptions",
+        "concept": "Expected errors, defects, and Exit inspection",
+        "brief": "Model InvalidTitle and StorageUnavailable as expected failures, then inject a deliberate programmer defect. Make the caller preserve useful recovery behavior without presenting a bug as a normal validation message.",
+        "explanation": "Expected failures are outcomes the operation advertises and callers can handle deliberately. Defects represent unexpected problems such as violated programmer assumptions. Effect also tracks interruption in its failure cause structure. These categories should not be flattened into one generic string at every boundary. A final application boundary can render a safe generic message while retaining diagnostic classification for the operator.",
+        "steps": [
+          "Define tagged InvalidTitle and StorageUnavailable values using patterns supported by the installed version. Return expected failure for a blank title and a simulated unavailable repository.",
+          "Inject a defect in a separate fixture, such as an explicitly signaled impossible invariant. Observe outcomes with the installed version's Exit or cause-inspection API.",
+          "Handle the expected variants with deliberate user actions: edit the title or retry later. Preserve defect diagnostics at the application boundary without claiming the user entered invalid data."
+        ],
+        "checks": [
+          "Blank input returns InvalidTitle and performs zero repository writes.",
+          "The unavailable fixture returns StorageUnavailable and retains the submitted draft.",
+          "The defect fixture remains distinguishable from expected validation failure in the inspected outcome."
+        ],
+        "experiment": "Catch every cause and convert it to InvalidTitle. Demonstrate the false user blame and lost diagnostic distinction before restoring targeted handling.",
+        "review": "Teach back why E is not a list of every possible runtime problem. Review an agent's catch-all handler for whether it erases defects or interruption.",
+        "stretch": "Add an error-report correlation ID without exposing raw exception details in the user-facing message.",
+        "stage": "Build independently",
+        "minutes": 80,
+        "workedExample": "For title spaces, normalization yields empty and the operation fails with InvalidTitle. For valid Read with an unavailable adapter, it fails with StorageUnavailable. A deliberately broken internal invariant instead produces a defect cause. All three lack a successful Task, but only the first asks the user to change the title.",
+        "retrieval": [
+          {
+            "question": "Does E describe defects as ordinary expected errors?",
+            "answer": "No. Defects are represented separately in the runtime's cause structure."
+          },
+          {
+            "question": "Why preserve failure classification at the edge?",
+            "answer": "Different causes require different recovery, diagnostics, and user explanations even when the visible fallback message is brief."
+          }
+        ]
+      },
+      {
+        "id": "effect-effect-runtime-service-layer",
+        "title": "Provide capabilities through an explicit composition graph",
+        "concept": "Services, requirements, and Layers",
+        "brief": "Make createTask require TaskRepository and IdGenerator services. Run the same domain operation with a deterministic memory implementation and a storage adapter selected at the application edge.",
+        "explanation": "A service is a named capability the operation needs, such as saving a task or allocating an ID. A Layer describes how to construct and provide services, including any dependencies required for construction. Separating the service contract from its implementation keeps the domain from choosing infrastructure. Providing a Layer satisfies requirements; it does not erase expected failures from operations that use the provided service.",
+        "steps": [
+          "Inspect the installed major and follow its service declaration pattern. Effect v3 examples use Context.Tag patterns; v4 documentation uses Context.Service patterns. Do not combine snippets across those APIs.",
+          "Define narrow TaskRepository and IdGenerator capabilities and a create operation that obtains them through the environment. Supply a fixed ID generator returning t1 in the lab.",
+          "Compose memory implementations at the root, execute create Read, then substitute a failing repository implementation without editing the operation body."
+        ],
+        "checks": [
+          "The fixed service graph produces t1 Read deterministically.",
+          "The failing implementation changes the outcome to StorageUnavailable through the same operation.",
+          "Domain code imports service contracts but never constructs the concrete database adapter or reads global configuration directly."
+        ],
+        "experiment": "Instantiate the repository inside createTask. Attempt to replace it for the failing fixture and identify the new hidden dependency that blocks substitution.",
+        "review": "Teach back the difference between a service requirement and the Layer that builds an implementation. Review an agent's provider placement for accidental per-call reconstruction.",
+        "stretch": "Add a repository Layer that depends on a connection service and draw the two-stage construction graph.",
+        "stage": "Build independently",
+        "minutes": 80,
+        "workedExample": "createTask('Read') requires TaskRepository | IdGenerator. The application supplies IdGenerator fixed to t1 and a memory repository, yielding a fully provided program. Execution asks for t1 and saves Read. Swapping only the repository Layer to an unavailable implementation produces StorageUnavailable while title rules and ID logic remain unchanged.",
+        "retrieval": [
+          {
+            "question": "What does a Layer contribute?",
+            "answer": "A recipe for constructing and providing services, potentially using other services and scoped resources."
+          },
+          {
+            "question": "Does providing dependencies remove the operation's expected errors?",
+            "answer": "No. It satisfies requirements; the supplied capabilities can still fail according to their contracts."
+          }
+        ]
+      },
+      {
+        "id": "effect-effect-runtime-resource-scope",
+        "title": "Release a repository lease on every exit path",
+        "concept": "Acquisition, finalization, and Scope",
+        "brief": "Wrap a simulated database lease around a task import. Count acquire and release events on success, expected failure, and interruption so ownership is visible.",
+        "explanation": "A resource needs an owner responsible for ending its lifetime. A scope groups work with finalizers that run when that lifetime closes. In Effect v3, acquireRelease registers release after successful acquisition and requires a Scope; scoped supplies a local lifetime. Check equivalent installed-version APIs before coding. Correct finalization is stronger than a success-only cleanup call, but it is not rollback of completed business writes.",
+        "steps": [
+          "Create acquire returning lease L1 and release recording released L1. Make import use that lease to write two tasks inside a scoped workflow.",
+          "Run a success fixture, a fixture failing after the first write, and a gated fixture interrupted after acquisition. Inspect events after the scope has closed.",
+          "Make acquisition itself fail before returning a lease. Verify that no release is attempted for a resource that was never successfully acquired."
+        ],
+        "checks": [
+          "Each successfully acquired lease has exactly one release after its owned workflow exits in all three fixtures.",
+          "Acquisition failure produces no fictitious release event.",
+          "Failure after the first write still shows that write unless a separate transactional adapter explicitly rolls it back."
+        ],
+        "experiment": "Move release into a final success step and fail before that step. Show the leaked lease, then restore registered finalization.",
+        "review": "Teach back who owns L1 and when that ownership ends. Review an agent's cleanup patch for the mistake of equating released connection with rolled-back data.",
+        "stretch": "Simulate release failure and inspect the resulting cause information instead of silently swallowing cleanup diagnostics.",
+        "stage": "Make it reliable",
+        "minutes": 80,
+        "workedExample": "The failure trace is acquire L1 → write t1 → fail while preparing t2 → release L1. ReleaseCount becomes 1 even though import has no successful result. The saved t1 remains because releasing L1 closes the resource; it does not undo the write. If acquire fails first, there is no L1 and releaseCount stays 0.",
+        "retrieval": [
+          {
+            "question": "When is release registered by a successful acquire-release pattern?",
+            "answer": "After acquisition produces a resource, so the scope owns cleanup for that resource."
+          },
+          {
+            "question": "Does closing the scope reverse completed writes?",
+            "answer": "No. Resource cleanup and transactional rollback are separate guarantees."
+          }
+        ]
+      },
+      {
+        "id": "effect-effect-runtime-bounded-work",
+        "title": "Limit concurrent CRUD work with explicit ownership",
+        "concept": "Fibers, structured concurrency, and backpressure",
+        "brief": "Import six tasks with at most two repository calls active at once. Keep the import owned by a parent operation so canceling the import stops its outstanding child work.",
+        "explanation": "Concurrency allows multiple operations to make progress without requiring them to finish in input order. A bound limits simultaneous demand on a repository or remote service. Structured ownership associates child work with a parent lifetime, making cleanup and interruption tractable. None of these properties supplies atomic batch persistence: some writes may complete before another fails or the parent is canceled.",
+        "steps": [
+          "Use the installed version's documented bounded-concurrency combinator to process t1 through t6 with concurrency two. Add active and maximumActive counters around each gated repository call.",
+          "Release gates in reverse order where possible and inspect completion events separately from the aggregate result's documented ordering.",
+          "Cancel the parent after two tasks complete and two more are pending. Observe child exits, finalizers, and the exact saved subset before reporting the result."
+        ],
+        "checks": [
+          "maximumActive never exceeds two, and all six complete when no failure or cancellation occurs.",
+          "Completion event order can differ from input order without misidentifying task results.",
+          "After observed parent cancellation, owned pending work is finalized and no additional tasks are started by this fixture."
+        ],
+        "experiment": "Replace structured child work with detached fire-and-forget execution. Cancel the parent and observe children continuing beyond the intended import lifetime.",
+        "review": "Teach back the differences between concurrency bound, result ordering, and transactional batch behavior. Review an agent suggestion to use unlimited concurrency for a large input file.",
+        "stretch": "Add a bounded input queue for streamed imports so memory usage is controlled as well as the number of active writes.",
+        "stage": "Make it reliable",
+        "minutes": 80,
+        "workedExample": "Initially t1 and t2 occupy the two slots, so active is 2. When t2 finishes first, t3 may start while t1 remains pending; active stays 2. Completed records are tracked by ID, not arrival position. Canceling later cannot erase the already saved t2, even when every remaining owned fiber stops correctly.",
+        "retrieval": [
+          {
+            "question": "What does a concurrency bound control?",
+            "answer": "The number of simultaneously active operations, not whether the batch is atomic."
+          },
+          {
+            "question": "Why retain task IDs in concurrent results?",
+            "answer": "Completion order may differ from input order, so identity must not depend on arrival position."
+          }
+        ]
+      },
+      {
+        "id": "effect-effect-runtime-retry-evidence",
+        "title": "Retry only a safe unit with deterministic evidence",
+        "concept": "Retry policies, schedules, and testing",
+        "brief": "Build a create workflow whose first two repository attempts fail transiently and third succeeds. Keep one operationId across attempts, bound retries, and verify timing through the installed version's test clock.",
+        "explanation": "A retry reruns a computation after an eligible failure. Choosing the unit being retried determines which side effects repeat. Validation failures should not consume retry attempts, and ambiguous writes require idempotency or reconciliation before replay is safe. A retry schedule controls timing and limits; a test clock makes these behaviors observable without waiting through real delays.",
+        "steps": [
+          "Define command op7 for t1 Read and a repository fixture that fails twice before succeeding. Classify only TransientStorage as retryable and keep validation outside the retried write attempt.",
+          "Choose two retries after the initial attempt, separated by one second. Verify the installed Schedule and TestClock APIs, fork the workflow, and wait until each sleep is registered before advancing virtual time.",
+          "Inspect attempt count, operation IDs, final saved rows, and exit. Repeat with InvalidTitle and with three transient failures so both no-retry and exhausted-budget paths are visible."
+        ],
+        "checks": [
+          "The success fixture makes three total attempts using op7 every time and stores one task under the fixture's idempotency contract.",
+          "InvalidTitle makes zero repository attempts; exhaustion returns the documented storage failure after three attempts.",
+          "Virtual-time evidence shows no attempt before its scheduled delay and requires no real multi-second sleeps."
+        ],
+        "experiment": "Wrap the entire create workflow, including ID allocation and notification, in retry. Observe repeated identities or side effects, then narrow the retried region.",
+        "review": "Teach back initial attempt versus retry count and why transient does not automatically mean replay-safe. Review an agent's unbounded retry proposal against user cancellation and duplicate-write behavior.",
+        "stretch": "Add jitter for production contention while keeping a deterministic schedule in the focused test fixture.",
+        "stage": "Own the outcome",
+        "minutes": 80,
+        "workedExample": "At time 0, attempt 1 with op7 fails. At time 1000, attempt 2 with op7 fails. At time 2000, attempt 3 with op7 succeeds and returns t1. There are two retries but three attempts. The same logical identity lets the adapter recognize repeats; scheduling alone would not prevent duplicate records.",
+        "retrieval": [
+          {
+            "question": "How many attempts follow an initial attempt plus two retries?",
+            "answer": "Three total attempts, assuming no earlier success or nonretryable failure."
+          },
+          {
+            "question": "Why keep the operation ID outside the retried region?",
+            "answer": "It identifies repeated attempts as one logical command for idempotency or reconciliation."
+          }
+        ]
+      }
+    ]
+  },
+  "drills": [
+    {
+      "id": "effect-effect-runtime-lazy-values",
+      "title": "Place changing computations inside the suspended work",
+      "concept": "Eager arguments and repeatable execution",
+      "brief": "Compare constructing an Effect from nextId() with constructing one that calls nextId only when run. Explain why the two descriptions consume IDs at different times.",
+      "explanation": "JavaScript evaluates function arguments before calling the function. An Effect constructor that receives an already computed value cannot defer that computation retroactively. A constructor receiving a thunk can defer the thunk's body, provided the constructor's contract says so. This distinction matters for timestamps, random IDs, logging, and promises just as it does for database writes.",
+      "steps": [
+        "Implement nextId with a visible counter producing t1, t2, and t3. Compare Effect.succeed(nextId()) with the installed version's Effect.sync(() => nextId()) behavior.",
+        "Record the counter immediately after both descriptions are created, then run each description twice and record every returned ID.",
+        "Choose where a create command's stable operationId is captured, keeping that command identity outside a retry loop while deferring the repository attempt itself."
+      ],
+      "checks": [
+        "Constructing the eager-value description consumes one ID before any run.",
+        "Repeated runs of the eager-value description return its already captured ID; repeated runs of the thunk description consume IDs per execution.",
+        "The create command retains one operationId across retries even though the repository attempt runs again."
+      ],
+      "experiment": "Put operationId generation inside the retried effect. Force one transient failure and observe a different identity on the next attempt.",
+      "review": "Teach back why laziness and stable command identity are different design choices. Review an agent's claim that every changing value should automatically be generated inside the retried computation.",
+      "stretch": "Add a supplied clock and compare capturing createdAt once per command with measuring attemptStartedAt separately for each attempt.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "Initially counter is 0. Effect.succeed(nextId()) evaluates nextId immediately, producing t1 and counter 1. Its two executions both return t1. Constructing Effect.sync(() => nextId()) does not increment the counter; its first execution returns t2 and its second t3. Different placement chooses when the changing value is observed.",
+      "retrieval": [
+        {
+          "question": "Why can an Effect description contain an eagerly computed value?",
+          "answer": "Its constructor arguments follow ordinary JavaScript evaluation rules before Effect receives them."
+        },
+        {
+          "question": "Which identity should stay stable across a retried create?",
+          "answer": "The logical operation identity, so repeated attempts can be recognized as the same command."
+        }
+      ],
+      "parentId": "effect-effect-runtime-describe-run"
+    },
+    {
+      "id": "effect-effect-runtime-compose-boundary",
+      "title": "Compose operations before running the runtime",
+      "concept": "Effect composition and application edges",
+      "brief": "Create a rename workflow that reads t1, validates Study, writes the update, and returns the saved task. Keep the whole workflow as one Effect until the UI or command-line boundary.",
+      "explanation": "Composition connects descriptions while preserving their failures and requirements. Running a nested operation prematurely turns it into a promise and can detach it from the surrounding Effect's dependency, interruption, and error structure. A reusable workflow should describe its complete behavior. The application edge supplies services and chooses how to execute and expose the result to a non-Effect caller.",
+      "steps": [
+        "Use the installed version's documented composition style, such as Effect.gen, to sequence read, validation, and update. Inspect the inferred error union and remaining requirements.",
+        "Return the composed description from renameTask. Provide TaskRepository only at a composition boundary and call runPromise from the outer UI or CLI handler.",
+        "Make read return NotFound and prove that validation-dependent update never executes. Then run the valid t1 fixture and inspect the resulting title."
+      ],
+      "checks": [
+        "Building renameTask produces no repository calls.",
+        "A NotFound read prevents update and remains an explicit expected outcome.",
+        "The successful workflow performs read then update and returns Study without intermediate runPromise calls."
+      ],
+      "experiment": "Have an agent implement read by calling runPromise inside the workflow. Trace which requirements and failure details now have to be manually reconstructed at the promise boundary.",
+      "review": "Explain where composition ends and execution begins in this program. Name the concrete reason each runtime call belongs at its chosen boundary.",
+      "stretch": "Expose the same operation through both a CLI and a browser handler while keeping its domain body unchanged.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "The valid trace is describe rename → provide repository → run → read t1 Read → validate Study → update t1 Study → return saved task. In the missing fixture, execution stops after read t9 yields NotFound; updateCount remains 0. The same description structure carries both paths without starting a second independent runtime.",
+      "retrieval": [
+        {
+          "question": "Why return an Effect from a reusable operation?",
+          "answer": "It preserves composability, expected failures, requirements, and lifecycle control until the caller chooses an execution boundary."
+        },
+        {
+          "question": "Does sequential composition run later work after an expected failure?",
+          "answer": "Ordinary fail-fast sequencing stops at the failure unless recovery explicitly resumes the workflow."
+        }
+      ],
+      "parentId": "effect-effect-runtime-describe-run"
+    },
+    {
+      "id": "effect-effect-runtime-promise-adapter",
+      "title": "Translate rejected promises at the repository boundary",
+      "concept": "tryPromise and error mapping",
+      "brief": "Adapt a promise-based save API into the service's Effect contract. Map a simulated quota rejection to StorageUnavailable while preserving enough cause information for diagnosis.",
+      "explanation": "A promise rejection can carry any JavaScript value, so a repository adapter must translate unknown rejection data into its documented error model. The Effect v3 tryPromise constructor is one explicit boundary for this translation; verify the installed major's signature before using it. Keeping the mapping in the adapter lets domain code handle stable failures rather than storage-library-specific objects.",
+      "steps": [
+        "Create a promise save that resolves t1 in one mode, rejects an Error in another, and rejects a plain string in a third. Delay invocation until the Effect runs.",
+        "Use the installed version's failure-aware promise constructor and map unknown rejection values into a tagged storage error with operation context. Avoid assuming every rejection has message.",
+        "Call the domain create operation against all three modes and inspect both the typed result and the adapter's diagnostic cause field."
+      ],
+      "checks": [
+        "The successful promise produces the expected Task through the Effect success channel.",
+        "Both rejection shapes become the documented storage failure without a secondary property-access crash.",
+        "The promise factory is invoked per execution, not eagerly while defining the service."
+      ],
+      "experiment": "Use a constructor intended for a promise that is assumed not to fail, or throw during error mapping. Inspect how the outcome classification changes and why the adapter broke its promise.",
+      "review": "Explain which layer knows storage-specific exceptions. Review an agent mapping that labels every rejection as a retryable network outage without evidence.",
+      "stretch": "Distinguish quota, permission, and transient connectivity only when the adapter can reliably identify those cases.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "The adapter runs save({id:'t1',title:'Read'}) and receives rejection 'disk full'. Because the caught value is unknown, it does not blindly read cause.message. It creates StorageUnavailable with operation create and retains the original cause for diagnostics. Domain handling sees the stable tag, while the original rejection remains available for investigation.",
+      "retrieval": [
+        {
+          "question": "Why treat a promise rejection as unknown?",
+          "answer": "JavaScript permits rejection with arbitrary values, not only Error instances."
+        },
+        {
+          "question": "Where should storage-library exceptions become domain-facing failures?",
+          "answer": "At the adapter boundary that understands those exceptions and owns the translation contract."
+        }
+      ],
+      "parentId": "effect-effect-runtime-failure-channels"
+    },
+    {
+      "id": "effect-effect-runtime-recover-deliberately",
+      "title": "Recover only when the replacement result is honest",
+      "concept": "Targeted recovery and missing-data semantics",
+      "brief": "Implement getTask where NotFound becomes an explicit missing result for the editor, while StorageUnavailable remains a failure. Do not turn every failed read into an empty task.",
+      "explanation": "Recovery replaces a failed computation with another computation. That is a semantic decision about what the caller may now believe. A missing row can legitimately become a missing-state result, but an unavailable repository supplies no evidence that the row is absent. Broad recovery to an empty list or placeholder record converts uncertainty into false data and can lead subsequent CRUD actions to overwrite existing information.",
+      "steps": [
+        "Create repository fixtures for found t1, NotFound t9, and StorageUnavailable. Define the editor read result as Found(task) or Missing(id), with storage failure still in E.",
+        "Use the installed version's tag-specific recovery mechanism to handle only NotFound. Let unrelated expected failures propagate to the boundary.",
+        "Render Missing as a deleted-or-absent record state and StorageUnavailable as a retryable read failure without enabling a misleading recreate action."
+      ],
+      "checks": [
+        "NotFound t9 produces Missing t9 without a fabricated Task.",
+        "StorageUnavailable does not become Missing or an empty successful list.",
+        "Found t1 returns its actual title and revision unchanged."
+      ],
+      "experiment": "Replace targeted recovery with a catch-all returning Missing. Simulate a temporary outage for t1 and observe the false claim that the existing task was deleted.",
+      "review": "Teach back the evidence needed to say missing. Review an agent's fallback for whether it preserves uncertainty or quietly manufactures success.",
+      "stretch": "Allow an explicitly labeled stale cached task during outage and carry freshness information rather than pretending it is a current read.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "Reading t9 returns NotFound, so targeted recovery yields {_tag:'Missing',id:'t9'}. Reading t1 during outage returns StorageUnavailable and remains failed. The editor can offer retry for the latter. The distinction prevents a network problem from becoming evidence that the user should create a replacement record.",
+      "retrieval": [
+        {
+          "question": "What does recovery change beyond control flow?",
+          "answer": "It changes the meaning of the returned outcome and what downstream callers are entitled to assume."
+        },
+        {
+          "question": "Why is an outage not equivalent to an empty result?",
+          "answer": "A failed read provides no evidence about whether matching records exist."
+        }
+      ],
+      "parentId": "effect-effect-runtime-failure-channels"
+    },
+    {
+      "id": "effect-effect-runtime-layer-lifetime",
+      "title": "Share one service instance for one application lifetime",
+      "concept": "Layer construction, sharing, and runtime ownership",
+      "brief": "Use a memory repository whose constructor increments a counter. Ensure create followed by list sees the same store within one application runtime, while a fresh test runtime starts clean.",
+      "explanation": "Dependency injection determines not only which implementation is used but also when it is constructed and how long it lives. Rebuilding an in-memory repository for every request gives each operation a different store. Effect Layer sharing and memoization have defined scope and build semantics that vary with how the graph is assembled; do not assume a declaration becomes a process-wide singleton automatically.",
+      "steps": [
+        "Read the installed version's Layer and runtime lifetime documentation. Build one provided application program that creates t1 and then lists tasks using the same service graph.",
+        "Record constructionCount and the returned IDs. Then build an independent application/test instance and show that it starts with its own empty repository.",
+        "Place long-lived service construction at the chosen app boundary and document where its shutdown occurs rather than rebuilding it inside every domain operation."
+      ],
+      "checks": [
+        "The create-then-list program returns t1 and constructs the intended repository instance once.",
+        "A fresh independent test context begins empty and does not inherit t1.",
+        "The lifetime decision is explicit in composition code rather than relying on a mutable module singleton."
+      ],
+      "experiment": "Provide a newly constructed memory Layer separately around create and list. Observe that the second store may be empty, then restore shared application provision.",
+      "review": "Explain why dependency identity and dependency lifetime are separate concerns. Review an agent's use of repeated Layer factory calls against the installed version's sharing rules.",
+      "stretch": "Use a managed application runtime if supported by the installed version and demonstrate explicit disposal after the app closes.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "Application A builds repository instance A with an empty map. Create stores t1 in A; list reads A and returns [t1]. Application B builds repository instance B and lists []. If each command builds its own new map, create succeeds in one map while list reads another, a lifecycle bug that method signatures alone cannot reveal.",
+      "retrieval": [
+        {
+          "question": "Is a Layer definition automatically a global singleton?",
+          "answer": "No. Instance sharing depends on the construction graph and runtime or scope in which it is built."
+        },
+        {
+          "question": "Why should separate tests often get separate service instances?",
+          "answer": "It prevents state from one test changing another test's starting conditions."
+        }
+      ],
+      "parentId": "effect-effect-runtime-service-layer"
+    },
+    {
+      "id": "effect-effect-runtime-service-agent-check",
+      "title": "Review dependency provision without hiding requirements",
+      "concept": "Agent review of service boundaries",
+      "brief": "Ask an agent to add an audit service to renameTask, then verify that the new requirement appears at the composition root instead of being satisfied by a hidden global.",
+      "explanation": "Requirements make dependencies visible in the operation's type and composition graph. An agent can accidentally defeat this benefit by creating a concrete logger in the domain, using an unchecked cast, or executing a nested runtime with its own environment. A useful review follows the requirement from its first use to the place that supplies it and checks the behavior of both real and test implementations.",
+      "steps": [
+        "Define Audit.append(event) and decide that rename success is reported only after the audit append succeeds in this lab. State that this sequence is not an atomic transaction across stores.",
+        "Update renameTask to require Audit alongside TaskRepository. Provide a recording audit service in the lab and inspect the event after renaming t1 to Study.",
+        "Supply a failing audit service after a successful repository update. Show the documented partial-outcome behavior and avoid claiming the task rename was rolled back."
+      ],
+      "checks": [
+        "The service requirement is visible until the root supplies Audit.",
+        "The recording service receives task ID t1 and the normalized new title Study.",
+        "Audit failure after persistence is reported honestly while a fresh read still shows Study."
+      ],
+      "experiment": "Let the agent catch audit failure and announce that the entire operation failed without clarifying persistence. Use a read-back to reveal the misleading all-or-nothing implication.",
+      "review": "Teach back where the new capability is constructed and what its failure means after a write. Review any as never cast used to hide an unresolved requirement.",
+      "stretch": "Design an outbox-backed audit flow if durable coordinated delivery becomes a real requirement, keeping it separate from this sequential fixture.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "The operation reads t1 Read, writes Study, then appends an audit event. If append fails, the workflow has no successful result, but the earlier write remains Study. Dependency provision lets the fixture expose this exact sequence. It does not add cross-service transaction semantics or automatically compensate the completed write.",
+      "retrieval": [
+        {
+          "question": "What should happen to R when an operation uses a new service?",
+          "answer": "The new requirement remains visible until an enclosing composition boundary supplies it."
+        },
+        {
+          "question": "Does sequential Effect composition make two services transactional?",
+          "answer": "No. Earlier external effects can remain committed when a later step fails."
+        }
+      ],
+      "parentId": "effect-effect-runtime-service-layer"
+    },
+    {
+      "id": "effect-effect-runtime-scope-placement",
+      "title": "Keep a live resource inside the lifetime that owns it",
+      "concept": "Escaping scoped values",
+      "brief": "Build a repository session with an isOpen flag. Demonstrate why returning the session from an already closed local scope leaves the caller holding an unusable capability.",
+      "explanation": "A scope controls when resource cleanup occurs, not when the last JavaScript reference disappears. Returning a resource value does not extend the scope that acquired it. If cleanup runs before a caller uses the value, the reference still exists but its capability is no longer valid. Either keep all use inside the scope or move ownership to a longer-lived application boundary.",
+      "steps": [
+        "Acquire session S1 inside a local scoped program and return it directly. Record close at scope exit, then attempt a read with the returned value.",
+        "Refactor the workflow to perform read and update inside that same scope, returning plain Task data instead of the live session.",
+        "Create a separate application-lifetime example where the service remains open across two commands and closes only when that application's owner shuts down."
+      ],
+      "checks": [
+        "The escaped-session fixture visibly rejects use after close rather than silently succeeding.",
+        "The corrected request-scoped workflow completes its repository work before close and returns ordinary task data.",
+        "The application-lifetime session closes once after its final owned command, not after the first command."
+      ],
+      "experiment": "Have an agent solve the failure by removing the close finalizer. Show that the escaped reference works at the cost of losing explicit resource cleanup.",
+      "review": "Teach back the distinction between a JavaScript object's reachability and a resource's permitted lifetime. Review where the scope should live for each example.",
+      "stretch": "Return a function that requires the live service through R instead of capturing a session whose owner has already ended.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "Local scope acquires S1 with isOpen true. Returning S1 completes the scope, whose finalizer sets isOpen false. The caller still has an object reference, but read(S1) now reports ClosedSession. In the corrected version, read produces {id:'t1',title:'Read'} before finalization; that detached data remains valid after S1 closes.",
+      "retrieval": [
+        {
+          "question": "Does returning a resource extend its scope?",
+          "answer": "No. The scope closes according to its owner, independently of references retained elsewhere."
+        },
+        {
+          "question": "What is safe to return after a repository scope closes?",
+          "answer": "Detached result data whose use no longer depends on the live resource."
+        }
+      ],
+      "parentId": "effect-effect-runtime-resource-scope"
+    },
+    {
+      "id": "effect-effect-runtime-interrupted-cleanup",
+      "title": "Observe finalization before treating cancellation as complete",
+      "concept": "Interruption and finalizer completion",
+      "brief": "Cancel a gated import after its lease is acquired. Keep release itself gated so you can distinguish requesting interruption from observing a fully cleaned-up operation.",
+      "explanation": "Interruption requests that a running computation stop according to its runtime semantics. Cleanup is part of ending a scoped operation and may itself take time. A UI that treats issuing a cancel request as proof that every resource is already released can make an unsupported claim. The owner should observe the appropriate completion or interruption result before asserting that cleanup has finished.",
+      "steps": [
+        "Acquire L1, signal that the import has reached its work gate, and request interruption using the installed version's fiber API.",
+        "Make the release finalizer record release-started and wait on a separate release gate. Inspect the event log before opening that gate.",
+        "Open the release gate, await the appropriate fiber completion, and record release-finished. Keep user-facing states explicit about canceling versus fully stopped."
+      ],
+      "checks": [
+        "Interruption starts finalization after the acquired work is stopped according to the fixture's ownership.",
+        "Before the release gate opens, release-started exists but release-finished does not.",
+        "After observed completion, release-finished appears once and no new import writes begin."
+      ],
+      "experiment": "Display Fully stopped immediately after requesting cancel without observing completion. Hold the release gate and demonstrate the inaccurate status.",
+      "review": "Explain which event proves the lease is released. Review an agent patch that uses fire-and-forget interruption while immediately starting a replacement operation requiring the same exclusive resource.",
+      "stretch": "Set a separate operational policy for slow cleanup and surface diagnostics without claiming an external resource was released when it was not.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "The trace reaches acquire L1 and work-waiting. Cancellation triggers release-started, but the finalizer waits. At this point the operation is canceling and the lease is still owned. Opening the cleanup gate appends release-finished; observing the fiber's completed exit then provides evidence that this scoped fixture has finished cleanup.",
+      "retrieval": [
+        {
+          "question": "Is requesting interruption the same as observing completed cleanup?",
+          "answer": "No. Cleanup can still be running after the request is issued."
+        },
+        {
+          "question": "Why gate the finalizer in this lab?",
+          "answer": "It makes the otherwise brief difference between cancellation request and resource release directly observable."
+        }
+      ],
+      "parentId": "effect-effect-runtime-resource-scope"
+    },
+    {
+      "id": "effect-effect-runtime-cancel-adapter",
+      "title": "Propagate cancellation to the external operation",
+      "concept": "Interruption versus abort-capable I/O",
+      "brief": "Adapt a gated fetch-like request that records whether its AbortSignal is triggered. Cancel the owning Effect and determine whether the underlying request actually stops.",
+      "explanation": "Runtime interruption and external I/O cancellation are related only when the adapter connects them. A promise may continue doing work after its caller stops waiting. An abort-capable API offers a mechanism the adapter can invoke, but even abort does not prove a remote server has rolled back a committed write. The operation must distinguish local waiting, external request lifetime, and persistent outcome.",
+      "steps": [
+        "Use the installed version's documented abort-signal support at the promise boundary. Build a fake request that listens for abort and records request-started, aborted, and request-finished.",
+        "Start the operation, wait for request-started through a gate, then interrupt its owning fiber. Observe the signal and final outcome.",
+        "Repeat with an intentionally non-abortable promise and document the continuing external work rather than asserting that Effect can cancel arbitrary JavaScript activity automatically."
+      ],
+      "checks": [
+        "The abort-capable fixture observes the signal when the owning operation is interrupted.",
+        "The non-abortable fixture demonstrates that stopping the waiter does not necessarily stop the underlying work.",
+        "The UI avoids claiming that canceling a create request guarantees no record was committed remotely."
+      ],
+      "experiment": "Ignore the supplied signal inside the adapter. Cancel the operation and show that the request's own event log continues despite the interrupted caller.",
+      "review": "Teach back all three lifetimes: fiber, network request, and remote mutation. Review an agent's cancellation message for guarantees unsupported by the storage protocol.",
+      "stretch": "Add a read-back or operation-status lookup for an ambiguously completed create, using stable operation identity.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "The request starts for operation op7. Interruption aborts the signal in the cooperative fixture, which records aborted and stops its pending local work. In a second fixture the server has already stored t7 before the response is lost; canceling the client cannot establish absence of t7. Reconciliation must ask about op7's outcome.",
+      "retrieval": [
+        {
+          "question": "Can interruption automatically stop every promise's underlying work?",
+          "answer": "No. The adapter and external API must support and connect a cancellation mechanism."
+        },
+        {
+          "question": "Does aborting a request prove a remote write did not commit?",
+          "answer": "No. The server may have committed before cancellation or response loss became observable."
+        }
+      ],
+      "parentId": "effect-effect-runtime-bounded-work"
+    },
+    {
+      "id": "effect-effect-runtime-race-read",
+      "title": "Race reads without confusing cancellation with rollback",
+      "concept": "Competing computations and result policy",
+      "brief": "Race a primary and replica read for t1 using controlled gates. Decide whether the application wants the first success or simply the first completion, and make the chosen policy explicit.",
+      "explanation": "A race combines competing computations, but the exact winner rule matters when one branch fails early. Effect APIs distinguish race policies, and their names or signatures should be checked for the installed version. Canceling a losing read can reduce wasted work if its adapter cooperates. Racing writes is a different problem because both branches may produce external changes before one is declared the winner.",
+      "steps": [
+        "Consult the installed-version race documentation and choose first-success semantics for this read-only lab. Start a primary failure gate and a replica success gate.",
+        "Fail the primary first while leaving the replica pending, then resolve the replica with t1 revision 3. Record whether the chosen combinator waits for the later success.",
+        "Run a second fixture where both succeed at different times. Observe the losing branch's interruption and adapter cleanup without assuming its network work always stops."
+      ],
+      "checks": [
+        "An early primary failure does not defeat a later replica success under the selected first-success policy.",
+        "The winning result includes its source and revision so freshness remains inspectable.",
+        "Losing work follows the documented ownership behavior, and cleanup observations match the adapter's cancellation capabilities."
+      ],
+      "experiment": "Replace the combinator with first-completion semantics and fail the primary immediately. Show how the same timing now produces failure, then restore the intended policy.",
+      "review": "Teach back why fastest is not necessarily freshest or most authoritative. Review an agent's suggestion to apply the same race to create operations.",
+      "stretch": "Require a minimum revision before accepting a replica result, making the consistency policy explicit rather than equating availability with correctness.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "Primary reports StorageUnavailable at logical time 1; replica returns t1 revision 3 at time 2. Under the chosen first-success policy, the useful result is the replica task. Under first-completion semantics, the earlier failure wins instead. The gates expose a policy difference rather than a performance difference.",
+      "retrieval": [
+        {
+          "question": "Why specify a race's winner rule?",
+          "answer": "First completion and first success behave differently when a branch fails before another succeeds."
+        },
+        {
+          "question": "Why is racing writes riskier than racing reads?",
+          "answer": "Both branches can commit external changes even if only one result is ultimately returned."
+        }
+      ],
+      "parentId": "effect-effect-runtime-bounded-work"
+    },
+    {
+      "id": "effect-effect-runtime-ambiguous-write",
+      "title": "Reconcile a committed write whose response was lost",
+      "concept": "Idempotency and retry scope",
+      "brief": "Simulate a repository that commits op7 and then returns a transient error before delivering the response. Retry using the same operationId and prove that the service returns the original task.",
+      "explanation": "A failed client attempt does not prove that the server performed no mutation. Idempotency records a logical command's identity and result so repeated delivery can return the same outcome instead of performing a second create. The repository must atomically coordinate the idempotency record and mutation for a strong guarantee. An in-memory demonstration teaches the contract but is not evidence that a remote database implements it.",
+      "steps": [
+        "Make the fixture commit t1 for op7, store the operation result, and then simulate response loss. Record both saved rows and the client's observed failure.",
+        "Retry op7 with the identical command payload. Return the recorded t1 result without allocating another task. Reject reuse of op7 with a different title as an identity conflict.",
+        "Inspect the retry wrapper and ensure it encloses only the replay-safe adapter call, leaving notifications and unrelated writes outside."
+      ],
+      "checks": [
+        "After response loss, the repository contains t1 even though the client has not received success.",
+        "Retrying identical op7 returns t1 and the row count remains one.",
+        "Reusing op7 with title Different returns a documented conflict rather than silently returning an unrelated prior success."
+      ],
+      "experiment": "Generate op8 on retry. Observe a second logical create and explain why backoff and a retry limit cannot compensate for the changed identity.",
+      "review": "Teach back the atomic storage requirement behind a production idempotency claim. Review an agent patch that writes the task and idempotency record in unrelated transactions.",
+      "stretch": "Add an operation-status query for clients that prefer reconciliation before automatically replaying an ambiguous write.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "Attempt one executes op7, stores t1 Read, and loses its response. The caller sees TransientStorage while rowCount is already 1. Attempt two sends op7 with Read again; the adapter finds the recorded result and returns t1 without a new insert. Sending op7 with Different fails the payload-consistency rule.",
+      "retrieval": [
+        {
+          "question": "Why can retrying a failed create duplicate a record?",
+          "answer": "The first attempt may have committed before its response was lost."
+        },
+        {
+          "question": "What must an idempotency key identify?",
+          "answer": "One logical command with a consistent payload, not a new random identity for every transport attempt."
+        }
+      ],
+      "parentId": "effect-effect-runtime-retry-evidence"
+    },
+    {
+      "id": "effect-effect-runtime-runtime-teachback",
+      "title": "Deliver a controlled failure walkthrough for the whole runtime",
+      "concept": "Integrated contracts and agent evidence",
+      "brief": "Demonstrate one create operation through validation, service provision, resource acquisition, transient failure, retry, success, and cleanup. Include a separate cancellation run with no unsupported persistence claims.",
+      "explanation": "Runtime reliability comes from several independent contracts working together. Types describe results, expected failures, and requirements; Layers construct capabilities; scopes own cleanup; retries repeat eligible work; adapter protocols determine whether repeated or canceled writes are safe. A clear walkthrough keeps these guarantees separate so a reviewer can see where each claim comes from and where evidence ends.",
+      "steps": [
+        "Use command op7 title ' Read ', fixed ID t1, one scoped lease, and a repository that fails the first eligible attempt then succeeds. Record a structured event log with command identity and attempt number.",
+        "Run with a controlled clock and gates, then produce a trace containing normalized input, provided services, acquisition, both attempts, result, and release. Compare it with the documented ownership policy.",
+        "Run cancellation while a second command is pending. Inspect its fiber exit, finalizer log, external adapter events, and saved rows before writing the user-facing outcome."
+      ],
+      "checks": [
+        "The successful trace contains one logical command, the intended service instance count, two attempts, one saved row, and one lease release.",
+        "The cancellation report distinguishes stopped local work from any uncertain external commit.",
+        "An agent reviewer can locate every runtime execution, provider, retry boundary, and resource owner without hidden global setup."
+      ],
+      "experiment": "Ask an agent to simplify the implementation by nesting runPromise, broadening recovery, and retrying the whole handler. Reject changes whose event trace violates the established ownership or failure contract.",
+      "review": "Teach back the complete trace in ordinary language, naming one guarantee from types, one from runtime composition, and one from the repository protocol. State which production behaviors the fake does not establish.",
+      "stretch": "Replace the fake with a real adapter and retain the contract-level observations, adding integration evidence only for the guarantees that depend on that adapter.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "The trace is decode Read → provide services → acquire L1 → attempt op7/1 fails transiently → scheduled wait → attempt op7/2 returns t1 → release L1 → report success. Release belongs to the scope, retry belongs to the attempt policy, and single-row behavior belongs to the operation-identity contract. None is implied merely by calling runPromise.",
+      "retrieval": [
+        {
+          "question": "Which mechanism guarantees a single persistent row across ambiguous retries?",
+          "answer": "The adapter's idempotency or reconciliation protocol, not the retry scheduler by itself."
+        },
+        {
+          "question": "What should a cancellation report avoid claiming without read-back evidence?",
+          "answer": "That no remote write committed merely because local execution was interrupted."
+        }
+      ],
+      "parentId": "effect-effect-runtime-retry-evidence"
+    }
+  ]
+}

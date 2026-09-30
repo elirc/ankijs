@@ -12,7 +12,14 @@ const report = JSON.parse(
     "utf8",
   ),
 );
-const starterCardCount: number = report.totalCards;
+// Workshop decks ship outside the manifest/content report (runtime-built, 2 cards per unit,
+// one deck per group) — mirror src/data/curriculum.test.ts.
+const workshopUnits = JSON.parse(
+  readFileSync(new URL("../src/data/workshop-units.json", import.meta.url), "utf8"),
+) as { group: string }[];
+const workshopDeckCount = new Set(workshopUnits.map((unit) => unit.group)).size;
+const starterCardCount: number = report.totalCards + workshopUnits.length * 2;
+const starterDeckCount: number = report.decks + workshopDeckCount;
 const manifest = JSON.parse(
   readFileSync(new URL("../src/data/section-expansion-manifest.json", import.meta.url), "utf8"),
 ) as { sections: { track: string; after: number }[] };
@@ -43,7 +50,9 @@ test("CRUD lessons replace puzzle decks and work offline", async ({ page, contex
   await page.getByLabel("Search decks").fill("algorithm");
   await expect(page.locator(".deck-card")).toHaveCount(0);
   await page.getByLabel("Search decks").fill("CRUD");
-  await expect(page.locator(".deck-card")).toHaveCount(3);
+  // v17 "Build real apps" added "24 · SQL for everyday CRUD" alongside the three CRUD lesson decks.
+  await expect(page.locator(".deck-card")).toHaveCount(4);
+  await expect(page.locator(".deck-card", { hasText: "SQL for everyday CRUD" })).toHaveCount(1);
   await page.goto("/study/a0000000-0000-4000-8000-000000005011?minutes=2");
   await page.getByRole("button", { name: "Show answer", exact: true }).click();
   await expect(page.getByText("Explanation 1 of 5")).toBeVisible();
@@ -87,7 +96,8 @@ test("CRUD upgrade preserves personal content and saved review progress", async 
         cards.put({ ...existing, id: "b0000000-0000-4000-8000-000000001004", deck_id: deckId, front: "LeetCode Two Sum" });
         cards.put({ ...existing, id: "10000000-0000-4000-8000-000000000001", deck_id: deckId, front: "My personal API checklist" });
       };
-      tx.objectStore("sync_meta").delete(versionKey);
+      // The install key now carries a suffix (e.g. `_workshop1`); clear every current-version key.
+      tx.objectStore("sync_meta").delete(IDBKeyRange.bound(versionKey, versionKey + "￿"));
       tx.objectStore("sync_meta").put({ key: "starter_curriculum_v5", value: "2026-01-01T00:00:00.000Z" });
       tx.oncomplete = () => { database.close(); resolve(); };
       tx.onabort = () => { database.close(); reject(tx.error); };
@@ -393,7 +403,7 @@ test("preloaded library, review, undo, and saved progress", async ({
     page.getByRole("img", { name: "1 of 20 reviews today" }),
   ).toBeVisible();
   await page.goto("/decks");
-  await expect(page.locator(".deck-card")).toHaveCount(report.decks);
+  await expect(page.locator(".deck-card")).toHaveCount(starterDeckCount);
   await page.getByRole("button", { name: "Backend", exact: true }).click();
   await expect(page.locator(".deck-card")).toHaveCount(
     3 + curriculum.filter((deck) => deck.track === "Backend").length,

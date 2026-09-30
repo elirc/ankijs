@@ -1,0 +1,1244 @@
+[
+  {
+    "id": "effect-drill-reliable-sync-retry-only-transient-failures",
+    "parentId": "effect-sync-retry",
+    "title": "Retry only transient failures",
+    "concept": "Error classification",
+    "brief": "A sync request alternates between validation failure, connection reset, and permission denial.",
+    "explanation": "Retries are justified by failure semantics rather than by any rejected promise.",
+    "steps": [
+      "Create a repeatable fixture: A sync request alternates between validation failure, connection reset, and permission denial. Record the starting rows and relevant UI state before making the change.",
+      "Define typed permanent, transient, and ambiguous-result categories.",
+      "Inject each category and count attempts. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The transient failure follows the bounded retry policy.",
+      "Validation and permission failures stop without repeated requests.",
+      "Recovery evidence: Return a permanent error after two transient failures. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return a permanent error after two transient failures.",
+    "review": "Review the agent's proposed diff: Does retry logic inspect domain variants instead of matching message text?",
+    "stretch": "Add a table documenting retry decisions for every external error category.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-cap-total-retry-duration",
+    "parentId": "effect-sync-retry",
+    "title": "Cap total retry duration",
+    "concept": "Time budgets",
+    "brief": "A request has a five-second timeout and can retry four times with delays.",
+    "explanation": "Attempt limits alone do not establish a useful overall latency bound.",
+    "steps": [
+      "Create a repeatable fixture: A request has a five-second timeout and can retry four times with delays. Record the starting rows and relevant UI state before making the change.",
+      "Define both per-attempt timeout and total operation deadline.",
+      "Use a controlled clock to run repeated slow failures. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The operation stops within its documented total budget.",
+      "Backoff delays cannot extend work indefinitely past the deadline.",
+      "Recovery evidence: Begin the final attempt with less time than its usual timeout. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Begin the final attempt with less time than its usual timeout.",
+    "review": "Review the agent's proposed diff: Does the implementation pass the remaining budget to the attempt?",
+    "stretch": "Expose a user-visible retry action after automatic retries are exhausted.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-jitter-synchronized-clients",
+    "parentId": "effect-sync-retry",
+    "title": "Jitter synchronized clients",
+    "concept": "Retry scheduling",
+    "brief": "One hundred clients reconnect after an outage and receive the same transient error.",
+    "explanation": "Identical backoff schedules can synchronize load spikes across clients.",
+    "steps": [
+      "Create a repeatable fixture: One hundred clients reconnect after an outage and receive the same transient error. Record the starting rows and relevant UI state before making the change.",
+      "Add bounded jitter through an injectable random source.",
+      "Compare scheduled times with a fixed deterministic random sequence. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Retry delays stay within the declared range and attempt budget.",
+      "Clients do not all retry at the exact same instant.",
+      "Recovery evidence: Set random values to their minimum and maximum extremes. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Set random values to their minimum and maximum extremes.",
+    "review": "Review the agent's proposed diff: Does jitter accidentally permit negative or excessive delays?",
+    "stretch": "Simulate a reconnect wave and compare peak request rate before and after jitter.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-respect-server-retry-guidance",
+    "parentId": "effect-sync-retry",
+    "title": "Respect server retry guidance",
+    "concept": "Protocol handling",
+    "brief": "A service returns a retry-after hint longer than the client's usual backoff.",
+    "explanation": "Server guidance needs parsing, caps, and compatibility with the total deadline.",
+    "steps": [
+      "Create a repeatable fixture: A service returns a retry-after hint longer than the client's usual backoff. Record the starting rows and relevant UI state before making the change.",
+      "Interpret supported hint forms and clamp them to the documented policy.",
+      "Test valid, malformed, past, and excessive retry hints. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Accepted hints influence scheduling within the total budget.",
+      "Malformed headers never create NaN timers or immediate tight loops.",
+      "Recovery evidence: Return a hint beyond the remaining operation deadline. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return a hint beyond the remaining operation deadline.",
+    "review": "Review the agent's proposed diff: Does the user receive an understandable deferred or exhausted state?",
+    "stretch": "Persist a next-eligible-at time when background work must survive restart.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-keep-timeout-outcomes-honest",
+    "parentId": "effect-sync-retry",
+    "title": "Keep timeout outcomes honest",
+    "concept": "Ambiguous writes",
+    "brief": "A create request times out after the server has already committed the row.",
+    "explanation": "Timeout proves lack of a timely response, not absence of a durable side effect.",
+    "steps": [
+      "Create a repeatable fixture: A create request times out after the server has already committed the row. Record the starting rows and relevant UI state before making the change.",
+      "Use stable command identity and reconciliation for uncertain write outcomes.",
+      "Commit remotely, drop the response, then retry. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The server retains one row for the original command.",
+      "The client never blindly creates a new identity after timeout.",
+      "Recovery evidence: Reconnect after reloading the application. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reconnect after reloading the application.",
+    "review": "Review the agent's proposed diff: Does the operation distinguish retrying delivery from issuing a new user command?",
+    "stretch": "Add a status endpoint keyed by command identity.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-stop-retries-on-cancellation",
+    "parentId": "effect-sync-retry",
+    "title": "Stop retries on cancellation",
+    "concept": "Interruption",
+    "brief": "Cancel sync while the worker is waiting between attempts.",
+    "explanation": "Cancellation should prevent future attempts and release owned timers.",
+    "steps": [
+      "Create a repeatable fixture: Cancel sync while the worker is waiting between attempts. Record the starting rows and relevant UI state before making the change.",
+      "Tie retry scheduling to the worker's interruption scope.",
+      "Cancel during request, delay, and final result handling. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "No new attempt starts after cancellation settles.",
+      "Timers and listeners do not survive the canceled worker.",
+      "Recovery evidence: Cancel at the exact boundary when the next attempt becomes eligible. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Cancel at the exact boundary when the next attempt becomes eligible.",
+    "review": "Review the agent's proposed diff: Can a queued callback start work after scope disposal?",
+    "stretch": "Add deterministic tests using a controlled clock rather than real sleeps.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-preserve-the-original-cause",
+    "parentId": "effect-sync-retry",
+    "title": "Preserve the original cause",
+    "concept": "Diagnostic errors",
+    "brief": "Three connection failures exhaust the retry schedule with different low-level causes.",
+    "explanation": "A final error should retain enough cause history to explain exhaustion safely.",
+    "steps": [
+      "Create a repeatable fixture: Three connection failures exhaust the retry schedule with different low-level causes. Record the starting rows and relevant UI state before making the change.",
+      "Record attempt count, categories, and sanitized final cause.",
+      "Inspect the final typed failure and user-facing message. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Diagnostics identify the retry budget and relevant cause.",
+      "The user message contains no raw credential-bearing request data.",
+      "Recovery evidence: Make the final failure differ from the first two. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Make the final failure differ from the first two.",
+    "review": "Review the agent's proposed diff: Does wrapping replace every useful cause with a generic timeout string?",
+    "stretch": "Attach a correlation ID linking operation history across attempts.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-avoid-nested-retry-multiplication",
+    "parentId": "effect-sync-retry",
+    "title": "Avoid nested retry multiplication",
+    "concept": "Composition",
+    "brief": "The HTTP adapter retries three times and the sync operation also retries three times.",
+    "explanation": "Layered retries can multiply attempts and exceed the intended latency budget.",
+    "steps": [
+      "Create a repeatable fixture: The HTTP adapter retries three times and the sync operation also retries three times. Record the starting rows and relevant UI state before making the change.",
+      "Choose one retry owner or explicitly divide budgets across layers.",
+      "Count actual network calls under persistent transient failure. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Observed attempts match the documented overall limit.",
+      "Three-by-three hidden retry multiplication cannot occur.",
+      "Recovery evidence: Add a timeout wrapper around both layers and inspect cancellation. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add a timeout wrapper around both layers and inspect cancellation.",
+    "review": "Review the agent's proposed diff: Does each abstraction document whether it retries internally?",
+    "stretch": "Expose attempt metadata so higher layers can enforce an end-to-end budget.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-test-retry-schedules-deterministically",
+    "parentId": "effect-sync-retry",
+    "title": "Test retry schedules deterministically",
+    "concept": "Effect testing",
+    "brief": "A flaky test waits real seconds for a backoff schedule to complete.",
+    "explanation": "Time-dependent behavior should be verified through controllable time and dependencies.",
+    "steps": [
+      "Create a repeatable fixture: A flaky test waits real seconds for a backoff schedule to complete. Record the starting rows and relevant UI state before making the change.",
+      "Inject or provide the test clock and deterministic failure sequence.",
+      "Advance through each scheduled boundary and count requests. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "No request starts before its scheduled eligibility.",
+      "The final result appears at the expected controlled time.",
+      "Recovery evidence: Advance past several deadlines in one jump. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Advance past several deadlines in one jump.",
+    "review": "Review the agent's proposed diff: Does the test assert schedule semantics rather than implementation timer calls?",
+    "stretch": "Add property checks for monotonic bounded next-attempt times.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-commit-intent-with-local-mutation",
+    "parentId": "effect-sync-outbox",
+    "title": "Commit intent with local mutation",
+    "concept": "Transactional outbox",
+    "brief": "Edit a project locally while network delivery is unavailable.",
+    "explanation": "The local change and its delivery intent must become durable together.",
+    "steps": [
+      "Create a repeatable fixture: Edit a project locally while network delivery is unavailable. Record the starting rows and relevant UI state before making the change.",
+      "Write the project update and outbox entry in one transaction.",
+      "Fail each write position independently and inspect both tables. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Successful local edits have exactly one corresponding delivery intent.",
+      "No unsent local mutation exists without an outbox record.",
+      "Recovery evidence: Crash immediately after the transaction commits. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Crash immediately after the transaction commits.",
+    "review": "Review the agent's proposed diff: Does the worker discover committed intent without relying on an in-memory event?",
+    "stretch": "Add a startup drain that scans durable pending entries.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-deduplicate-remote-delivery",
+    "parentId": "effect-sync-outbox",
+    "title": "Deduplicate remote delivery",
+    "concept": "Idempotency",
+    "brief": "Deliver one outbox command twice after losing the first successful response.",
+    "explanation": "At-least-once delivery requires an idempotent receiver for one logical command.",
+    "steps": [
+      "Create a repeatable fixture: Deliver one outbox command twice after losing the first successful response. Record the starting rows and relevant UI state before making the change.",
+      "Send a stable operation ID and persist the server's receipt atomically with mutation.",
+      "Replay the command with the same identity. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Remote state changes once and returns a consistent receipt.",
+      "Duplicate delivery cannot increment revision or counters twice.",
+      "Recovery evidence: Reuse the identity with different payload content. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reuse the identity with different payload content.",
+    "review": "Review the agent's proposed diff: Does the receiver reject inconsistent reuse rather than accepting changed intent?",
+    "stretch": "Store a payload digest with the idempotency receipt.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-delete-only-acknowledged-entries",
+    "parentId": "effect-sync-outbox",
+    "title": "Delete only acknowledged entries",
+    "concept": "Acknowledgment boundaries",
+    "brief": "The server accepts a command but the client crashes before processing its acknowledgment.",
+    "explanation": "An outbox entry remains pending until acknowledgment is durably recorded.",
+    "steps": [
+      "Create a repeatable fixture: The server accepts a command but the client crashes before processing its acknowledgment. Record the starting rows and relevant UI state before making the change.",
+      "Apply the receipt and remove or mark the entry in one local transaction.",
+      "Crash before and after the local acknowledgment transaction. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Restart safely redelivers or recognizes the acknowledged command.",
+      "Pending intent is never deleted merely because a request was sent.",
+      "Recovery evidence: Return a malformed acknowledgment after remote success. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return a malformed acknowledgment after remote success.",
+    "review": "Review the agent's proposed diff: Does receipt validation happen before local queue cleanup?",
+    "stretch": "Keep a bounded archive of acknowledged receipts for diagnostics.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-preserve-per-entity-order",
+    "parentId": "effect-sync-outbox",
+    "title": "Preserve per-entity order",
+    "concept": "Causal delivery",
+    "brief": "Queue create, rename, and archive for the same project while offline.",
+    "explanation": "Dependent commands must reach the receiver in an order compatible with their assumptions.",
+    "steps": [
+      "Create a repeatable fixture: Queue create, rename, and archive for the same project while offline. Record the starting rows and relevant UI state before making the change.",
+      "Track entity sequence or dependencies and block later commands until predecessors settle.",
+      "Make rename's network response faster than create's response. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The server observes the intended project lifecycle.",
+      "Archive cannot overtake an uncommitted create for the same entity.",
+      "Recovery evidence: Fail the first command permanently. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Fail the first command permanently.",
+    "review": "Review the agent's proposed diff: Does the queue mark dependent commands blocked instead of retrying them blindly?",
+    "stretch": "Allow unrelated entities to progress concurrently despite one blocked chain.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-handle-poison-entries-visibly",
+    "parentId": "effect-sync-outbox",
+    "title": "Handle poison entries visibly",
+    "concept": "Dead-letter workflow",
+    "brief": "One outbox command has an invalid field and fails every delivery attempt.",
+    "explanation": "Permanent failure must leave a visible repairable record without blocking unrelated work forever.",
+    "steps": [
+      "Create a repeatable fixture: One outbox command has an invalid field and fails every delivery attempt. Record the starting rows and relevant UI state before making the change.",
+      "Classify the entry as failed with safe reason and explicit repair actions.",
+      "Queue valid commands before and after the invalid entry. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Valid independent commands still synchronize.",
+      "The poison entry never disappears or retries in a tight loop.",
+      "Recovery evidence: Edit the underlying entity after the entry becomes failed. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Edit the underlying entity after the entry becomes failed.",
+    "review": "Review the agent's proposed diff: Does repair create new intent rather than mutating historical command identity?",
+    "stretch": "Add exportable diagnostics and an explicit abandon action with consequences explained.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-coalesce-only-compatible-edits",
+    "parentId": "effect-sync-outbox",
+    "title": "Coalesce only compatible edits",
+    "concept": "Queue optimization",
+    "brief": "Offline edits change a project's goal three times before any delivery begins.",
+    "explanation": "Coalescing is safe only when intermediate commands carry no required independent semantics.",
+    "steps": [
+      "Create a repeatable fixture: Offline edits change a project's goal three times before any delivery begins. Record the starting rows and relevant UI state before making the change.",
+      "Define eligible patch coalescing and preserve the earliest base revision.",
+      "Compare final state with sequential execution of the original commands. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The coalesced command produces the same allowed final domain state.",
+      "Create, archive, audit, or dependent operations are not collapsed indiscriminately.",
+      "Recovery evidence: Insert a command from another workflow between the edits. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Insert a command from another workflow between the edits.",
+    "review": "Review the agent's proposed diff: Does optimization preserve causality and idempotency receipts?",
+    "stretch": "Measure queue reduction while retaining an explanation of coalesced user actions.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-survive-browser-restart",
+    "parentId": "effect-sync-outbox",
+    "title": "Survive browser restart",
+    "concept": "Durable queue",
+    "brief": "Create three offline changes, close the browser, and reopen with connectivity restored.",
+    "explanation": "Queue durability must not depend on component memory or an open tab.",
+    "steps": [
+      "Create a repeatable fixture: Create three offline changes, close the browser, and reopen with connectivity restored. Record the starting rows and relevant UI state before making the change.",
+      "Load pending entries from storage during worker startup.",
+      "Restart using the same persisted fixture and inspect delivered identities. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "All three commands remain available and deliver once logically.",
+      "No command is regenerated with a new identity on startup.",
+      "Recovery evidence: Crash after delivering the first command but before local acknowledgment. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Crash after delivering the first command but before local acknowledgment.",
+    "review": "Review the agent's proposed diff: Does startup reconcile in-flight entries left by the prior process?",
+    "stretch": "Add durable attempt metadata without treating old in-flight flags as permanent locks.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-keep-payload-versions-explicit",
+    "parentId": "effect-sync-outbox",
+    "title": "Keep payload versions explicit",
+    "concept": "Command contracts",
+    "brief": "An older queued command remains on disk when a new app version changes the update schema.",
+    "explanation": "Outbox payloads are durable contracts that may outlive the code that created them.",
+    "steps": [
+      "Create a repeatable fixture: An older queued command remains on disk when a new app version changes the update schema. Record the starting rows and relevant UI state before making the change.",
+      "Store a payload version and route old commands through supported adapters.",
+      "Upgrade with pending old-version entries and drain them. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Supported old commands retain their original meaning.",
+      "Unknown command versions are quarantined instead of guessed.",
+      "Recovery evidence: Introduce a renamed field in the new command decoder. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Introduce a renamed field in the new command decoder.",
+    "review": "Review the agent's proposed diff: Does the migration preserve operation IDs while adapting payload shape?",
+    "stretch": "Add historical outbox fixtures to release compatibility checks.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-separate-discard-from-undo",
+    "parentId": "effect-sync-outbox",
+    "title": "Separate discard from undo",
+    "concept": "User intent",
+    "brief": "A user discards a queued archive command after it may have reached the server.",
+    "explanation": "Removing local intent cannot guarantee reversal of an already accepted remote mutation.",
+    "steps": [
+      "Create a repeatable fixture: A user discards a queued archive command after it may have reached the server. Record the starting rows and relevant UI state before making the change.",
+      "Define pending, in-flight, acknowledged, and uncertain discard behavior.",
+      "Attempt discard in each delivery state. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The UI accurately explains whether cancellation is still possible.",
+      "Discard never claims the server action was undone without evidence.",
+      "Recovery evidence: Lose the response during an in-flight discard attempt. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Lose the response during an in-flight discard attempt.",
+    "review": "Review the agent's proposed diff: Does undo issue a new compensating command with fresh preconditions?",
+    "stretch": "Offer reconciliation before permitting a compensation based on uncertain remote state.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-reliable-sync-own-one-worker-per-scope",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Own one worker per scope",
+    "concept": "Resource lifetime",
+    "brief": "Navigate into and out of the app shell repeatedly while sync is enabled.",
+    "explanation": "A worker needs a clear owner so navigation does not duplicate background loops.",
+    "steps": [
+      "Create a repeatable fixture: Navigate into and out of the app shell repeatedly while sync is enabled. Record the starting rows and relevant UI state before making the change.",
+      "Create the worker in one managed scope and dispose it on owner shutdown.",
+      "Count workers and network polls across repeated mount cycles. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Exactly the intended number of workers remains active.",
+      "Old loops do not survive scope disposal.",
+      "Recovery evidence: Trigger a setup error after registering one listener. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Trigger a setup error after registering one listener.",
+    "review": "Review the agent's proposed diff: Does partial initialization still release already acquired resources?",
+    "stretch": "Expose a development-only active-worker counter.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-release-connectivity-listeners",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Release connectivity listeners",
+    "concept": "Cleanup",
+    "brief": "Register online and offline listeners whenever a sync panel opens.",
+    "explanation": "Listener accumulation can trigger duplicate drains and retain stale state.",
+    "steps": [
+      "Create a repeatable fixture: Register online and offline listeners whenever a sync panel opens. Record the starting rows and relevant UI state before making the change.",
+      "Install listeners once per owning scope and remove the exact handlers on cleanup.",
+      "Open the panel ten times, then fire one connectivity event. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "One event produces one intended wake-up.",
+      "Unmounted panels receive no state updates.",
+      "Recovery evidence: Fire an event during cleanup. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Fire an event during cleanup.",
+    "review": "Review the agent's proposed diff: Does the handler close over obsolete credentials or configuration?",
+    "stretch": "Use a narrow service for connectivity state with a tested lifecycle.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-observe-background-failures",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Observe background failures",
+    "concept": "Error supervision",
+    "brief": "A background sync fiber fails while no sync screen is visible.",
+    "explanation": "Background failure must be observed and translated into recoverable status.",
+    "steps": [
+      "Create a repeatable fixture: A background sync fiber fails while no sync screen is visible. Record the starting rows and relevant UI state before making the change.",
+      "Supervise the worker and publish typed terminal state to diagnostics.",
+      "Inject a defect and an expected delivery failure separately. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Expected failures remain actionable and supervised.",
+      "No unhandled rejection silently stops synchronization.",
+      "Recovery evidence: Navigate away before the failure arrives. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Navigate away before the failure arrives.",
+    "review": "Review the agent's proposed diff: Does observation belong to the worker owner rather than one transient screen?",
+    "stretch": "Add a restart policy only for failure classes safe to restart.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-stop-work-on-account-switch",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Stop work on account switch",
+    "concept": "Principal lifetime",
+    "brief": "Switch from Alice to Bob while Alice's outbox delivery is in flight.",
+    "explanation": "Background work and cached credentials must remain bound to their original principal.",
+    "steps": [
+      "Create a repeatable fixture: Switch from Alice to Bob while Alice's outbox delivery is in flight. Record the starting rows and relevant UI state before making the change.",
+      "Scope workers by account and prevent old callbacks from mutating the new account view.",
+      "Switch accounts during request and acknowledgment handling. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Bob's screen contains only Bob's sync state.",
+      "Alice's response never writes into Bob's local namespace.",
+      "Recovery evidence: Switch back to Alice and inspect pending intent. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Switch back to Alice and inspect pending intent.",
+    "review": "Review the agent's proposed diff: Does cancellation preserve unresolved durable work for later reconciliation?",
+    "stretch": "Add account-specific queue partitions and status summaries.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-bound-diagnostic-history",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Bound diagnostic history",
+    "concept": "Observability",
+    "brief": "A worker retries for several days while recording every attempt in memory.",
+    "explanation": "Diagnostics should remain useful without becoming an unbounded memory sink.",
+    "steps": [
+      "Create a repeatable fixture: A worker retries for several days while recording every attempt in memory. Record the starting rows and relevant UI state before making the change.",
+      "Keep bounded recent events and aggregate counters for older attempts.",
+      "Generate thousands of failures and inspect retained entries. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "History stays within its configured capacity.",
+      "Current failure context and aggregate counts remain available.",
+      "Recovery evidence: Clear diagnostics while a new attempt finishes. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Clear diagnostics while a new attempt finishes.",
+    "review": "Review the agent's proposed diff: Does history retention delete durable business receipts by accident?",
+    "stretch": "Export a redacted diagnostic snapshot before clearing local display history.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-distinguish-paused-from-failed",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Distinguish paused from failed",
+    "concept": "Worker state machine",
+    "brief": "The user pauses sync while the network is offline and a retry is scheduled.",
+    "explanation": "Paused, offline, retrying, and failed states represent different causes and recovery actions.",
+    "steps": [
+      "Create a repeatable fixture: The user pauses sync while the network is offline and a retry is scheduled. Record the starting rows and relevant UI state before making the change.",
+      "Model state transitions explicitly and render the relevant next action.",
+      "Exercise pause, reconnect, resume, and permanent failure sequences. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Resume restarts eligible work under the documented policy.",
+      "Reconnect alone does not override an explicit user pause.",
+      "Recovery evidence: Pause at the instant a scheduled retry starts. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Pause at the instant a scheduled retry starts.",
+    "review": "Review the agent's proposed diff: Does state priority preserve user intent during concurrent events?",
+    "stretch": "Add a transition table and test every allowed state edge.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-redact-diagnostic-requests",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Redact diagnostic requests",
+    "concept": "Safe telemetry",
+    "brief": "A failed sync request includes authorization headers and private project text.",
+    "explanation": "Useful diagnostics need categories and correlation without copying secrets.",
+    "steps": [
+      "Create a repeatable fixture: A failed sync request includes authorization headers and private project text. Record the starting rows and relevant UI state before making the change.",
+      "Select safe metadata fields instead of serializing the entire request object.",
+      "Capture diagnostics for success, retry, and terminal failure. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Logs identify operation and timing without private payload bodies.",
+      "No token or full authorization header is emitted.",
+      "Recovery evidence: Throw an error object that embeds the original request. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Throw an error object that embeds the original request.",
+    "review": "Review the agent's proposed diff: Does error-cause serialization apply the same redaction rules?",
+    "stretch": "Add a fixture-secret scan to diagnostic tests.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-avoid-busy-polling-when-idle",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Avoid busy polling when idle",
+    "concept": "Scheduling efficiency",
+    "brief": "An empty outbox leaves a worker polling storage every fifty milliseconds.",
+    "explanation": "Idle scheduling should minimize unnecessary CPU and storage work.",
+    "steps": [
+      "Create a repeatable fixture: An empty outbox leaves a worker polling storage every fifty milliseconds. Record the starting rows and relevant UI state before making the change.",
+      "Wake on durable queue changes and use a conservative fallback check.",
+      "Measure storage reads during an idle minute and after one new command. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "New work starts promptly through the wake-up path.",
+      "Idle work stays within the documented low-frequency budget.",
+      "Recovery evidence: Drop one wake-up notification and verify eventual fallback discovery. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Drop one wake-up notification and verify eventual fallback discovery.",
+    "review": "Review the agent's proposed diff: Does optimization retain correctness when notifications are missed?",
+    "stretch": "Adapt polling intervals to visibility and connectivity without losing durable intent.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-make-shutdown-observable",
+    "parentId": "effect-sync-lifecycle",
+    "title": "Make shutdown observable",
+    "concept": "Graceful termination",
+    "brief": "Close the feature scope while one request is finishing and another is queued.",
+    "explanation": "Shutdown should stop new scheduling and settle owned cleanup predictably.",
+    "steps": [
+      "Create a repeatable fixture: Close the feature scope while one request is finishing and another is queued. Record the starting rows and relevant UI state before making the change.",
+      "Expose a stopping state and await the worker's cleanup boundary.",
+      "Begin shutdown during request, backoff, and queue-idle states. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "No new command starts after stopping begins.",
+      "Unacknowledged durable entries remain available for the next worker.",
+      "Recovery evidence: Make network cancellation reject during cleanup. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Make network cancellation reject during cleanup.",
+    "review": "Review the agent's proposed diff: Does cleanup failure obscure the original operation outcome?",
+    "stretch": "Record a safe shutdown reason and unresolved-entry count for diagnostics.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-key-cache-by-principal",
+    "parentId": "effect-sync-cache",
+    "title": "Key cache by principal",
+    "concept": "Cache isolation",
+    "brief": "Alice and Bob both request project ID p-1 in separately scoped accounts.",
+    "explanation": "A cache key must include every dimension that changes authorized results.",
+    "steps": [
+      "Create a repeatable fixture: Alice and Bob both request project ID p-1 in separately scoped accounts. Record the starting rows and relevant UI state before making the change.",
+      "Include principal or tenant scope and relevant query parameters in cache identity.",
+      "Switch accounts while a cached detail response exists. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Bob receives only his authorized result.",
+      "Alice's private project never appears through a reused key.",
+      "Recovery evidence: Resolve Alice's delayed request after Bob signs in. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Resolve Alice's delayed request after Bob signs in.",
+    "review": "Review the agent's proposed diff: Does response publication verify the active request scope as well as its key?",
+    "stretch": "Clear or partition caches explicitly when authentication changes.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-ignore-obsolete-search-responses",
+    "parentId": "effect-sync-cache",
+    "title": "Ignore obsolete search responses",
+    "concept": "Request ordering",
+    "brief": "Search for alpha, then beta, while alpha's request resolves last.",
+    "explanation": "Latest user intent must determine displayed search results.",
+    "steps": [
+      "Create a repeatable fixture: Search for alpha, then beta, while alpha's request resolves last. Record the starting rows and relevant UI state before making the change.",
+      "Associate results with query identity and discard superseded completions.",
+      "Resolve the two requests in reverse order. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The list continues showing beta results.",
+      "Alpha's late response never replaces the current query state.",
+      "Recovery evidence: Reject alpha after beta succeeds. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reject alpha after beta succeeds.",
+    "review": "Review the agent's proposed diff: Does an obsolete error also get prevented from replacing current success?",
+    "stretch": "Keep per-query cached results without confusing them with the active view.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-invalidate-exact-affected-queries",
+    "parentId": "effect-sync-cache",
+    "title": "Invalidate exact affected queries",
+    "concept": "Mutation effects",
+    "brief": "Rename a project that appears in detail, search, and archived-list caches.",
+    "explanation": "Mutation invalidation should update every affected projection without clearing unrelated data unnecessarily.",
+    "steps": [
+      "Create a repeatable fixture: Rename a project that appears in detail, search, and archived-list caches. Record the starting rows and relevant UI state before making the change.",
+      "Map changed fields to cache keys or use a documented broad invalidation policy.",
+      "Rename across a search-match boundary and inspect all views. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every relevant view converges to the accepted name.",
+      "Unrelated project drafts and caches remain usable.",
+      "Recovery evidence: Fail the refresh after invalidation. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Fail the refresh after invalidation.",
+    "review": "Review the agent's proposed diff: Does the interface distinguish stale confirmed data from absent data?",
+    "stretch": "Measure invalidation breadth before optimizing it with entity-based indexing.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-roll-back-optimistic-patches-conditionally",
+    "parentId": "effect-sync-cache",
+    "title": "Roll back optimistic patches conditionally",
+    "concept": "Optimistic UI",
+    "brief": "Optimistically rename a project, then accept a newer rename before the first request fails.",
+    "explanation": "Rollback must not overwrite a later successful change.",
+    "steps": [
+      "Create a repeatable fixture: Optimistically rename a project, then accept a newer rename before the first request fails. Record the starting rows and relevant UI state before making the change.",
+      "Associate optimistic patches with operation IDs and rebase or remove only the failed patch.",
+      "Resolve success for the second rename before failure for the first. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The final displayed and stored name is the second accepted value.",
+      "The first rollback cannot restore an obsolete original snapshot.",
+      "Recovery evidence: Fail both requests in reverse order. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Fail both requests in reverse order.",
+    "review": "Review the agent's proposed diff: Does the patch model compose operations instead of copying whole objects?",
+    "stretch": "Add a visible pending-changes list for multiple outstanding edits.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-set-freshness-by-data-meaning",
+    "parentId": "effect-sync-cache",
+    "title": "Set freshness by data meaning",
+    "concept": "Cache policy",
+    "brief": "Cache a rarely changing project label and a rapidly changing permission result.",
+    "explanation": "Different data have different acceptable staleness and invalidation triggers.",
+    "steps": [
+      "Create a repeatable fixture: Cache a rarely changing project label and a rapidly changing permission result. Record the starting rows and relevant UI state before making the change.",
+      "Define freshness policies for descriptive data and authorization-sensitive state.",
+      "Expire each fixture independently under a controlled clock. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The UI refreshes according to the declared policy.",
+      "A cached permission never authorizes a backend mutation.",
+      "Recovery evidence: Revoke membership while a descriptive cache remains fresh. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Revoke membership while a descriptive cache remains fresh.",
+    "review": "Review the agent's proposed diff: Does the product communicate stale display data without implying stale write authority?",
+    "stretch": "Document maximum visible staleness for each important projection.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-deduplicate-concurrent-reads",
+    "parentId": "effect-sync-cache",
+    "title": "Deduplicate concurrent reads",
+    "concept": "Shared requests",
+    "brief": "Three mounted components request the same project detail simultaneously.",
+    "explanation": "Equivalent reads may share work while retaining independent subscriber lifetimes.",
+    "steps": [
+      "Create a repeatable fixture: Three mounted components request the same project detail simultaneously. Record the starting rows and relevant UI state before making the change.",
+      "Track an in-flight read by full cache key and share its result.",
+      "Mount three subscribers and count network requests. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "One request supplies all matching subscribers.",
+      "Canceling one subscriber does not incorrectly cancel work needed by others.",
+      "Recovery evidence: Unmount every subscriber before the request finishes. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Unmount every subscriber before the request finishes.",
+    "review": "Review the agent's proposed diff: Does resource ownership define when the shared request can be interrupted?",
+    "stretch": "Add a short deduplication window without extending data freshness implicitly.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-cache-failures-deliberately",
+    "parentId": "effect-sync-cache",
+    "title": "Cache failures deliberately",
+    "concept": "Error caching",
+    "brief": "A project read fails once with permission denial and once with a transient timeout.",
+    "explanation": "Error caching needs category-specific policy and invalidation after context changes.",
+    "steps": [
+      "Create a repeatable fixture: A project read fails once with permission denial and once with a transient timeout. Record the starting rows and relevant UI state before making the change.",
+      "Separate cached data, transient error status, and permanent access outcomes.",
+      "Retry after connectivity recovery and after membership grant. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Recovery can replace the prior failure with valid data.",
+      "A timeout is not cached forever as a missing project.",
+      "Recovery evidence: Change accounts while a denial is cached. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change accounts while a denial is cached.",
+    "review": "Review the agent's proposed diff: Does the cache key and invalidation include authorization context?",
+    "stretch": "Expose an explicit refresh action that respects request deduplication.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-bound-cache-growth",
+    "parentId": "effect-sync-cache",
+    "title": "Bound cache growth",
+    "concept": "Memory policy",
+    "brief": "Visit ten thousand distinct project-search queries during a long session.",
+    "explanation": "Cache retention must be bounded independently of query diversity.",
+    "steps": [
+      "Create a repeatable fixture: Visit ten thousand distinct project-search queries during a long session. Record the starting rows and relevant UI state before making the change.",
+      "Use a documented eviction policy with size or entry limits.",
+      "Populate beyond capacity and inspect retained keys and active subscribers. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Inactive entries are evicted within the configured bound.",
+      "Active subscribed data is not unpredictably removed midinteraction.",
+      "Recovery evidence: Revisit an evicted query and verify a fresh read. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Revisit an evicted query and verify a fresh read.",
+    "review": "Review the agent's proposed diff: Does eviction dispose timers and references associated with removed entries?",
+    "stretch": "Measure retained bytes rather than relying only on entry count.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-keep-offline-freshness-visible",
+    "parentId": "effect-sync-cache",
+    "title": "Keep offline freshness visible",
+    "concept": "Offline UX",
+    "brief": "Open a cached project while offline after it was last confirmed two days ago.",
+    "explanation": "Offline availability should preserve useful data while exposing its age and write limitations.",
+    "steps": [
+      "Create a repeatable fixture: Open a cached project while offline after it was last confirmed two days ago. Record the starting rows and relevant UI state before making the change.",
+      "Display last-confirmed time and queue allowed edits explicitly.",
+      "Read, edit, and reconnect using the stale fixture. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Cached data remains usable with a clear freshness indicator.",
+      "The screen never labels old cached data as newly synchronized.",
+      "Recovery evidence: Receive a conflicting server revision on reconnect. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Receive a conflicting server revision on reconnect.",
+    "review": "Review the agent's proposed diff: Does the recovery flow keep the local draft separate from the stale base?",
+    "stretch": "Offer a comparison view before applying queued changes to newer remote state.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-reliable-sync-bound-active-deliveries",
+    "parentId": "effect-sync-concurrency",
+    "title": "Bound active deliveries",
+    "concept": "Concurrency control",
+    "brief": "Drain forty independent outbox entries with a configured concurrency of three.",
+    "explanation": "The worker must bound actual in-flight deliveries across success and failure paths.",
+    "steps": [
+      "Create a repeatable fixture: Drain forty independent outbox entries with a configured concurrency of three. Record the starting rows and relevant UI state before making the change.",
+      "Use a shared permit or worker-pool boundary around each complete attempt.",
+      "Track active requests while varying response durations. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The high-water mark never exceeds three.",
+      "Retries do not bypass the same concurrency boundary.",
+      "Recovery evidence: Interrupt one active request while others are queued. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Interrupt one active request while others are queued.",
+    "review": "Review the agent's proposed diff: Are permits released on every exit path?",
+    "stretch": "Measure throughput and latency before increasing the concurrency limit.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-keep-entity-lanes-ordered",
+    "parentId": "effect-sync-concurrency",
+    "title": "Keep entity lanes ordered",
+    "concept": "Per-key scheduling",
+    "brief": "Queue five updates for Alpha and five updates for Beta.",
+    "explanation": "Parallelism may span entities while each entity preserves command order.",
+    "steps": [
+      "Create a repeatable fixture: Queue five updates for Alpha and five updates for Beta. Record the starting rows and relevant UI state before making the change.",
+      "Schedule independent entity lanes with one active command per lane.",
+      "Delay Alpha's first command while Beta progresses. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Beta can complete without waiting for Alpha.",
+      "Alpha's later commands cannot overtake its first command.",
+      "Recovery evidence: Permanently fail Alpha's first entry. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Permanently fail Alpha's first entry.",
+    "review": "Review the agent's proposed diff: Does lane blocking expose the dependent backlog clearly?",
+    "stretch": "Add a repair action that intentionally rebases or abandons a blocked lane.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-claim-work-across-tabs",
+    "parentId": "effect-sync-concurrency",
+    "title": "Claim work across tabs",
+    "concept": "Distributed local workers",
+    "brief": "Two browser tabs wake and scan the same pending outbox entries.",
+    "explanation": "Multiple workers need an atomic claim protocol or a single-owner strategy.",
+    "steps": [
+      "Create a repeatable fixture: Two browser tabs wake and scan the same pending outbox entries. Record the starting rows and relevant UI state before making the change.",
+      "Claim entries transactionally with worker identity and lease expiry.",
+      "Start both workers against the same stored queue. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only the permitted claim holder actively processes each entry.",
+      "A read-then-write race cannot grant both tabs the same claim.",
+      "Recovery evidence: Close the claiming tab without cleanup. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Close the claiming tab without cleanup.",
+    "review": "Review the agent's proposed diff: Does lease expiry allow recovery without assuming delivery never happened?",
+    "stretch": "Combine claims with remote idempotency to handle unavoidable duplicate attempts.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-renew-leases-safely",
+    "parentId": "effect-sync-concurrency",
+    "title": "Renew leases safely",
+    "concept": "Lease ownership",
+    "brief": "A slow delivery outlasts its initial worker lease.",
+    "explanation": "Lease renewal must prove current ownership and avoid extending a lease already taken over.",
+    "steps": [
+      "Create a repeatable fixture: A slow delivery outlasts its initial worker lease. Record the starting rows and relevant UI state before making the change.",
+      "Update expiry conditionally using worker identity and claim generation.",
+      "Pause renewal, let another worker reclaim, then resume the old worker. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The old worker cannot renew or acknowledge the new claim.",
+      "The current owner remains identifiable in storage.",
+      "Recovery evidence: Let both workers receive successful remote responses. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Let both workers receive successful remote responses.",
+    "review": "Review the agent's proposed diff: Does acknowledgment verify claim generation before local queue cleanup?",
+    "stretch": "Track lease age and renewal failures in safe diagnostics.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-prevent-starvation",
+    "parentId": "effect-sync-concurrency",
+    "title": "Prevent starvation",
+    "concept": "Scheduling fairness",
+    "brief": "A busy project continually adds new commands while a quiet project has one pending update.",
+    "explanation": "A scheduler should provide bounded opportunity for independent eligible work.",
+    "steps": [
+      "Create a repeatable fixture: A busy project continually adds new commands while a quiet project has one pending update. Record the starting rows and relevant UI state before making the change.",
+      "Choose FIFO or round-robin fairness across entity lanes.",
+      "Continuously enqueue busy-project work during a controlled drain. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The quiet project's command begins within the declared fairness bound.",
+      "New arrivals cannot indefinitely jump ahead of old eligible work.",
+      "Recovery evidence: Make the busy lane retry repeatedly. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Make the busy lane retry repeatedly.",
+    "review": "Review the agent's proposed diff: Does retry priority accidentally starve fresh independent commands?",
+    "stretch": "Add age-based diagnostics for entries waiting unusually long.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-apply-rate-limits-globally",
+    "parentId": "effect-sync-concurrency",
+    "title": "Apply rate limits globally",
+    "concept": "Shared budgets",
+    "brief": "Three workers each obey a per-worker limit but call one shared external API.",
+    "explanation": "A provider budget applies across all workers sharing the same quota scope.",
+    "steps": [
+      "Create a repeatable fixture: Three workers each obey a per-worker limit but call one shared external API. Record the starting rows and relevant UI state before making the change.",
+      "Centralize or coordinate token consumption for the relevant account or host.",
+      "Run workers concurrently and count requests in each time window. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Combined traffic respects the configured shared budget.",
+      "Per-worker limits cannot multiply the provider-facing rate.",
+      "Recovery evidence: Return a server throttle response to one worker only. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return a server throttle response to one worker only.",
+    "review": "Review the agent's proposed diff: Does the cooldown propagate to the other workers in the same quota scope?",
+    "stretch": "Persist cooldown deadlines so restart does not immediately resume a request burst.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-separate-concurrency-from-throughput",
+    "parentId": "effect-sync-concurrency",
+    "title": "Separate concurrency from throughput",
+    "concept": "Performance reasoning",
+    "brief": "Increase active requests from two to twenty against a slow rate-limited server.",
+    "explanation": "More concurrent work can increase latency and failures without increasing useful throughput.",
+    "steps": [
+      "Create a repeatable fixture: Increase active requests from two to twenty against a slow rate-limited server. Record the starting rows and relevant UI state before making the change.",
+      "Measure completed commands, p95 latency, and throttle rate at several limits.",
+      "Run the same fixed workload and compare results. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The selected setting is justified by completed work and error evidence.",
+      "A larger concurrency number is not treated as success by itself.",
+      "Recovery evidence: Introduce one very slow request among ordinary requests. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Introduce one very slow request among ordinary requests.",
+    "review": "Review the agent's proposed diff: Does the worker maintain fairness and bounded memory under tail latency?",
+    "stretch": "Plot throughput against concurrency and retain the smallest effective setting.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-stop-scheduling-after-fatal-configuration",
+    "parentId": "effect-sync-concurrency",
+    "title": "Stop scheduling after fatal configuration",
+    "concept": "Failure scope",
+    "brief": "Every delivery fails because the configured API endpoint is invalid.",
+    "explanation": "A global configuration failure should not consume each entry's retry budget independently forever.",
+    "steps": [
+      "Create a repeatable fixture: Every delivery fails because the configured API endpoint is invalid. Record the starting rows and relevant UI state before making the change.",
+      "Classify shared configuration failure and pause the affected worker scope.",
+      "Queue many entries and inject the same configuration error. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The worker surfaces one actionable configuration state.",
+      "It does not hammer the endpoint once per queued entry.",
+      "Recovery evidence: Correct configuration and resume without deleting intent. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Correct configuration and resume without deleting intent.",
+    "review": "Review the agent's proposed diff: Does global pause preserve per-entry state for later valid delivery?",
+    "stretch": "Add a health probe that validates configuration before draining a large queue.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-test-scheduler-invariants-under-reorder",
+    "parentId": "effect-sync-concurrency",
+    "title": "Test scheduler invariants under reorder",
+    "concept": "Controlled concurrency",
+    "brief": "Resolve ten delivery promises in an order different from their start order.",
+    "explanation": "Completion ordering must not corrupt queue ownership, counts, or entity sequencing.",
+    "steps": [
+      "Create a repeatable fixture: Resolve ten delivery promises in an order different from their start order. Record the starting rows and relevant UI state before making the change.",
+      "Build a controllable transport that exposes each pending completion.",
+      "Complete, fail, and interrupt requests in a chosen permutation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every entry reaches one valid final or retryable state.",
+      "Counters never become negative or mark the wrong entry complete.",
+      "Recovery evidence: Resolve a previously interrupted transport callback late. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Resolve a previously interrupted transport callback late.",
+    "review": "Review the agent's proposed diff: Does each callback carry immutable entry and claim identity?",
+    "stretch": "Generate several deterministic completion permutations as regression fixtures.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-compare-revisions-before-repair",
+    "parentId": "effect-sync-reconcile",
+    "title": "Compare revisions before repair",
+    "concept": "Divergence detection",
+    "brief": "Local project revision eight differs from remote revision ten after a long outage.",
+    "explanation": "Reconciliation needs a trusted comparison before choosing overwrite direction.",
+    "steps": [
+      "Create a repeatable fixture: Local project revision eight differs from remote revision ten after a long outage. Record the starting rows and relevant UI state before making the change.",
+      "Fetch remote metadata and compare it with the local acknowledged base.",
+      "Create local-only, remote-only, equal, and conflicting fixtures. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each fixture receives the correct reconciliation category.",
+      "Newer remote data is not replaced solely because local data exists.",
+      "Recovery evidence: Change remote revision after the comparison snapshot. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change remote revision after the comparison snapshot.",
+    "review": "Review the agent's proposed diff: Does repair revalidate the assumptions used to create its plan?",
+    "stretch": "Use a preview plan with expected revisions and a stable identity.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-respect-deletion-tombstones",
+    "parentId": "effect-sync-reconcile",
+    "title": "Respect deletion tombstones",
+    "concept": "Deletion propagation",
+    "brief": "A project deleted remotely remains in an old offline client's local database.",
+    "explanation": "Absence alone cannot distinguish deletion from an incomplete fetch.",
+    "steps": [
+      "Create a repeatable fixture: A project deleted remotely remains in an old offline client's local database. Record the starting rows and relevant UI state before making the change.",
+      "Represent deletion through a versioned tombstone or authoritative snapshot contract.",
+      "Reconnect the stale client and reconcile the deleted entity. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The deletion policy applies without resurrecting the old row.",
+      "An old queued update cannot silently recreate a tombstoned project.",
+      "Recovery evidence: Deliver the tombstone before and after an older update event. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Deliver the tombstone before and after an older update event.",
+    "review": "Review the agent's proposed diff: Does ordering compare entity versions rather than arrival times?",
+    "stretch": "Define tombstone retention based on the maximum supported offline period.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-repair-missing-local-receipts",
+    "parentId": "effect-sync-reconcile",
+    "title": "Repair missing local receipts",
+    "concept": "Ambiguous acknowledgment",
+    "brief": "The server applied a command but the client's acknowledgment transaction was lost.",
+    "explanation": "Reconciliation can recover accepted outcomes without issuing a new logical command.",
+    "steps": [
+      "Create a repeatable fixture: The server applied a command but the client's acknowledgment transaction was lost. Record the starting rows and relevant UI state before making the change.",
+      "Query or fetch receipts by stable operation identity.",
+      "Restore the missing receipt and update local queue state. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The command becomes acknowledged without another domain mutation.",
+      "Revision and audit counts remain unchanged.",
+      "Recovery evidence: Return an unavailable receipt service and retain uncertainty. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return an unavailable receipt service and retain uncertainty.",
+    "review": "Review the agent's proposed diff: Does the UI distinguish unknown outcome from confirmed failure?",
+    "stretch": "Batch receipt lookups for many ambiguous entries with bounded request size.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-resolve-divergent-field-edits",
+    "parentId": "effect-sync-reconcile",
+    "title": "Resolve divergent field edits",
+    "concept": "Three-way merge",
+    "brief": "Local goal and remote title changed independently from a shared base revision.",
+    "explanation": "A safe merge compares both changes with their common base, not just the two final objects.",
+    "steps": [
+      "Create a repeatable fixture: Local goal and remote title changed independently from a shared base revision. Record the starting rows and relevant UI state before making the change.",
+      "Build field-level changed sets and flag overlapping edits.",
+      "Test independent, identical, and conflicting field changes. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Independent changes combine under the declared policy.",
+      "Overlapping edits require explicit resolution.",
+      "Recovery evidence: Remove the common base snapshot and retry planning. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Remove the common base snapshot and retry planning.",
+    "review": "Review the agent's proposed diff: Does the system refuse unsupported automatic merge instead of guessing?",
+    "stretch": "Retain compact base snapshots only for entities with unsynchronized edits.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-reconcile-pagination-snapshots",
+    "parentId": "effect-sync-reconcile",
+    "title": "Reconcile pagination snapshots",
+    "concept": "Large remote sets",
+    "brief": "Fetch a large remote collection across pages while records are inserted and deleted.",
+    "explanation": "A reconciliation scan needs stable snapshot semantics or change-token boundaries.",
+    "steps": [
+      "Create a repeatable fixture: Fetch a large remote collection across pages while records are inserted and deleted. Record the starting rows and relevant UI state before making the change.",
+      "Use a server snapshot token or an explicit change feed contract.",
+      "Mutate records between page requests in the fixture. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The scan produces a coherent set or detects that it must restart.",
+      "A missed page boundary cannot be interpreted as a deletion.",
+      "Recovery evidence: Expire the snapshot token midway through scanning. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Expire the snapshot token midway through scanning.",
+    "review": "Review the agent's proposed diff: Does the client preserve progress only when continuation semantics remain valid?",
+    "stretch": "Checkpoint stable scans with token expiry and version metadata.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-quarantine-unrecognized-remote-data",
+    "parentId": "effect-sync-reconcile",
+    "title": "Quarantine unrecognized remote data",
+    "concept": "Compatibility recovery",
+    "brief": "A remote record uses a newer status value that the offline client cannot decode.",
+    "explanation": "Unknown remote data should remain diagnosable without poisoning all synchronization.",
+    "steps": [
+      "Create a repeatable fixture: A remote record uses a newer status value that the offline client cannot decode. Record the starting rows and relevant UI state before making the change.",
+      "Quarantine the unsupported record and continue independent compatible work.",
+      "Reconcile a collection containing one future-shape row. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Compatible rows still update according to policy.",
+      "The unsupported row is not silently rewritten into an older shape.",
+      "Recovery evidence: Upgrade the decoder and retry the quarantined record. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Upgrade the decoder and retry the quarantined record.",
+    "review": "Review the agent's proposed diff: Does quarantine retain safe source metadata and a recovery path?",
+    "stretch": "Add a minimum-client-version hint when a newer contract is required.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-keep-reconciliation-resumable",
+    "parentId": "effect-sync-reconcile",
+    "title": "Keep reconciliation resumable",
+    "concept": "Long operations",
+    "brief": "Repair ten thousand divergent records and close the application halfway through.",
+    "explanation": "A long repair needs checkpoints that do not pretend uncommitted work finished.",
+    "steps": [
+      "Create a repeatable fixture: Repair ten thousand divergent records and close the application halfway through. Record the starting rows and relevant UI state before making the change.",
+      "Persist completed plan segments and verify each segment's assumptions.",
+      "Restart after a selected batch boundary. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The next run resumes without duplicating committed repairs.",
+      "A partially processed batch is revalidated before retry.",
+      "Recovery evidence: Change a previously unprocessed remote row before resumption. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change a previously unprocessed remote row before resumption.",
+    "review": "Review the agent's proposed diff: Does checkpoint identity bind to the same reconciliation plan?",
+    "stretch": "Expose completed, conflicted, and remaining counts in a durable receipt.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-audit-repair-decisions",
+    "parentId": "effect-sync-reconcile",
+    "title": "Audit repair decisions",
+    "concept": "Operational evidence",
+    "brief": "An automatic reconciliation chooses remote values for several stale local rows.",
+    "explanation": "Repair should explain its policy and preserve evidence of meaningful discarded intent.",
+    "steps": [
+      "Create a repeatable fixture: An automatic reconciliation chooses remote values for several stale local rows. Record the starting rows and relevant UI state before making the change.",
+      "Record plan ID, source revisions, chosen action, and safe conflict summaries.",
+      "Inspect receipts for no-op, replacement, merge, and manual-conflict cases. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every changed row has an explainable reconciliation decision.",
+      "Private payloads are not copied wholesale into routine logs.",
+      "Recovery evidence: Undo a repair after a later legitimate edit. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Undo a repair after a later legitimate edit.",
+    "review": "Review the agent's proposed diff: Does compensation check current revisions before restoring old data?",
+    "stretch": "Provide a review screen for decisions requiring human intent.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-reliable-sync-prove-convergence-after-repeated-sync",
+    "parentId": "effect-sync-reconcile",
+    "title": "Prove convergence after repeated sync",
+    "concept": "System property",
+    "brief": "Replay the same remote changes and local outbox receipts several times in shuffled delivery order.",
+    "explanation": "A correct reconciliation protocol should converge under its documented ordering and idempotency assumptions.",
+    "steps": [
+      "Create a repeatable fixture: Replay the same remote changes and local outbox receipts several times in shuffled delivery order. Record the starting rows and relevant UI state before making the change.",
+      "Define the expected final graph and execute multiple delivery schedules.",
+      "Compare local and remote canonical domain snapshots after settling. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Supported schedules converge to the same expected state.",
+      "Duplicate delivery does not accumulate extra rows or events.",
+      "Recovery evidence: Include a tombstone, a conflict, and a lost acknowledgment. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Include a tombstone, a conflict, and a lost acknowledgment.",
+    "review": "Review the agent's proposed diff: Does the test state which schedules are supported rather than assuming arbitrary commutativity?",
+    "stretch": "Add generated sequences constrained by the protocol's causal rules.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  }
+]

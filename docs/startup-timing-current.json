@@ -1,0 +1,641 @@
+{
+  "conditions": "Headless Chromium, 1440×1000, localhost uncompressed static server, no CPU/network throttle, one fresh browser context followed by three reloads. Service workers blocked to isolate app installation. Readiness is the visible Today heading; OS load and Playwright scheduling affect timings. These are diagnostic samples, not a latency guarantee.",
+  "freshMs": 15384,
+  "repeatMedianMs": 1451,
+  "samples": [
+    {
+      "kind": "fresh installation",
+      "readyMs": 15384,
+      "javascript": [
+        {
+          "path": "/assets/index-DdvPhC5L.js",
+          "transferBytes": 23871,
+          "encodedBytes": 23571
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 994,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 233200,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 96764,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 1953,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 1593,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/userStateRepo-B7YybQPs.js",
+          "transferBytes": 2192,
+          "encodedBytes": 1892
+        },
+        {
+          "path": "/assets/curriculum-catalog-BfF7oPJM.js",
+          "transferBytes": 51181,
+          "encodedBytes": 50881
+        },
+        {
+          "path": "/assets/HomeScreen-Xj5VyRk4.js",
+          "transferBytes": 9177,
+          "encodedBytes": 8877
+        },
+        {
+          "path": "/assets/arrow-right-C57y1VF5.js",
+          "transferBytes": 454,
+          "encodedBytes": 154
+        },
+        {
+          "path": "/assets/DeckCard-BqhegAUr.js",
+          "transferBytes": 4414,
+          "encodedBytes": 4114
+        },
+        {
+          "path": "/assets/clock-3-DDnah3ws.js",
+          "transferBytes": 458,
+          "encodedBytes": 158
+        },
+        {
+          "path": "/assets/play-lIwwMsB4.js",
+          "transferBytes": 479,
+          "encodedBytes": 179
+        },
+        {
+          "path": "/assets/engineering-completion-checks-DrO3PDMw.js",
+          "transferBytes": 5155,
+          "encodedBytes": 4855
+        },
+        {
+          "path": "/assets/Button-EAzLibdR.js",
+          "transferBytes": 1459,
+          "encodedBytes": 1159
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 702,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/noteRepo-BzKOsk5C.js",
+          "transferBytes": 1652,
+          "encodedBytes": 1352
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 355,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/studyRepo-Ds26dP-g.js",
+          "transferBytes": 3893,
+          "encodedBytes": 3593
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 635,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/dotnet-path-u31Ckgak.js",
+          "transferBytes": 943,
+          "encodedBytes": 643
+        },
+        {
+          "path": "/assets/CreateDeckDialog-D0Eqdohv.js",
+          "transferBytes": 1511,
+          "encodedBytes": 1211
+        },
+        {
+          "path": "/assets/Modal-2HwtyPrZ.js",
+          "transferBytes": 2280,
+          "encodedBytes": 1980
+        },
+        {
+          "path": "/assets/deckRepo-DzZIGkF9.js",
+          "transferBytes": 2039,
+          "encodedBytes": 1739
+        },
+        {
+          "path": "/assets/useNow-Bn3iLU09.js",
+          "transferBytes": 696,
+          "encodedBytes": 396
+        },
+        {
+          "path": "/assets/dashboardRepo-zHWZRsH4.js",
+          "transferBytes": 2207,
+          "encodedBytes": 1907
+        },
+        {
+          "path": "/assets/DataProtection-BdlRiMJf.js",
+          "transferBytes": 2568,
+          "encodedBytes": 2268
+        },
+        {
+          "path": "/assets/GoalPicker-BUghS3Gb.js",
+          "transferBytes": 1420,
+          "encodedBytes": 1120
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 5953,
+          "encodedBytes": 5653
+        },
+        {
+          "path": "/assets/seed-BLIioupd.js",
+          "transferBytes": 34531,
+          "encodedBytes": 34231
+        },
+        {
+          "path": "/assets/retiredCurriculum-Bpx9Xr9q.js",
+          "transferBytes": 20478,
+          "encodedBytes": 20178
+        },
+        {
+          "path": "/assets/workshop--wvr20Tl.js",
+          "transferBytes": 72666,
+          "encodedBytes": 72366
+        },
+        {
+          "path": "/assets/scheduler-bblrgvcP.js",
+          "transferBytes": 22408,
+          "encodedBytes": 22108
+        },
+        {
+          "path": "/assets/expanded-cards-DeDD_Z4H.js",
+          "transferBytes": 4032207,
+          "encodedBytes": 4031907
+        },
+        {
+          "path": "/assets/reviewed-01-RQ3g0JHC.js",
+          "transferBytes": 190436,
+          "encodedBytes": 190136
+        }
+      ]
+    },
+    {
+      "kind": "repeat open",
+      "readyMs": 1451,
+      "javascript": [
+        {
+          "path": "/assets/index-DdvPhC5L.js",
+          "transferBytes": 0,
+          "encodedBytes": 23571
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 0,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 0,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 0,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 0,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 0,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/userStateRepo-B7YybQPs.js",
+          "transferBytes": 0,
+          "encodedBytes": 1892
+        },
+        {
+          "path": "/assets/curriculum-catalog-BfF7oPJM.js",
+          "transferBytes": 0,
+          "encodedBytes": 50881
+        },
+        {
+          "path": "/assets/HomeScreen-Xj5VyRk4.js",
+          "transferBytes": 0,
+          "encodedBytes": 8877
+        },
+        {
+          "path": "/assets/arrow-right-C57y1VF5.js",
+          "transferBytes": 0,
+          "encodedBytes": 154
+        },
+        {
+          "path": "/assets/DeckCard-BqhegAUr.js",
+          "transferBytes": 0,
+          "encodedBytes": 4114
+        },
+        {
+          "path": "/assets/clock-3-DDnah3ws.js",
+          "transferBytes": 0,
+          "encodedBytes": 158
+        },
+        {
+          "path": "/assets/play-lIwwMsB4.js",
+          "transferBytes": 0,
+          "encodedBytes": 179
+        },
+        {
+          "path": "/assets/engineering-completion-checks-DrO3PDMw.js",
+          "transferBytes": 0,
+          "encodedBytes": 4855
+        },
+        {
+          "path": "/assets/Button-EAzLibdR.js",
+          "transferBytes": 0,
+          "encodedBytes": 1159
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 0,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/noteRepo-BzKOsk5C.js",
+          "transferBytes": 0,
+          "encodedBytes": 1352
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 0,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/studyRepo-Ds26dP-g.js",
+          "transferBytes": 0,
+          "encodedBytes": 3593
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 0,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/dotnet-path-u31Ckgak.js",
+          "transferBytes": 0,
+          "encodedBytes": 643
+        },
+        {
+          "path": "/assets/CreateDeckDialog-D0Eqdohv.js",
+          "transferBytes": 0,
+          "encodedBytes": 1211
+        },
+        {
+          "path": "/assets/Modal-2HwtyPrZ.js",
+          "transferBytes": 0,
+          "encodedBytes": 1980
+        },
+        {
+          "path": "/assets/deckRepo-DzZIGkF9.js",
+          "transferBytes": 0,
+          "encodedBytes": 1739
+        },
+        {
+          "path": "/assets/useNow-Bn3iLU09.js",
+          "transferBytes": 0,
+          "encodedBytes": 396
+        },
+        {
+          "path": "/assets/dashboardRepo-zHWZRsH4.js",
+          "transferBytes": 0,
+          "encodedBytes": 1907
+        },
+        {
+          "path": "/assets/DataProtection-BdlRiMJf.js",
+          "transferBytes": 0,
+          "encodedBytes": 2268
+        },
+        {
+          "path": "/assets/GoalPicker-BUghS3Gb.js",
+          "transferBytes": 0,
+          "encodedBytes": 1120
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 0,
+          "encodedBytes": 5653
+        }
+      ]
+    },
+    {
+      "kind": "repeat open",
+      "readyMs": 1332,
+      "javascript": [
+        {
+          "path": "/assets/index-DdvPhC5L.js",
+          "transferBytes": 0,
+          "encodedBytes": 23571
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 0,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 0,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 0,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 0,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 0,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/userStateRepo-B7YybQPs.js",
+          "transferBytes": 0,
+          "encodedBytes": 1892
+        },
+        {
+          "path": "/assets/curriculum-catalog-BfF7oPJM.js",
+          "transferBytes": 0,
+          "encodedBytes": 50881
+        },
+        {
+          "path": "/assets/HomeScreen-Xj5VyRk4.js",
+          "transferBytes": 0,
+          "encodedBytes": 8877
+        },
+        {
+          "path": "/assets/arrow-right-C57y1VF5.js",
+          "transferBytes": 0,
+          "encodedBytes": 154
+        },
+        {
+          "path": "/assets/DeckCard-BqhegAUr.js",
+          "transferBytes": 0,
+          "encodedBytes": 4114
+        },
+        {
+          "path": "/assets/clock-3-DDnah3ws.js",
+          "transferBytes": 0,
+          "encodedBytes": 158
+        },
+        {
+          "path": "/assets/play-lIwwMsB4.js",
+          "transferBytes": 0,
+          "encodedBytes": 179
+        },
+        {
+          "path": "/assets/engineering-completion-checks-DrO3PDMw.js",
+          "transferBytes": 0,
+          "encodedBytes": 4855
+        },
+        {
+          "path": "/assets/Button-EAzLibdR.js",
+          "transferBytes": 0,
+          "encodedBytes": 1159
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 0,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/noteRepo-BzKOsk5C.js",
+          "transferBytes": 0,
+          "encodedBytes": 1352
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 0,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/studyRepo-Ds26dP-g.js",
+          "transferBytes": 0,
+          "encodedBytes": 3593
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 0,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/dotnet-path-u31Ckgak.js",
+          "transferBytes": 0,
+          "encodedBytes": 643
+        },
+        {
+          "path": "/assets/CreateDeckDialog-D0Eqdohv.js",
+          "transferBytes": 0,
+          "encodedBytes": 1211
+        },
+        {
+          "path": "/assets/Modal-2HwtyPrZ.js",
+          "transferBytes": 0,
+          "encodedBytes": 1980
+        },
+        {
+          "path": "/assets/deckRepo-DzZIGkF9.js",
+          "transferBytes": 0,
+          "encodedBytes": 1739
+        },
+        {
+          "path": "/assets/useNow-Bn3iLU09.js",
+          "transferBytes": 0,
+          "encodedBytes": 396
+        },
+        {
+          "path": "/assets/dashboardRepo-zHWZRsH4.js",
+          "transferBytes": 0,
+          "encodedBytes": 1907
+        },
+        {
+          "path": "/assets/DataProtection-BdlRiMJf.js",
+          "transferBytes": 0,
+          "encodedBytes": 2268
+        },
+        {
+          "path": "/assets/GoalPicker-BUghS3Gb.js",
+          "transferBytes": 0,
+          "encodedBytes": 1120
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 0,
+          "encodedBytes": 5653
+        }
+      ]
+    },
+    {
+      "kind": "repeat open",
+      "readyMs": 2036,
+      "javascript": [
+        {
+          "path": "/assets/index-DdvPhC5L.js",
+          "transferBytes": 0,
+          "encodedBytes": 23571
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 0,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 0,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 0,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 0,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 0,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/userStateRepo-B7YybQPs.js",
+          "transferBytes": 0,
+          "encodedBytes": 1892
+        },
+        {
+          "path": "/assets/curriculum-catalog-BfF7oPJM.js",
+          "transferBytes": 0,
+          "encodedBytes": 50881
+        },
+        {
+          "path": "/assets/HomeScreen-Xj5VyRk4.js",
+          "transferBytes": 0,
+          "encodedBytes": 8877
+        },
+        {
+          "path": "/assets/arrow-right-C57y1VF5.js",
+          "transferBytes": 0,
+          "encodedBytes": 154
+        },
+        {
+          "path": "/assets/DeckCard-BqhegAUr.js",
+          "transferBytes": 0,
+          "encodedBytes": 4114
+        },
+        {
+          "path": "/assets/clock-3-DDnah3ws.js",
+          "transferBytes": 0,
+          "encodedBytes": 158
+        },
+        {
+          "path": "/assets/play-lIwwMsB4.js",
+          "transferBytes": 0,
+          "encodedBytes": 179
+        },
+        {
+          "path": "/assets/engineering-completion-checks-DrO3PDMw.js",
+          "transferBytes": 0,
+          "encodedBytes": 4855
+        },
+        {
+          "path": "/assets/Button-EAzLibdR.js",
+          "transferBytes": 0,
+          "encodedBytes": 1159
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 0,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/noteRepo-BzKOsk5C.js",
+          "transferBytes": 0,
+          "encodedBytes": 1352
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 0,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/studyRepo-Ds26dP-g.js",
+          "transferBytes": 0,
+          "encodedBytes": 3593
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 0,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/dotnet-path-u31Ckgak.js",
+          "transferBytes": 0,
+          "encodedBytes": 643
+        },
+        {
+          "path": "/assets/CreateDeckDialog-D0Eqdohv.js",
+          "transferBytes": 0,
+          "encodedBytes": 1211
+        },
+        {
+          "path": "/assets/Modal-2HwtyPrZ.js",
+          "transferBytes": 0,
+          "encodedBytes": 1980
+        },
+        {
+          "path": "/assets/deckRepo-DzZIGkF9.js",
+          "transferBytes": 0,
+          "encodedBytes": 1739
+        },
+        {
+          "path": "/assets/useNow-Bn3iLU09.js",
+          "transferBytes": 0,
+          "encodedBytes": 396
+        },
+        {
+          "path": "/assets/dashboardRepo-zHWZRsH4.js",
+          "transferBytes": 0,
+          "encodedBytes": 1907
+        },
+        {
+          "path": "/assets/DataProtection-BdlRiMJf.js",
+          "transferBytes": 0,
+          "encodedBytes": 2268
+        },
+        {
+          "path": "/assets/GoalPicker-BUghS3Gb.js",
+          "transferBytes": 0,
+          "encodedBytes": 1120
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 0,
+          "encodedBytes": 5653
+        }
+      ]
+    }
+  ]
+}

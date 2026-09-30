@@ -9,22 +9,57 @@ import {
 } from "../data/curriculum";
 import { applyReview } from "./repos/cardRepo";
 import { newCardFields, rate } from "../srs/scheduler";
+import * as retirement from "./retiredCurriculum";
+import * as curriculumData from "../data/curriculum";
 describe("starter curriculum", () => {
   beforeEach(resetDatabaseForTests);
+  it("coalesces boot requests and skips archived migrations only for an empty library", async () => {
+    const migrate = vi
+      .spyOn(retirement, "retireLegacyCurriculum")
+      .mockResolvedValue(false);
+    try {
+      const first = initializeStudyData();
+      const second = initializeStudyData();
+      expect(first).toBe(second);
+      await first;
+      expect(migrate).not.toHaveBeenCalled();
+      await db.sync_meta.delete(curriculumVersionKey);
+      await initializeStudyData();
+      expect(migrate).toHaveBeenCalledTimes(1);
+    } finally {
+      migrate.mockRestore();
+    }
+  });
   it("rolls back every batch and the version marker when saving the queue fails", async () => {
+    // Cross three card batches without fake-indexeddb's quadratic index rollback
+    // over the entire library. Real full-library installs/upgrades are tested below.
+    const cards = Array.from({ length: 1001 }, (_, index) => ({
+      id: `f1000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      front: `Rollback fixture ${index + 1}`,
+      back: "The entire installation must commit or none of it may persist.",
+    }));
+    const content = vi
+      .spyOn(curriculumData, "loadStarterCards")
+      .mockResolvedValue(new Map([[curriculum[0].id, cards]]));
+    const bulkPut = db.outbox.bulkPut.bind(db.outbox);
     const failure = vi
       .spyOn(db.outbox, "bulkPut")
-      .mockRejectedValue(new Error("simulated queue failure"));
+      .mockImplementationOnce(bulkPut)
+      .mockRejectedValueOnce(new Error("simulated queue failure"));
     try {
       await expect(initializeStudyData()).rejects.toThrow(
         "simulated queue failure",
       );
+      expect(failure).toHaveBeenCalledTimes(2);
+      expect(failure.mock.calls[0][0]).toHaveLength(500);
+      expect(failure.mock.calls[1][0]).toHaveLength(500);
       expect(await db.cards.count()).toBe(0);
       expect(await db.decks.count()).toBe(0);
       expect(await db.outbox.count()).toBe(0);
       expect(await db.sync_meta.get(curriculumVersionKey)).toBeUndefined();
     } finally {
       failure.mockRestore();
+      content.mockRestore();
     }
   }, 120_000);
   it("installs complete ready-to-study cards atomically with sync entries", async () => {
@@ -114,7 +149,12 @@ describe("starter curriculum", () => {
     expect(await db.review_logs.count()).toBe(1);
   });
 
-  it.each([
+  it.each<{
+    version: string;
+    count: number;
+    excluded: string[];
+    excludedDecks?: string[];
+  }>([
     {
       version: "v2",
       count: 2247,
@@ -137,11 +177,23 @@ describe("starter curriculum", () => {
       excluded: ["C# & .NET", "Build real apps", "Workshop"],
     },
     { version: "v16", count: 2799, excluded: ["Build real apps", "Workshop"] },
+    {
+      // v17 shipped Build real apps decks 21–28; v18 adds decks 29 and 30.
+      version: "v17",
+      count: 2959,
+      excluded: ["Workshop"],
+      excludedDecks: [
+        "a0000000-0000-4000-8000-000000007009",
+        "a0000000-0000-4000-8000-000000007010",
+      ],
+    },
   ])(
     "upgrades $version without changing any existing card or review",
-    async ({ version, count, excluded }) => {
+    async ({ version, count, excluded, excludedDecks = [] }) => {
       const content = await loadStarterCards();
-      const baseline = curriculum.filter((d) => !excluded.includes(d.track));
+      const baseline = curriculum.filter(
+        (d) => !excluded.includes(d.track) && !excludedDecks.includes(d.id),
+      );
       const timestamp = "2026-01-01T00:00:00.000Z";
       const schedule = newCardFields(new Date(timestamp));
       const baselineCards = baseline.flatMap((deck) =>

@@ -1,0 +1,1244 @@
+[
+  {
+    "id": "effect-drill-project-tracker-normalize-before-measuring",
+    "parentId": "effect-tracker-create",
+    "title": "Normalize before measuring",
+    "concept": "Schema boundaries",
+    "brief": "Submit a project named with 99 letters surrounded by three spaces on each side.",
+    "explanation": "The stored name and the name whose length was validated must be the same normalized value.",
+    "steps": [
+      "Create a repeatable fixture: Submit a project named with 99 letters surrounded by three spaces on each side. Record the starting rows and relevant UI state before making the change.",
+      "Move trimming into the shared decode operation before the length constraint.",
+      "Test 99 letters, 100 letters, 101 letters, and whitespace-only input. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The first two names save without surrounding spaces.",
+      "Overlong and empty normalized names never reach the repository.",
+      "Recovery evidence: Make the form bypass its client validation and submit 101 letters directly. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Make the form bypass its client validation and submit 101 letters directly.",
+    "review": "Review the agent's proposed diff: Does the operation independently enforce the constraint when React is absent?",
+    "stretch": "Add an explicit policy for Unicode grapheme counts and document its tradeoff.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-preserve-a-rejected-draft",
+    "parentId": "effect-tracker-create",
+    "title": "Preserve a rejected draft",
+    "concept": "Typed storage errors",
+    "brief": "Enter a long project goal, then make the first repository write reject with a quota error.",
+    "explanation": "A failed durable write must not consume the draft or claim that a project exists.",
+    "steps": [
+      "Create a repeatable fixture: Enter a long project goal, then make the first repository write reject with a quota error. Record the starting rows and relevant UI state before making the change.",
+      "Map quota failure to a recoverable form state with retained name and goal.",
+      "Retry after restoring capacity and inspect the saved identity and goal. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The retry stores exactly the text visible in the recovered editor.",
+      "The failed attempt produces no success toast or empty replacement form.",
+      "Recovery evidence: Reject twice before permitting a third write to finish. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reject twice before permitting a third write to finish.",
+    "review": "Review the agent's proposed diff: Can an error handler accidentally clear the draft through a finally callback?",
+    "stretch": "Provide a copy-draft action when storage remains unavailable for several attempts.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-separate-empty-from-loading",
+    "parentId": "effect-tracker-create",
+    "title": "Separate empty from loading",
+    "concept": "Async state modeling",
+    "brief": "Open a clean database through a repository whose initial list takes two seconds.",
+    "explanation": "An unresolved read does not establish that the user's project collection is empty.",
+    "steps": [
+      "Create a repeatable fixture: Open a clean database through a repository whose initial list takes two seconds. Record the starting rows and relevant UI state before making the change.",
+      "Represent pending, successful empty, successful populated, and failed reads explicitly.",
+      "Hold the read promise and inspect visible text before resolving an empty result. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The empty-state create action appears after successful resolution.",
+      "A failed list is never presented as a confirmed empty collection.",
+      "Recovery evidence: Reject the delayed read after the user opens the create form. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reject the delayed read after the user opens the create form.",
+    "review": "Review the agent's proposed diff: Does refresh overwrite a draft because collection state and editor state share a reducer?",
+    "stretch": "Add a quiet refresh indicator that retains previously confirmed rows.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-defeat-double-submission",
+    "parentId": "effect-tracker-create",
+    "title": "Defeat double submission",
+    "concept": "Command identity",
+    "brief": "Press Enter twice quickly while creating a project called Billing redesign on a slow disk.",
+    "explanation": "One user creation attempt owns one stable identity across repeated delivery.",
+    "steps": [
+      "Create a repeatable fixture: Press Enter twice quickly while creating a project called Billing redesign on a slow disk. Record the starting rows and relevant UI state before making the change.",
+      "Generate the command ID before execution and guard pending submission at the boundary.",
+      "Deliver the same operation twice against the repository with completion ordering reversed. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Exactly one project and one success announcement exist afterward.",
+      "A second intentional creation after completion receives a different identity.",
+      "Recovery evidence: Resolve the second callback before the first callback and observe the form. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Resolve the second callback before the first callback and observe the form.",
+    "review": "Review the agent's proposed diff: Is duplicate protection enforced below the button rather than only through disabled styling?",
+    "stretch": "Persist pending operation identities so reload after an ambiguous write is safe.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-keep-time-deterministic",
+    "parentId": "effect-tracker-create",
+    "title": "Keep time deterministic",
+    "concept": "Clock service",
+    "brief": "Create two projects with a clock frozen at 2030-01-02T03:04:05Z and known generated IDs.",
+    "explanation": "Creation timestamps are domain inputs that must be reproducible independently of wall-clock scheduling.",
+    "steps": [
+      "Create a repeatable fixture: Create two projects with a clock frozen at 2030-01-02T03:04:05Z and known generated IDs. Record the starting rows and relevant UI state before making the change.",
+      "Inject the clock and ID service into the create operation.",
+      "Use fixed services in a test and compare the entire stored rows. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Both rows receive the specified timestamp and distinct expected IDs.",
+      "A clock failure produces no partially initialized persisted project.",
+      "Recovery evidence: Change the clock between constructing and executing an Effect and predict the recorded time. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change the clock between constructing and executing an Effect and predict the recorded time.",
+    "review": "Review the agent's proposed diff: Is time read at execution, and is the intended timing documented?",
+    "stretch": "Add monotonic revision numbers without pretending wall-clock timestamps are unique.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-map-unknown-rejections",
+    "parentId": "effect-tracker-create",
+    "title": "Map unknown rejections",
+    "concept": "Promise adapters",
+    "brief": "Make a legacy repository reject with a string, then an Error, then an arbitrary object.",
+    "explanation": "An external rejection has unknown shape until the adapter maps it into a safe typed failure.",
+    "steps": [
+      "Create a repeatable fixture: Make a legacy repository reject with a string, then an Error, then an arbitrary object. Record the starting rows and relevant UI state before making the change.",
+      "Wrap the promise boundary and preserve useful diagnostic causes without exposing them in the form.",
+      "Exercise all three rejection shapes with the same create operation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each failure becomes the documented storage-error variant.",
+      "Raw object serialization and stack traces do not appear in the user message.",
+      "Recovery evidence: Throw an object containing a circular reference to challenge naive error formatting. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Throw an object containing a circular reference to challenge naive error formatting.",
+    "review": "Review the agent's proposed diff: Does the adapter catch only external promise failure without hiding programming defects?",
+    "stretch": "Introduce a diagnostic correlation ID that links the safe message to local logs.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-choose-a-duplicate-name-policy",
+    "parentId": "effect-tracker-create",
+    "title": "Choose a duplicate-name policy",
+    "concept": "Domain invariants",
+    "brief": "Seed active Atlas and archived Atlas projects, then create atlas with surrounding whitespace.",
+    "explanation": "Name uniqueness is a product rule with an explicit comparison and archive scope.",
+    "steps": [
+      "Create a repeatable fixture: Seed active Atlas and archived Atlas projects, then create atlas with surrounding whitespace. Record the starting rows and relevant UI state before making the change.",
+      "Specify case folding and active-versus-all scope before adding a repository constraint.",
+      "Race two creates whose names become equal after normalization. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The accepted rows match the written duplicate-name policy.",
+      "The losing operation receives a useful conflict rather than a generic disk error.",
+      "Recovery evidence: Restore the archived Atlas while another active Atlas exists. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Restore the archived Atlas while another active Atlas exists.",
+    "review": "Review the agent's proposed diff: Are create, rename, and restore all checked against the same uniqueness rule?",
+    "stretch": "Test a locale-sensitive name and document whether comparison uses locale or stable normalization.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-cancel-without-imaginary-rollback",
+    "parentId": "effect-tracker-create",
+    "title": "Cancel without imaginary rollback",
+    "concept": "Interruption semantics",
+    "brief": "Start a delayed project save, close the editor, and reopen the project list before completion.",
+    "explanation": "Closing a UI does not prove that a durable operation was rolled back.",
+    "steps": [
+      "Create a repeatable fixture: Start a delayed project save, close the editor, and reopen the project list before completion. Record the starting rows and relevant UI state before making the change.",
+      "Define whether saving continues or is cancellable and present that behavior honestly.",
+      "Complete the write after the editor unmounts and inspect durable data and announcements. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The eventual row is represented consistently after the next list read.",
+      "No obsolete callback reopens the closed editor or steals focus.",
+      "Recovery evidence: Interrupt while the storage adapter has already accepted the write. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Interrupt while the storage adapter has already accepted the write.",
+    "review": "Review the agent's proposed diff: Does cleanup distinguish stopping observation from reversing persistence?",
+    "stretch": "Add an operation-status lookup for ambiguous completion after navigation.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-keep-form-text-inert",
+    "parentId": "effect-tracker-create",
+    "title": "Keep form text inert",
+    "concept": "Rendering boundaries",
+    "brief": "Create a project with a goal containing an HTML image tag and a script-looking URL.",
+    "explanation": "User-authored text remains data unless a separately validated rendering feature explicitly interprets it.",
+    "steps": [
+      "Create a repeatable fixture: Create a project with a goal containing an HTML image tag and a script-looking URL. Record the starting rows and relevant UI state before making the change.",
+      "Render plain text and inspect any preview or highlighting path for unsafe markup insertion.",
+      "Reload the record and inspect the DOM and attempted network requests. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The complete literal goal remains readable as text.",
+      "No element or request is created from embedded markup.",
+      "Recovery evidence: Paste the same payload into the search field and empty-state message. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Paste the same payload into the search field and empty-state message.",
+    "review": "Review the agent's proposed diff: Did an agent add innerHTML merely to highlight matching words?",
+    "stretch": "Implement highlight spans through escaped text segments and test mixed Unicode input.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-reject-stale-editor-revisions",
+    "parentId": "effect-tracker-edit",
+    "title": "Reject stale editor revisions",
+    "concept": "Optimistic concurrency",
+    "brief": "Open revision 4 of Atlas in two tabs and save different goals from each.",
+    "explanation": "A save based on old state must not silently replace a newer accepted edit.",
+    "steps": [
+      "Create a repeatable fixture: Open revision 4 of Atlas in two tabs and save different goals from each. Record the starting rows and relevant UI state before making the change.",
+      "Require the expected revision in the update command and compare atomically in storage.",
+      "Save tab A, then tab B, and inspect the persisted revision and goal. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Tab A advances the revision exactly once.",
+      "Tab B receives a conflict with its unsaved goal still available.",
+      "Recovery evidence: Refresh the conflicting record while retaining the stale draft for comparison. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Refresh the conflicting record while retaining the stale draft for comparison.",
+    "review": "Review the agent's proposed diff: Can the conflict path distinguish a deleted row from an updated row?",
+    "stretch": "Add a field-level comparison view that lets the user compose a fresh revision.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-search-literal-punctuation",
+    "parentId": "effect-tracker-edit",
+    "title": "Search literal punctuation",
+    "concept": "Query semantics",
+    "brief": "Seed projects named C++, foo.bar, and roadmap[2026], then search punctuation fragments.",
+    "explanation": "A simple substring search must not accidentally interpret user text as a regular expression.",
+    "steps": [
+      "Create a repeatable fixture: Seed projects named C++, foo.bar, and roadmap[2026], then search punctuation fragments. Record the starting rows and relevant UI state before making the change.",
+      "Implement normalized literal matching and preserve the original display strings.",
+      "Search ++, ., [, and a whitespace-only query under both archive filters. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only names containing the requested literal fragment match.",
+      "Malformed regex-like text never crashes or widens the search unexpectedly.",
+      "Recovery evidence: Paste a very long sequence of parentheses into the query. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Paste a very long sequence of parentheses into the query.",
+    "review": "Review the agent's proposed diff: Does the code require regex at all, and if so is every metacharacter escaped?",
+    "stretch": "Add indexed prefix matching and document how its semantics differ from substring search.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-archive-during-editing",
+    "parentId": "effect-tracker-edit",
+    "title": "Archive during editing",
+    "concept": "State transitions",
+    "brief": "Edit an active project in one view while another view archives that same record.",
+    "explanation": "An edit must respect the current lifecycle state rather than restoring stale active status.",
+    "steps": [
+      "Create a repeatable fixture: Edit an active project in one view while another view archives that same record. Record the starting rows and relevant UI state before making the change.",
+      "Limit editable fields and handle the archived transition explicitly in the command.",
+      "Save the old form after the archive operation commits. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The archive state remains durable after the attempted edit.",
+      "A stale form never reactivates the record by spreading old properties.",
+      "Recovery evidence: Restore the record and retry with a fresh revision. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Restore the record and retry with a fresh revision.",
+    "review": "Review the agent's proposed diff: Does update accept an explicit patch instead of a whole stale entity snapshot?",
+    "stretch": "Offer a deliberate restore-and-edit command with its own confirmation.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-navigate-away-from-dirty-input",
+    "parentId": "effect-tracker-edit",
+    "title": "Navigate away from dirty input",
+    "concept": "Draft ownership",
+    "brief": "Change a project goal, then use a sidebar link before saving.",
+    "explanation": "Unsaved text must have a predictable lifetime across route changes and cancellation.",
+    "steps": [
+      "Create a repeatable fixture: Change a project goal, then use a sidebar link before saving. Record the starting rows and relevant UI state before making the change.",
+      "Choose a route-leave confirmation or local draft policy and implement it consistently.",
+      "Exercise save, discard, stay, browser Back, and a same-record link. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Choosing stay preserves the exact draft and focused field.",
+      "Choosing discard never creates an unrequested write.",
+      "Recovery evidence: Fail a save that was initiated from the leave confirmation. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Fail a save that was initiated from the leave confirmation.",
+    "review": "Review the agent's proposed diff: Does a failed transition keep both the draft and the intended destination understandable?",
+    "stretch": "Restore a local draft after browser restart with a visible age indicator.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-missing-record-recovery",
+    "parentId": "effect-tracker-edit",
+    "title": "Missing record recovery",
+    "concept": "Domain error mapping",
+    "brief": "Open an edit URL for a project removed from the test database.",
+    "explanation": "Absence is a normal domain result and must not fall through into accidental creation.",
+    "steps": [
+      "Create a repeatable fixture: Open an edit URL for a project removed from the test database. Record the starting rows and relevant UI state before making the change.",
+      "Return a typed missing-project result with a link back to a usable list.",
+      "Delete the row after initial read but before update and submit once. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The interface explains that the project is unavailable.",
+      "The update never inserts a replacement with the missing ID.",
+      "Recovery evidence: Make the list read fail after the missing-record message appears. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Make the list read fail after the missing-record message appears.",
+    "review": "Review the agent's proposed diff: Are not-found and storage-unavailable presented as different recovery choices?",
+    "stretch": "Preserve the unsaved text in a copyable panel on the missing-record page.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-make-clear-search-predictable",
+    "parentId": "effect-tracker-edit",
+    "title": "Make clear search predictable",
+    "concept": "URL state",
+    "brief": "Open an archived-only list with query alpha, then clear the search field.",
+    "explanation": "Clearing one filter must leave unrelated filter state and navigation history coherent.",
+    "steps": [
+      "Create a repeatable fixture: Open an archived-only list with query alpha, then clear the search field. Record the starting rows and relevant UI state before making the change.",
+      "Represent search and lifecycle filter separately in the URL or state model.",
+      "Clear via button, keyboard deletion, and browser Back after changing the query. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Clearing restores all archived projects and keeps the archive filter.",
+      "The action does not silently switch to active projects or another project.",
+      "Recovery evidence: Reload after clearing and compare the resulting visible collection. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reload after clearing and compare the resulting visible collection.",
+    "review": "Review the agent's proposed diff: Does one state reset helper accidentally erase filters it does not own?",
+    "stretch": "Support shareable search links while excluding private draft text from URLs.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-distinguish-patch-from-replacement",
+    "parentId": "effect-tracker-edit",
+    "title": "Distinguish patch from replacement",
+    "concept": "Update contracts",
+    "brief": "A stored project has name, goal, priority, and a migration-added color; rename only its name.",
+    "explanation": "A narrow edit preserves fields that its editor does not own.",
+    "steps": [
+      "Create a repeatable fixture: A stored project has name, goal, priority, and a migration-added color; rename only its name. Record the starting rows and relevant UI state before making the change.",
+      "Define a validated update patch and apply only allowed keys inside the repository.",
+      "Rename using an older client payload that does not know the color field. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The new name persists while goal, priority, and color remain unchanged.",
+      "Unknown or immutable patch keys are rejected according to the contract.",
+      "Recovery evidence: Send createdAt and id in a malicious update patch. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Send createdAt and id in a malicious update patch.",
+    "review": "Review the agent's proposed diff: Did the agent use object spreading where an explicit allowed-field mapping is needed?",
+    "stretch": "Add contract fixtures for older clients that omit newly introduced optional fields.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-sort-without-losing-identity",
+    "parentId": "effect-tracker-edit",
+    "title": "Sort without losing identity",
+    "concept": "Stable list keys",
+    "brief": "Create three projects with equal updatedAt values and edit the second while sorting the table.",
+    "explanation": "Rendered row identity must survive ordering changes even when sort keys tie.",
+    "steps": [
+      "Create a repeatable fixture: Create three projects with equal updatedAt values and edit the second while sorting the table. Record the starting rows and relevant UI state before making the change.",
+      "Use stable IDs for React keys and add a deterministic ID tiebreaker to ordering.",
+      "Change the sort while one row contains an open inline editor. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The editor stays attached to the same project ID.",
+      "Text, errors, and pending indicators never jump into a neighboring row.",
+      "Recovery evidence: Update another row so it crosses the edited row in sort order. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Update another row so it crosses the edited row in sort order.",
+    "review": "Review the agent's proposed diff: Are array indices used anywhere as identity for mutable rows?",
+    "stretch": "Preserve the edited row in view using explicit scroll behavior instead of index guesses.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-undo-only-your-archive",
+    "parentId": "effect-tracker-edit",
+    "title": "Undo only your archive",
+    "concept": "Conditional compensation",
+    "brief": "Archive revision 8, then let another tab restore and rename the project before pressing Undo.",
+    "explanation": "An undo receipt may reverse its own unchanged result but must not overwrite later work.",
+    "steps": [
+      "Create a repeatable fixture: Archive revision 8, then let another tab restore and rename the project before pressing Undo. Record the starting rows and relevant UI state before making the change.",
+      "Capture the produced revision and require it for conditional undo.",
+      "Perform archive, external rename, then undo with the original receipt. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Later edits remain intact and the receipt reports its conflict.",
+      "Undo never restores a whole pre-archive snapshot over new fields.",
+      "Recovery evidence: Press the same undo action twice after one successful restoration. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Press the same undo action twice after one successful restoration.",
+    "review": "Review the agent's proposed diff: Does compensation target one transition or pretend to rewind the database?",
+    "stretch": "Add receipt expiry and explain why an expired receipt cannot promise safe reversal.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-project-tracker-specify-repository-ordering",
+    "parentId": "effect-tracker-layers",
+    "title": "Specify repository ordering",
+    "concept": "Service contracts",
+    "brief": "Seed three project rows in different insertion orders in memory and Dexie adapters.",
+    "explanation": "The repository contract must define whether ordering is guaranteed or delegated to its caller.",
+    "steps": [
+      "Create a repeatable fixture: Seed three project rows in different insertion orders in memory and Dexie adapters. Record the starting rows and relevant UI state before making the change.",
+      "Write a contract fixture with equal timestamps and a deterministic expected ordering.",
+      "Run the same read assertion against both adapters without adapting expected results. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Both implementations return the documented ordering.",
+      "The fake cannot pass by relying on an insertion-order accident.",
+      "Recovery evidence: Reverse seed order and repeat the contract suite. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reverse seed order and repeat the contract suite.",
+    "review": "Review the agent's proposed diff: Does the service signature make its ordering promise visible to callers?",
+    "stretch": "Add pagination contract checks that prove stable boundaries with equal sort keys.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-remove-shared-fake-state",
+    "parentId": "effect-tracker-layers",
+    "title": "Remove shared fake state",
+    "concept": "Layer isolation",
+    "brief": "Run two independent project-operation tests that each create an item named Scratch.",
+    "explanation": "A fresh test service must not inherit records or failure switches from another test.",
+    "steps": [
+      "Create a repeatable fixture: Run two independent project-operation tests that each create an item named Scratch. Record the starting rows and relevant UI state before making the change.",
+      "Allocate fake state inside each Layer construction rather than module-level mutable storage.",
+      "Run the tests in reversed order and with overlapping execution. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each test observes only its own Scratch project.",
+      "A rejected-write flag in one fixture never leaks into another fixture.",
+      "Recovery evidence: Mutate one fake after both runtimes are constructed. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Mutate one fake after both runtimes are constructed.",
+    "review": "Review the agent's proposed diff: Are default maps or arrays reused through a singleton export?",
+    "stretch": "Expose a read-only inspection capability for tests without exposing mutable production internals.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-model-failure-before-mutation",
+    "parentId": "effect-tracker-layers",
+    "title": "Model failure before mutation",
+    "concept": "Fake fidelity",
+    "brief": "Configure the in-memory repository to fail the next create of project Delta.",
+    "explanation": "A failed write should match the live adapter's atomicity, including whether data changed.",
+    "steps": [
+      "Create a repeatable fixture: Configure the in-memory repository to fail the next create of project Delta. Record the starting rows and relevant UI state before making the change.",
+      "Place the injected failure at the same semantic boundary as the live operation.",
+      "After failure, list rows and retry the same command ID. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The fake and live adapter agree on durable state after rejection.",
+      "The test fake never inserts a row before reporting a precommit failure.",
+      "Recovery evidence: Add a separate ambiguous-after-commit failure fixture and compare outcomes. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add a separate ambiguous-after-commit failure fixture and compare outcomes.",
+    "review": "Review the agent's proposed diff: Does one generic failure switch collapse materially different storage behaviors?",
+    "stretch": "Document failure injection points with before-commit and after-commit names.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-keep-execution-at-the-edge",
+    "parentId": "effect-tracker-layers",
+    "title": "Keep execution at the edge",
+    "concept": "Effect composition",
+    "brief": "Trace createProject from React through validation and repository insertion.",
+    "explanation": "An operation remains composable when it describes work without secretly starting another runtime.",
+    "steps": [
+      "Create a repeatable fixture: Trace createProject from React through validation and repository insertion. Record the starting rows and relevant UI state before making the change.",
+      "Remove nested execution from repository helpers and return their Effects to the caller.",
+      "Compose create followed by read with one supplied test Layer. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "One boundary controls execution and dependency provision.",
+      "Replacing the repository requires no global runtime monkey-patching.",
+      "Recovery evidence: Construct the composed Effect without running it and inspect repository call counts. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Construct the composed Effect without running it and inspect repository call counts.",
+    "review": "Review the agent's proposed diff: Did any refactor execute promises while building the supposedly lazy computation?",
+    "stretch": "Add cancellation tests showing which composed work has started at interruption time.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-close-owned-resources-once",
+    "parentId": "effect-tracker-layers",
+    "title": "Close owned resources once",
+    "concept": "Scoped resources",
+    "brief": "Use a repository adapter that opens a diagnostic channel when the feature runtime starts.",
+    "explanation": "A resource has one owner whose lifetime determines acquisition and release.",
+    "steps": [
+      "Create a repeatable fixture: Use a repository adapter that opens a diagnostic channel when the feature runtime starts. Record the starting rows and relevant UI state before making the change.",
+      "Represent channel acquisition and cleanup in the runtime's scoped construction.",
+      "Mount, unmount, and remount the feature while counting active channels. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Active channels return to zero after the owning scope closes.",
+      "Repeated disposal never leaves listeners or closes another runtime's channel.",
+      "Recovery evidence: Throw during acquisition after creating the channel but before readiness. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Throw during acquisition after creating the channel but before readiness.",
+    "review": "Review the agent's proposed diff: Is cleanup registered early enough to cover partially completed initialization?",
+    "stretch": "Track resource counters in development diagnostics to catch navigation leaks.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-keep-storage-types-private",
+    "parentId": "effect-tracker-layers",
+    "title": "Keep storage types private",
+    "concept": "Adapter boundaries",
+    "brief": "Replace Dexie with a fake whose methods return plain domain project records.",
+    "explanation": "Business operations should not depend on database table handles, cursors, or transaction objects.",
+    "steps": [
+      "Create a repeatable fixture: Replace Dexie with a fake whose methods return plain domain project records. Record the starting rows and relevant UI state before making the change.",
+      "Move persistence-specific types and conversions into the Dexie adapter.",
+      "Compile and exercise operations with a minimal fake service implementation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The fake implements only the documented domain-oriented operations.",
+      "Application code never reaches through the service to a Dexie table.",
+      "Recovery evidence: Change an adapter-only column representation without editing business operations. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change an adapter-only column representation without editing business operations.",
+    "review": "Review the agent's proposed diff: Is a supposedly reusable repository merely a renamed database API?",
+    "stretch": "Add an HTTP-backed adapter that preserves the same domain failure contract.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-use-a-controlled-id-stream",
+    "parentId": "effect-tracker-layers",
+    "title": "Use a controlled ID stream",
+    "concept": "Deterministic dependencies",
+    "brief": "Arrange generated IDs p-100, p-101, then an exhausted generator for three create attempts.",
+    "explanation": "Identity exhaustion is a dependency failure with no fallback to accidental duplicate IDs.",
+    "steps": [
+      "Create a repeatable fixture: Arrange generated IDs p-100, p-101, then an exhausted generator for three create attempts. Record the starting rows and relevant UI state before making the change.",
+      "Supply a deterministic ID service and map its failure before persistence.",
+      "Create twice successfully and attempt a third creation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The first two stored IDs match the supplied sequence exactly.",
+      "The failed third attempt leaves the repository unchanged.",
+      "Recovery evidence: Make the generator return an existing ID to exercise collision handling. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Make the generator return an existing ID to exercise collision handling.",
+    "review": "Review the agent's proposed diff: Does the code regenerate identity during a retry of one command?",
+    "stretch": "Add a collision fixture that distinguishes retrying generation from retrying delivery.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-contract-test-missing-updates",
+    "parentId": "effect-tracker-layers",
+    "title": "Contract-test missing updates",
+    "concept": "Adapter parity",
+    "brief": "Ask both adapters to update project missing-17 with a valid new name.",
+    "explanation": "A fake must not invent upsert behavior where the live service promises update-only semantics.",
+    "steps": [
+      "Create a repeatable fixture: Ask both adapters to update project missing-17 with a valid new name. Record the starting rows and relevant UI state before making the change.",
+      "State the not-found contract and implement the same typed result in both adapters.",
+      "Run create, update, delete-fixture, and missing-update sequences against both stores. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Successful updates preserve identity and increment the expected revision.",
+      "Missing updates produce no inserted project in either adapter.",
+      "Recovery evidence: Inject a read failure during an adapter's existence check. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Inject a read failure during an adapter's existence check.",
+    "review": "Review the agent's proposed diff: Can absence and an unavailable read be distinguished without catch-all conversion?",
+    "stretch": "Replace read-then-write with an atomic update result and retain the same contract.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-prove-dependency-replacement",
+    "parentId": "effect-tracker-layers",
+    "title": "Prove dependency replacement",
+    "concept": "Layer composition",
+    "brief": "Provide a failing live repository and a successful fake repository in separate feature tests.",
+    "explanation": "Tests should establish which implementation is actually used, not merely observe a green assertion.",
+    "steps": [
+      "Create a repeatable fixture: Provide a failing live repository and a successful fake repository in separate feature tests. Record the starting rows and relevant UI state before making the change.",
+      "Add call counters and distinct sentinel failures to the competing implementations.",
+      "Run the same operation with each explicitly provided Layer. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only the selected repository receives operation calls.",
+      "No hidden global repository bypasses the supplied service.",
+      "Recovery evidence: Accidentally omit the fake provision and ensure the test fails conspicuously. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Accidentally omit the fake provision and ensure the test fails conspicuously.",
+    "review": "Review the agent's proposed diff: Does the test exercise dependency wiring as well as the operation body?",
+    "stretch": "Add a startup validation that reports missing required services before the first user action.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-focus-the-first-actionable-error",
+    "parentId": "effect-tracker-accessible",
+    "title": "Focus the first actionable error",
+    "concept": "Accessible validation",
+    "brief": "Submit empty name and overlong goal, then correct only the name.",
+    "explanation": "Focus should reach the first remaining invalid field after each failed submission.",
+    "steps": [
+      "Create a repeatable fixture: Submit empty name and overlong goal, then correct only the name. Record the starting rows and relevant UI state before making the change.",
+      "Associate each message with its field and compute focus from current validation results.",
+      "Submit twice and record activeElement after each response. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The second submission focuses the goal field and announces its error.",
+      "The corrected name loses stale invalid state and stale error description.",
+      "Recovery evidence: Make server validation add a name conflict after client checks pass. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Make server validation add a name conflict after client checks pass.",
+    "review": "Review the agent's proposed diff: Is focus driven by the current error set rather than remembered field order?",
+    "stretch": "Add an error summary whose links move focus without submitting the form.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-announce-one-save-outcome",
+    "parentId": "effect-tracker-accessible",
+    "title": "Announce one save outcome",
+    "concept": "Live regions",
+    "brief": "Save a project on a slow connection while a polite status region is present.",
+    "explanation": "A successful command should create one useful announcement rather than repeated noisy rerenders.",
+    "steps": [
+      "Create a repeatable fixture: Save a project on a slow connection while a polite status region is present. Record the starting rows and relevant UI state before making the change.",
+      "Separate pending and terminal status text and stabilize the live-region container.",
+      "Observe accessibility output while unrelated form state rerenders repeatedly. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The final saved message is announced once for the accepted command.",
+      "A refresh of the project list does not replay the save announcement.",
+      "Recovery evidence: Resolve an older failed save after a newer successful save. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Resolve an older failed save after a newer successful save.",
+    "review": "Review the agent's proposed diff: Is announcement state keyed to operation identity instead of arbitrary renders?",
+    "stretch": "Add a status history that remains visually available without forcing repeated speech.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-return-focus-after-archive",
+    "parentId": "effect-tracker-accessible",
+    "title": "Return focus after archive",
+    "concept": "Dialog focus",
+    "brief": "Open archive confirmation from the third row using only the keyboard.",
+    "explanation": "Closing a dialog should restore a sensible focus target even if its trigger row disappears.",
+    "steps": [
+      "Create a repeatable fixture: Open archive confirmation from the third row using only the keyboard. Record the starting rows and relevant UI state before making the change.",
+      "Capture the trigger identity and define a fallback target after successful archive.",
+      "Cancel once, confirm once, and inspect focus in both paths. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Cancel returns focus to the original archive button.",
+      "Successful archive moves focus to a remaining list control instead of the document body.",
+      "Recovery evidence: Remove the next row while the archive dialog is still open. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Remove the next row while the archive dialog is still open.",
+    "review": "Review the agent's proposed diff: Does focus recovery query current DOM state rather than a detached element?",
+    "stretch": "Announce the archived project name and offer a keyboard-reachable undo action.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-handle-composition-input",
+    "parentId": "effect-tracker-accessible",
+    "title": "Handle composition input",
+    "concept": "IME behavior",
+    "brief": "Enter a Japanese project name through an input method and press Enter to choose a candidate.",
+    "explanation": "Composition confirmation must not be mistaken for intentional form submission.",
+    "steps": [
+      "Create a repeatable fixture: Enter a Japanese project name through an input method and press Enter to choose a candidate. Record the starting rows and relevant UI state before making the change.",
+      "Check composition state when handling custom Enter shortcuts.",
+      "Record submissions during composition start, update, end, and a final Enter. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "No command runs while the candidate is being committed.",
+      "A normal Enter after composition submits exactly once.",
+      "Recovery evidence: Deliver compositionend and keydown in adjacent events. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Deliver compositionend and keydown in adjacent events.",
+    "review": "Review the agent's proposed diff: Did the agent add a key handler that bypasses native form behavior unnecessarily?",
+    "stretch": "Test the same form with speech input and a mobile software keyboard.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-reveal-errors-without-color",
+    "parentId": "effect-tracker-accessible",
+    "title": "Reveal errors without color",
+    "concept": "Perceivable states",
+    "brief": "Make a name conflict appear in a form displayed in monochrome and at 200 percent zoom.",
+    "explanation": "Validation meaning must survive loss of color and increased text size.",
+    "steps": [
+      "Create a repeatable fixture: Make a name conflict appear in a form displayed in monochrome and at 200 percent zoom. Record the starting rows and relevant UI state before making the change.",
+      "Add text, semantic invalid state, and layout that wraps long messages.",
+      "Use a long project name inside the conflict message and inspect narrow layout. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The conflict and its recovery instruction remain readable without horizontal scrolling.",
+      "The submit button and error summary do not cover each other.",
+      "Recovery evidence: Replace the short English message with a translation twice as long. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Replace the short English message with a translation twice as long.",
+    "review": "Review the agent's proposed diff: Are fixed heights clipping the exact information needed for recovery?",
+    "stretch": "Create a visual-regression fixture with large text and reduced contrast settings.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-label-repeated-row-actions",
+    "parentId": "effect-tracker-accessible",
+    "title": "Label repeated row actions",
+    "concept": "Accessible names",
+    "brief": "Render four project cards whose menu buttons all visually display three dots.",
+    "explanation": "Assistive users need to distinguish which project's actions a repeated control opens.",
+    "steps": [
+      "Create a repeatable fixture: Render four project cards whose menu buttons all visually display three dots. Record the starting rows and relevant UI state before making the change.",
+      "Give action triggers contextual accessible names without duplicating visible prose.",
+      "Inspect the accessibility tree and navigate buttons by keyboard. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each menu trigger identifies its associated project.",
+      "A renamed project does not leave an obsolete accessible label.",
+      "Recovery evidence: Rename a project while its action menu is open. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Rename a project while its action menu is open.",
+    "review": "Review the agent's proposed diff: Does labeling follow the entity identity through list reorder and updates?",
+    "stretch": "Add a search shortcut that moves focus to the chosen project's action trigger.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-respect-reduced-motion",
+    "parentId": "effect-tracker-accessible",
+    "title": "Respect reduced motion",
+    "concept": "User preferences",
+    "brief": "Complete a project action when reduced motion is enabled and list animations normally run.",
+    "explanation": "Animation may decorate state changes but must not be required to understand completion.",
+    "steps": [
+      "Create a repeatable fixture: Complete a project action when reduced motion is enabled and list animations normally run. Record the starting rows and relevant UI state before making the change.",
+      "Provide a nonanimated status transition and avoid scroll motion for routine saves.",
+      "Toggle the preference and verify identical command outcomes and readable status. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Save feedback remains visible and understandable with animation removed.",
+      "Focus does not move solely to make an animated element visible.",
+      "Recovery evidence: Enable reduced motion while a list transition is already in progress. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Enable reduced motion while a list transition is already in progress.",
+    "review": "Review the agent's proposed diff: Is the animation's end callback incorrectly responsible for changing business state?",
+    "stretch": "Add a deterministic test that disables animations without shortening business timeouts.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-keep-pending-controls-understandable",
+    "parentId": "effect-tracker-accessible",
+    "title": "Keep pending controls understandable",
+    "concept": "Busy semantics",
+    "brief": "Submit a project while its text fields and cancel control remain visible.",
+    "explanation": "Busy presentation should communicate what can still change without trapping the user.",
+    "steps": [
+      "Create a repeatable fixture: Submit a project while its text fields and cancel control remain visible. Record the starting rows and relevant UI state before making the change.",
+      "Define whether fields are read-only or editable during save and label pending status.",
+      "Tab through the form during a deliberately delayed repository call. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Users can understand the pending action and reach permitted recovery controls.",
+      "Disabled styling alone does not hide the reason a command is unavailable.",
+      "Recovery evidence: Reject the request after the user changes an editable goal. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reject the request after the user changes an editable goal.",
+    "review": "Review the agent's proposed diff: Which draft version is saved, and is that version apparent in the UI?",
+    "stretch": "Display a pending snapshot alongside a newer unsaved draft when editing remains allowed.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-make-shortcuts-conflict-aware",
+    "parentId": "effect-tracker-accessible",
+    "title": "Make shortcuts conflict-aware",
+    "concept": "Keyboard interaction",
+    "brief": "Add a keyboard shortcut to create a project while the user types in a goal textarea.",
+    "explanation": "Global shortcuts must not steal normal text entry or browser accessibility commands.",
+    "steps": [
+      "Create a repeatable fixture: Add a keyboard shortcut to create a project while the user types in a goal textarea. Record the starting rows and relevant UI state before making the change.",
+      "Limit shortcut handling by target element, modifiers, and active modal state.",
+      "Type the shortcut characters inside inputs and invoke the shortcut from the list. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The shortcut opens creation only in the intended context.",
+      "Text entry, composition, and nested dialogs remain uninterrupted.",
+      "Recovery evidence: Invoke the shortcut while a confirmation dialog owns focus. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Invoke the shortcut while a confirmation dialog owns focus.",
+    "review": "Review the agent's proposed diff: Did the agent register listeners with cleanup and avoid duplicated handlers?",
+    "stretch": "Provide discoverable shortcut help with an option to disable custom shortcuts.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-project-tracker-define-page-selection-scope",
+    "parentId": "effect-tracker-bulk",
+    "title": "Define page selection scope",
+    "concept": "Selection semantics",
+    "brief": "Display twenty projects per page and select all while eighty match the current filter.",
+    "explanation": "A select-all label must identify whether it selects the page or the full filtered set.",
+    "steps": [
+      "Create a repeatable fixture: Display twenty projects per page and select all while eighty match the current filter. Record the starting rows and relevant UI state before making the change.",
+      "Implement a visible selection count and a separate full-result selection action if needed.",
+      "Select page one, navigate to page two, and inspect the confirmation target IDs. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The count and listed scope agree with the actual command payload.",
+      "Unseen projects are never silently included by an ambiguous checkbox.",
+      "Recovery evidence: Change page size between selection and confirmation. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change page size between selection and confirmation.",
+    "review": "Review the agent's proposed diff: Does selection store stable IDs or reconstruct targets from the current page?",
+    "stretch": "Add a server-issued selection snapshot for very large filtered collections.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-report-partial-archive-results",
+    "parentId": "effect-tracker-bulk",
+    "title": "Report partial archive results",
+    "concept": "Batch contracts",
+    "brief": "Archive five selected projects when one is missing and one repository write fails.",
+    "explanation": "A partial-success policy needs per-item outcomes that preserve retryable and permanent distinctions.",
+    "steps": [
+      "Create a repeatable fixture: Archive five selected projects when one is missing and one repository write fails. Record the starting rows and relevant UI state before making the change.",
+      "Return accepted, missing, and failed IDs and render their specific recovery options.",
+      "Inject each result category and compare the displayed rows with the stored rows. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The summary reports three successes, one missing item, and one failure.",
+      "Retry targets only the failed item rather than all five blindly.",
+      "Recovery evidence: Retry after the missing item is recreated with a new revision. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Retry after the missing item is recreated with a new revision.",
+    "review": "Review the agent's proposed diff: Is the command's batch policy documented rather than inferred from loop behavior?",
+    "stretch": "Provide a downloadable result report with IDs and safe error categories.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-prove-an-atomic-batch-rollback",
+    "parentId": "effect-tracker-bulk",
+    "title": "Prove an atomic batch rollback",
+    "concept": "Transaction ownership",
+    "brief": "Archive three projects in one transaction and fail the third update after two provisional changes.",
+    "explanation": "Atomic batch behavior requires one storage transaction covering every targeted row.",
+    "steps": [
+      "Create a repeatable fixture: Archive three projects in one transaction and fail the third update after two provisional changes. Record the starting rows and relevant UI state before making the change.",
+      "Place validation and mutation inside the transaction boundary chosen by the repository.",
+      "Read all three rows after the injected third-write failure. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every project retains its original active status and revision.",
+      "The UI never announces two durable successes for a rolled-back batch.",
+      "Recovery evidence: Repeat the operation after removing the injected failure. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Repeat the operation after removing the injected failure.",
+    "review": "Review the agent's proposed diff: Did any promise escape the transaction lifetime and commit independently?",
+    "stretch": "Compare the UX and implementation cost with an explicit partial-success alternative.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-handle-selection-after-filtering",
+    "parentId": "effect-tracker-bulk",
+    "title": "Handle selection after filtering",
+    "concept": "Hidden selection",
+    "brief": "Select Atlas and Boreal, then search so only Atlas remains visible.",
+    "explanation": "Hidden selected records need an explicit retain-or-clear policy before destructive-looking bulk actions.",
+    "steps": [
+      "Create a repeatable fixture: Select Atlas and Boreal, then search so only Atlas remains visible. Record the starting rows and relevant UI state before making the change.",
+      "Show hidden selection count or clear selection on filter changes with a visible explanation.",
+      "Apply search and archive filters in different orders before confirmation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The target payload matches the policy and displayed count.",
+      "Boreal is never affected without its inclusion being discoverable.",
+      "Recovery evidence: Clear the query while a bulk confirmation is already open. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Clear the query while a bulk confirmation is already open.",
+    "review": "Review the agent's proposed diff: Does the confirmation use a frozen target snapshot or mutable live selection?",
+    "stretch": "Offer a review-selected-only view before executing the batch.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-reject-stale-selected-rows",
+    "parentId": "effect-tracker-bulk",
+    "title": "Reject stale selected rows",
+    "concept": "Batch revisions",
+    "brief": "Select project revisions 2, 7, and 3, then edit the second project from another tab.",
+    "explanation": "Bulk commands should not overwrite conflicting revisions merely because selection happened earlier.",
+    "steps": [
+      "Create a repeatable fixture: Select project revisions 2, 7, and 3, then edit the second project from another tab. Record the starting rows and relevant UI state before making the change.",
+      "Include expected revisions in the selected target snapshot and choose a conflict policy.",
+      "Change one selected row before executing the batch. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Conflicts are reported with the exact affected project ID.",
+      "An old selection cannot replace the newly edited row's fields or status.",
+      "Recovery evidence: Reload the selected row and retry only after displaying its new state. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reload the selected row and retry only after displaying its new state.",
+    "review": "Review the agent's proposed diff: Does select-all capture revisions consistently with individually selected rows?",
+    "stretch": "Add a revalidation preview that identifies changes before the user confirms.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-cancel-long-batches-honestly",
+    "parentId": "effect-tracker-bulk",
+    "title": "Cancel long batches honestly",
+    "concept": "Batch interruption",
+    "brief": "Start archiving two hundred projects through a chunked partial-success worker.",
+    "explanation": "Cancellation stops future work while preserving an accurate account of already committed chunks.",
+    "steps": [
+      "Create a repeatable fixture: Start archiving two hundred projects through a chunked partial-success worker. Record the starting rows and relevant UI state before making the change.",
+      "Track processed IDs and stop scheduling new chunks after cancellation.",
+      "Cancel after chunk three and compare the receipt with actual database state. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The receipt lists every committed row and every unprocessed row.",
+      "Canceled status never implies that earlier durable chunks were undone.",
+      "Recovery evidence: Cancel while one chunk is in flight and let it finish afterward. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Cancel while one chunk is in flight and let it finish afterward.",
+    "review": "Review the agent's proposed diff: Is the final receipt assembled after in-flight work settles?",
+    "stretch": "Support resuming the same batch from its recorded unprocessed IDs.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-make-bulk-undo-conditional",
+    "parentId": "effect-tracker-bulk",
+    "title": "Make bulk undo conditional",
+    "concept": "Compensation receipts",
+    "brief": "Archive ten projects, then independently rename one and restore another before undo.",
+    "explanation": "Compensation should reverse only rows still at the revisions produced by the original batch.",
+    "steps": [
+      "Create a repeatable fixture: Archive ten projects, then independently rename one and restore another before undo. Record the starting rows and relevant UI state before making the change.",
+      "Store per-row result revisions and evaluate undo conditions individually.",
+      "Run undo and compare successful reversals with skipped conflicts. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Untouched rows restore while independently changed rows retain their new state.",
+      "A single conflicting row does not erase the receipt for other rows.",
+      "Recovery evidence: Submit the same undo receipt twice. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Submit the same undo receipt twice.",
+    "review": "Review the agent's proposed diff: Can the receipt itself be replayed without inventing extra state transitions?",
+    "stretch": "Add a result view explaining why each skipped row could not be safely reversed.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-keep-checkbox-navigation-usable",
+    "parentId": "effect-tracker-bulk",
+    "title": "Keep checkbox navigation usable",
+    "concept": "Table accessibility",
+    "brief": "Render selectable project rows with a header checkbox, mixed state, and row action menus.",
+    "explanation": "Selection and navigation are separate interactions with distinct accessible controls.",
+    "steps": [
+      "Create a repeatable fixture: Render selectable project rows with a header checkbox, mixed state, and row action menus. Record the starting rows and relevant UI state before making the change.",
+      "Use named checkboxes and expose the header's mixed state when some rows are selected.",
+      "Tab through selection, toggle with Space, and open a row action independently. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The header accurately exposes none, some, and all visible rows selected.",
+      "Clicking a checkbox never unexpectedly opens the project editor.",
+      "Recovery evidence: Sort the table while a row checkbox has focus. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Sort the table while a row checkbox has focus.",
+    "review": "Review the agent's proposed diff: Are checkbox IDs and labels derived from stable project IDs?",
+    "stretch": "Support a keyboard selection range with explicit scope and a documented escape route.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-audit-batch-payload-construction",
+    "parentId": "effect-tracker-bulk",
+    "title": "Audit batch payload construction",
+    "concept": "Agent review",
+    "brief": "An agent proposes archiving selected rows by reading visible checkbox positions after awaiting validation.",
+    "explanation": "The target set must remain bound to the user's confirmed identities across asynchronous gaps.",
+    "steps": [
+      "Create a repeatable fixture: An agent proposes archiving selected rows by reading visible checkbox positions after awaiting validation. Record the starting rows and relevant UI state before making the change.",
+      "Capture a command snapshot before awaiting and remove positional lookup from mutation code.",
+      "Reorder rows during the validation delay and inspect the affected IDs. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only the originally confirmed project IDs change status.",
+      "Newly visible rows cannot enter the command through a rerender.",
+      "Recovery evidence: Delete one confirmed row while the validation promise is pending. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Delete one confirmed row while the validation promise is pending.",
+    "review": "Review the agent's proposed diff: Can the reviewer trace every write target back to an explicit selection snapshot?",
+    "stretch": "Add a regression test that randomizes row order at every asynchronous boundary.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-default-absent-priority-only",
+    "parentId": "effect-tracker-migration",
+    "title": "Default absent priority only",
+    "concept": "Migration semantics",
+    "brief": "Load old projects with missing priority, valid low priority, and an explicitly invalid priority string.",
+    "explanation": "A migration must distinguish absent legacy fields from existing values that need validation.",
+    "steps": [
+      "Create a repeatable fixture: Load old projects with missing priority, valid low priority, and an explicitly invalid priority string. Record the starting rows and relevant UI state before making the change.",
+      "Specify a default for absence and a deliberate handling policy for malformed values.",
+      "Upgrade the fixture and inspect every migrated priority. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Missing values receive the documented default while valid values are preserved.",
+      "Malformed values are not silently treated as legitimate user choices.",
+      "Recovery evidence: Open the upgraded database again and compare serialized rows. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Open the upgraded database again and compare serialized rows.",
+    "review": "Review the agent's proposed diff: Does a truthiness check accidentally replace valid falsy legacy values?",
+    "stretch": "Produce a migration report that counts defaulted and quarantined records separately.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-preserve-historical-timestamps",
+    "parentId": "effect-tracker-migration",
+    "title": "Preserve historical timestamps",
+    "concept": "Data evolution",
+    "brief": "Upgrade active and archived projects created years earlier when adding priority and revision fields.",
+    "explanation": "Schema evolution must not rewrite historical facts as though every project were newly created.",
+    "steps": [
+      "Create a repeatable fixture: Upgrade active and archived projects created years earlier when adding priority and revision fields. Record the starting rows and relevant UI state before making the change.",
+      "Populate new fields without assigning current time to createdAt or archivedAt.",
+      "Compare pre-upgrade and post-upgrade historical fields byte for byte. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Historical dates and identities remain unchanged after migration.",
+      "The new build does not reorder old projects through artificial updatedAt changes.",
+      "Recovery evidence: Run the upgrade with a clock set far in the future. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Run the upgrade with a clock set far in the future.",
+    "review": "Review the agent's proposed diff: Are convenience model constructors incorrectly reused for migration records?",
+    "stretch": "Record a separate migratedAt diagnostic if operational visibility requires migration timing.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-recover-a-failed-upgrade",
+    "parentId": "effect-tracker-migration",
+    "title": "Recover a failed upgrade",
+    "concept": "Transactional migration",
+    "brief": "Force an exception halfway through upgrading a fixture containing fifty projects.",
+    "explanation": "An interrupted upgrade must not leave a database claiming the new version with half-shaped records.",
+    "steps": [
+      "Create a repeatable fixture: Force an exception halfway through upgrading a fixture containing fifty projects. Record the starting rows and relevant UI state before making the change.",
+      "Use the database's supported upgrade transaction and inject a midpoint failure.",
+      "Reopen after removing the failure and inspect schema version and all rows. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "A later successful open yields fifty valid upgraded records.",
+      "The failed attempt exposes neither mixed schema rows nor missing projects.",
+      "Recovery evidence: Crash the test connection immediately after the injected migration error. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Crash the test connection immediately after the injected migration error.",
+    "review": "Review the agent's proposed diff: Does retry resume safely because the old state remained intact?",
+    "stretch": "Add a pre-upgrade export path for installations with storage close to capacity.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-handle-an-older-open-tab",
+    "parentId": "effect-tracker-migration",
+    "title": "Handle an older open tab",
+    "concept": "Version change lifecycle",
+    "brief": "Keep the old application database connection open while a newer tab attempts the upgrade.",
+    "explanation": "A blocked upgrade needs visible recovery and must not masquerade as an empty fresh database.",
+    "steps": [
+      "Create a repeatable fixture: Keep the old application database connection open while a newer tab attempts the upgrade. Record the starting rows and relevant UI state before making the change.",
+      "Handle version-change and blocked-open events with a clear close-or-reload message.",
+      "Open both versions and observe behavior before and after closing the old connection. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The upgrade proceeds after the blocking tab releases its connection.",
+      "No code deletes the database to solve a blocked-open condition.",
+      "Recovery evidence: Reopen the old version after the new version has upgraded storage. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reopen the old version after the new version has upgraded storage.",
+    "review": "Review the agent's proposed diff: Does the user receive actionable information without losing their current draft?",
+    "stretch": "Add a cross-tab notice that identifies an available update without exposing record content.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-import-an-old-backup-after-upgrade",
+    "parentId": "effect-tracker-migration",
+    "title": "Import an old backup after upgrade",
+    "concept": "Versioned restore",
+    "brief": "Upgrade the database, then import a backup created before the priority field existed.",
+    "explanation": "Restore normalization and database migration must agree about the meaning of missing legacy fields.",
+    "steps": [
+      "Create a repeatable fixture: Upgrade the database, then import a backup created before the priority field existed. Record the starting rows and relevant UI state before making the change.",
+      "Route old backup decoding through an explicit version adapter before validation.",
+      "Compare a migrated old database row with the same row restored from old JSON. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Both paths produce equivalent domain records and defaults.",
+      "Import never bypasses validation simply because a backup is historically trusted.",
+      "Recovery evidence: Supply an old backup containing a malformed priority value anyway. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Supply an old backup containing a malformed priority value anyway.",
+    "review": "Review the agent's proposed diff: Are upgrade defaults duplicated in two places that can drift?",
+    "stretch": "Keep golden fixtures for each supported backup version and compare restored invariants.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-avoid-destructive-downgrade-assumptions",
+    "parentId": "effect-tracker-migration",
+    "title": "Avoid destructive downgrade assumptions",
+    "concept": "Compatibility boundaries",
+    "brief": "Start an older client against a database whose project records include new revision and priority fields.",
+    "explanation": "An older client must not replace newer records with a reduced shape that drops unfamiliar data.",
+    "steps": [
+      "Create a repeatable fixture: Start an older client against a database whose project records include new revision and priority fields. Record the starting rows and relevant UI state before making the change.",
+      "Document supported downgrade behavior and detect incompatible schema versions on open.",
+      "Attempt an edit from the older fixture client after the upgrade. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Unsupported versions receive a clear compatibility result before mutation.",
+      "No fallback path resets storage or strips the new fields.",
+      "Recovery evidence: Simulate a cached older service worker serving the outdated client shell. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Simulate a cached older service worker serving the outdated client shell.",
+    "review": "Review the agent's proposed diff: Does the deployment plan account for independently cached application and data versions?",
+    "stretch": "Add a minimum-writer version field to exported metadata and test its enforcement.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-budget-upgrade-storage",
+    "parentId": "effect-tracker-migration",
+    "title": "Budget upgrade storage",
+    "concept": "Capacity failures",
+    "brief": "Upgrade a database near quota when adding a searchable normalized-name index.",
+    "explanation": "A migration can require temporary storage, so capacity failure must preserve recoverable old data.",
+    "steps": [
+      "Create a repeatable fixture: Upgrade a database near quota when adding a searchable normalized-name index. Record the starting rows and relevant UI state before making the change.",
+      "Estimate the added footprint and surface quota failure through an explicit upgrade recovery state.",
+      "Inject quota rejection during index creation and inspect all original projects. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Old records remain available through a documented recovery or export path.",
+      "The interface never labels an upgrade failure as an empty account.",
+      "Recovery evidence: Free space and retry the same upgrade without deleting the fixture. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Free space and retry the same upgrade without deleting the fixture.",
+    "review": "Review the agent's proposed diff: Did an agent propose clearing user data as an automatic recovery shortcut?",
+    "stretch": "Show storage usage estimates before optional large indexes are built.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-check-malformed-legacy-rows",
+    "parentId": "effect-tracker-migration",
+    "title": "Check malformed legacy rows",
+    "concept": "Boundary validation",
+    "brief": "Prepare an old fixture with a missing name, a string timestamp, and a valid archived project.",
+    "explanation": "Migration policy must make corrupted legacy rows visible without discarding healthy neighboring records.",
+    "steps": [
+      "Create a repeatable fixture: Prepare an old fixture with a missing name, a string timestamp, and a valid archived project. Record the starting rows and relevant UI state before making the change.",
+      "Choose fail-whole-upgrade or quarantine behavior and implement a recoverable diagnostic.",
+      "Run the upgrade against each corruption independently and in combination. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The valid archived project is preserved according to the declared policy.",
+      "No malformed row becomes a silently accepted normal project.",
+      "Recovery evidence: Repair a quarantined row and rerun its validation path. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Repair a quarantined row and rerun its validation path.",
+    "review": "Review the agent's proposed diff: Does the report include stable IDs and safe reasons without dumping private goal text?",
+    "stretch": "Provide a repair preview that compares original and proposed normalized values.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-project-tracker-prove-migration-idempotence",
+    "parentId": "effect-tracker-migration",
+    "title": "Prove migration idempotence",
+    "concept": "Upgrade verification",
+    "brief": "Open the same old fixture with the new build, close it, and open it three more times.",
+    "explanation": "A completed upgrade should not repeatedly append defaults, increment revisions, or rewrite user content.",
+    "steps": [
+      "Create a repeatable fixture: Open the same old fixture with the new build, close it, and open it three more times. Record the starting rows and relevant UI state before making the change.",
+      "Capture the complete upgraded record set after the first successful open.",
+      "Compare subsequent opens and perform a normal edit between two of them. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Reopening alone produces no domain changes or extra revision increments.",
+      "The legitimate intervening edit survives every subsequent open.",
+      "Recovery evidence: Change the clock before each reopen to expose accidental timestamp rewrites. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change the clock before each reopen to expose accidental timestamp rewrites.",
+    "review": "Review the agent's proposed diff: Do tests verify stored rows rather than only the reported database version?",
+    "stretch": "Add a release checklist that includes old-fixture upgrade, reopen, edit, and export.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  }
+]

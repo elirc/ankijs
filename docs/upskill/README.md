@@ -51,3 +51,7 @@ A junior asks, "How do I make it work?" A mid-level engineer adds, "Is this the 
 - Ran `rg --files`, `git status --short -- .`, and focused `rg -n` anchor scans.
 - Earlier implementation pass verified `npm test` and `npm run build`; this documentation pass does not change product code.
 - No root `.github`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, Docker, or devcontainer files were found in repo-owned root files. A broad `.github` scan accidentally traversed `node_modules`; ignore third-party package metadata for this curriculum.
+
+## Placement and independent transfer
+
+Start the [seven-chapter independent practice pack](09-independent-practice/README.md) to diagnose gaps, follow source-checked deck/workshop routes, build evidence before reading solutions, and complete a reviewable capstone. Its route checker reads current catalogs without installing or retiring cards.

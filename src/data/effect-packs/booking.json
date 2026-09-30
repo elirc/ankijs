@@ -1,0 +1,2051 @@
+{
+  "id": "booking",
+  "title": "Booking & availability",
+  "kind": "Standalone app",
+  "summary": "Reserve shared resources with explicit time zones, overlap rules, expiring holds, and cancellation policies.",
+  "outcome": "A booking app that handles competing requests, time boundaries, rescheduling, and reminder delivery without double booking.",
+  "prerequisites": "Shared projects, inventory concurrency, and deterministic clocks. Begin with one resource type and a small explicit booking policy.",
+  "model": [
+    "Resource: id, ownerId, name, capacity, timeZone, active. Booking: resourceId, startsAt, endsAt, status, revision.",
+    "Hold: booking intent, expiry, operationId. AvailabilityRule: local weekday/time ranges and explicit exceptions.",
+    "Use half-open intervals [start, end) unless the product defines another boundary. Display zone and stored instants serve different purposes."
+  ],
+  "boundaries": "Local-time input → explicit zone resolution → booking service → concurrency-safe storage. Reminder work is delivered through an outbox.",
+  "milestones": [
+    {
+      "id": "effect-booking-resources",
+      "title": "Create resources and opening hours",
+      "concept": "Schema · calendar policy",
+      "brief": "Build resource CRUD and weekly availability rules with explicit ownership, capacity, and exception dates.",
+      "explanation": "Opening hours are local calendar rules, while a confirmed booking usually refers to specific instants. Keep those representations distinct. Define whether overnight hours are supported and how exceptions override the weekly schedule. Resource archival must have a declared effect on future bookings rather than silently deleting customer commitments.",
+      "steps": [
+        "Write examples for a closed day, an overnight range, an exception date, and resource archival. Define the supported capacity model.",
+        "Implement resource and availability-rule CRUD with validated time-zone identifiers and range boundaries. Scope every write to an authorized owner.",
+        "Display a human-readable weekly schedule and test keyboard editing, duplicate rules, and reload persistence."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Availability rules reject impossible or unsupported ranges."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Exception dates follow the documented precedence."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Resource archival preserves existing booking history."
+        }
+      ],
+      "experiment": "Create an exception on a normally open day and an opening on a normally closed day. Verify the schedule reflects the explicit override rule.",
+      "review": "Ask the agent to explain why a local recurring opening time cannot be represented by one fixed UTC offset for the entire year.",
+      "stretch": "Add an availability preview for a selected week without creating booking records.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-booking-timezones",
+      "title": "Resolve local times explicitly",
+      "concept": "Boundary decoding · ambiguous times",
+      "brief": "Convert selected local booking times into instants while handling nonexistent and repeated times at daylight-saving transitions.",
+      "explanation": "Some local clock times occur twice and others do not occur at all. A date, time, and time-zone identifier may therefore need a disambiguation policy. Validate the resolved interval, show the chosen zone to the user, and avoid silently interpreting input in the server's or browser's unrelated default zone.",
+      "steps": [
+        "Create fixtures around a forward and backward clock change in one supported zone, plus a zone without seasonal changes.",
+        "Implement explicit local-time resolution using the chosen time library and its documented disambiguation behavior. Reject or ask for clarification on ambiguous input according to your policy.",
+        "Round-trip stored instants to the displayed zone and test changing the viewer's zone without changing the booking itself."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Nonexistent and ambiguous times follow an explicit tested policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Stored duration and ordering remain correct across zone changes."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The confirmation clearly identifies the booking's displayed time zone."
+        }
+      ],
+      "experiment": "Choose a local time that occurs twice and submit both possible offsets. Verify they are treated as different instants rather than accidental duplicates.",
+      "review": "Document whether duration is elapsed time or wall-clock time. Do not hand-roll time-zone offset tables or assume every day lasts exactly 24 hours.",
+      "stretch": "Add a display showing the resource's zone and the customer's zone side by side.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-booking-overlap",
+      "title": "Reject conflicting reservations atomically",
+      "concept": "Interval constraints · transaction isolation",
+      "brief": "Prevent two clients from committing overlapping reservations for the same exclusive resource.",
+      "explanation": "Checking availability and later inserting a booking creates a race. Enforce the overlap rule at the database boundary using a suitable constraint or locking strategy. Adjacent intervals can be allowed under half-open semantics, but zero-length, reversed, and out-of-hours intervals still need separate validation.",
+      "steps": [
+        "Specify overlap examples, including exact adjacency, full containment, and identical intervals. Begin with capacity one before generalizing.",
+        "Implement the protected insert and map conflict into a typed domain error. Keep the selected form values so the user can choose another time.",
+        "Launch simultaneous overlapping requests against the real database and inspect committed rows. Test a rollback after a booking-related write fails."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only one conflicting request commits for an exclusive resource."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Allowed adjacent reservations remain possible."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Invalid or failed requests leave no partial booking records."
+        }
+      ],
+      "experiment": "Pause both requests after their availability read, then release them together. A correct implementation must still protect the invariant at commit.",
+      "review": "Show the constraint or lock that survives multiple API instances. A disabled browser button or process-local lock does not cover this race.",
+      "stretch": "Extend the model to capacity greater than one and explain why the exclusive-resource solution alone is insufficient.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-booking-holds",
+      "title": "Manage expiring temporary holds",
+      "concept": "Clock services · idempotent transitions",
+      "brief": "Hold availability briefly while a user confirms, then finalize or expire the hold exactly once.",
+      "explanation": "A hold is a temporary state with an expiry rule, not a confirmed booking. Confirmation and expiration may compete. Protect the transition and resource accounting in one transaction, and derive the authoritative expiry decision from a trusted clock. A client countdown is only a display of that server policy.",
+      "steps": [
+        "Define hold creation, extension if allowed, confirmation, and expiry. Set a maximum lifetime and a policy for repeated requests.",
+        "Implement a conditional state transition and an expiry worker with bounded batches. Return an established result when the same confirmation command is retried.",
+        "Test just-before, exactly-at, and just-after expiry using a controllable clock, including a worker restart."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Expired holds cannot be confirmed under the declared boundary rule."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Confirmation and expiry cannot both apply resource accounting."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A repeated command returns a consistent result without extra reservations."
+        }
+      ],
+      "experiment": "Race confirmation against the expiry worker at the same timestamp. Inspect both responses and the final hold and booking states.",
+      "review": "Explain which clock is authoritative and what happens when a worker runs late. Availability must not rely solely on a perfectly punctual background timer.",
+      "stretch": "Add a diagnostic showing expired-but-not-yet-cleaned holds without treating them as active capacity.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-booking-reschedule",
+      "title": "Reschedule without losing the old booking",
+      "concept": "Atomic replacement · version checks",
+      "brief": "Move a booking to a new interval while preserving the original reservation if the replacement cannot be accepted.",
+      "explanation": "Rescheduling is not safely implemented as an unconditional delete followed by create. Validate current permission and revision, reserve the replacement under the same concurrency rule, and release the old allocation inside one transaction where the storage model permits it. External side effects belong after the committed change.",
+      "steps": [
+        "Define who can reschedule and cancel, which time cutoffs apply, and how archived resources affect existing bookings.",
+        "Implement revision-aware reschedule and cancellation commands. Preserve old state on conflict and show both requested and current values for recovery.",
+        "Test an occupied destination, simultaneous cancellations, and two competing reschedules from one revision. Inspect history as well as availability."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "A rejected reschedule preserves the original booking."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Accepted changes update availability and history consistently."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Stale or repeated actions cannot release capacity twice."
+        }
+      ],
+      "experiment": "Attempt to move a booking into an interval another client reserves concurrently. Verify the losing request retains its old reservation.",
+      "review": "Check cancellation and rescheduling policies at the service boundary. UI date pickers can guide valid choices but cannot enforce a cutoff against direct requests.",
+      "stretch": "Add a waitlist promotion operation and prove that two workers cannot promote the same vacancy twice.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-booking-reminders",
+      "title": "Deliver reminders after committed changes",
+      "concept": "Outbox · stale job checks",
+      "brief": "Send reminders for current bookings and suppress jobs made obsolete by cancellation or rescheduling.",
+      "explanation": "A queued reminder describes a future action based on a past state. Recheck the current booking version before delivery, and distinguish an obsolete job from a transient provider failure. Commit the scheduling intent with the booking change, then let a separate worker deliver it with bounded retries and duplicate protection.",
+      "steps": [
+        "Model reminder identity, booking revision, scheduled time, attempt state, and delivery outcome. Define how rescheduling invalidates older jobs.",
+        "Add outbox creation to the booking transaction and a worker that checks current status before contacting a fake provider.",
+        "Test cancellation after queueing, rescheduling during a delayed attempt, a lost provider response, and worker restart."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only eligible current bookings produce reminders."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Obsolete jobs are recorded without sending stale details."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retries and restarts respect the declared duplicate-delivery policy."
+        }
+      ],
+      "experiment": "Queue a reminder, cancel the booking, then release the paused worker. Verify it observes cancellation before sending.",
+      "review": "A local receipt cannot prove whether an external provider accepted a timed-out request. Document the provider's idempotency support and remaining ambiguity.",
+      "stretch": "Deploy the app, restore a backup into a test environment, and ensure restored jobs cannot accidentally send real reminders.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-weekly-hours",
+      "parentId": "effect-booking-resources",
+      "title": "Represent split opening hours",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Configure Monday 09–12 and 13–17.",
+      "explanation": "A lunch closure must remain unbookable. Treat the two opening segments independently; combining their earliest start and latest end would accidentally reopen the lunch gap. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Decode non-overlapping opening segments. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Noon is closed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Morning booking works."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reversed segments fail."
+        }
+      ],
+      "experiment": "Submit duplicate 09–12 segments and verify that overlapping hours are rejected. Then submit adjacent 09–12 and 12–13 segments; accept them separately or merge them according to an explicitly documented policy, without closing the shared boundary.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Add overnight opening rules. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-holiday-override",
+      "parentId": "effect-booking-resources",
+      "title": "Override weekly availability",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Close Room A on December 24.",
+      "explanation": "A dated closure wins over recurring opening hours. The exception applies to the resource's local date, so a UTC date comparison alone may close the wrong interval. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Resolve exceptions before recurring schedule. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Closed date has no slots."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Adjacent day is unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Override is visible."
+        }
+      ],
+      "experiment": "Delete override from another tab. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Version schedule exceptions. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-resource-archive",
+      "parentId": "effect-booking-resources",
+      "title": "Archive a booked resource",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Archive Room A with Friday bookings.",
+      "explanation": "Archival cannot silently cancel accepted reservations. Customers still need a readable record and a clear policy for attending, moving, or cancelling their existing booking. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Separate new-booking eligibility from existing visibility. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "New bookings fail."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Existing bookings remain readable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Customers see resource context."
+        }
+      ],
+      "experiment": "Archive during checkout. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Add controlled replacement resources. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-capacity-edit",
+      "parentId": "effect-booking-resources",
+      "title": "Reduce resource capacity safely",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Reduce workshop seats from ten to four with six booked.",
+      "explanation": "Capacity cannot drop below accepted occupancy unnoticed. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Return a typed occupancy conflict. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reduction fails."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Six bookings survive."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Current capacity stays ten."
+        }
+      ],
+      "experiment": "Race reduction with another reservation. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Provide an explicit relocation workflow. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-schedule-keyboard",
+      "parentId": "effect-booking-resources",
+      "title": "Edit availability without dragging",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Set Tuesday hours using only keyboard.",
+      "explanation": "Calendar gestures need keyboard equivalents. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Add labeled time fields and remove controls. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Hours can be added."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Focus returns after deletion."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Validation names the interval."
+        }
+      ],
+      "experiment": "Delete the currently focused interval. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Test long localized labels. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-resource-rename",
+      "parentId": "effect-booking-resources",
+      "title": "Preserve booking identity after rename",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Rename Boardroom to North Room.",
+      "explanation": "A label change cannot create a new resource. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Update resource label while preserving identifier. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reservations keep their resource."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New name displays."
+        },
+        {
+          "id": "criterion-3",
+          "label": "History explains rename."
+        }
+      ],
+      "experiment": "Rename while details load. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Choose historical versus current labels. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-duration-step",
+      "parentId": "effect-booking-resources",
+      "title": "Validate selectable durations",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Resource accepts 30-minute slots only.",
+      "explanation": "UI increments cannot be the sole duration rule. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Validate duration and start alignment in service. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Thirty minutes works."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Forty minutes fails."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Crafted API input also fails."
+        }
+      ],
+      "experiment": "Send seconds in a start timestamp. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Allow resource-specific increments. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-schedule-conflict",
+      "parentId": "effect-booking-resources",
+      "title": "Reject stale hours edits",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Two admins edit Friday hours revision 5.",
+      "explanation": "One administrator cannot erase another schedule revision. Replacing the whole Friday array without comparing revisions can lose intervals the second administrator never saw. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use revision-aware schedule replacement. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One edit commits."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Other receives current schedule."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Draft values survive."
+        }
+      ],
+      "experiment": "Delay successful response behind conflict. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Add an explicit three-way comparison. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-resource-scope",
+      "parentId": "effect-booking-resources",
+      "title": "Isolate resource administration",
+      "concept": "Resource CRUD · schedule interpretation",
+      "brief": "Edit workspace B room from workspace A.",
+      "explanation": "Workspace ownership comes from verified context. Availability combines resource identity, calendar rules, and administrative changes. Keep the published schedule separate from reservations already accepted, and make each command explain its effect on existing customers.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Scope resource lookup and update together. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Foreign room is unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Error reveals no schedule."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A resources still work."
+        }
+      ],
+      "experiment": "Forge workspace ID in request body. Record persisted state and a recovery action.",
+      "review": "Review the source of each scheduling rule. Explain what is validated in the editor and what must be rechecked at commit.",
+      "stretch": "Test mixed-workspace bulk imports. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-spring-gap",
+      "parentId": "effect-booking-timezones",
+      "title": "Reject a nonexistent local time",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Select New York 2026-03-08 02:30.",
+      "explanation": "A missing clock hour must not silently shift bookings. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Surface a nonexistent-time validation result. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No instant is fabricated."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Form retains selection."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Nearby valid time succeeds."
+        }
+      ],
+      "experiment": "Post the missing time directly. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Suggest valid alternatives explicitly. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-fall-fold",
+      "parentId": "effect-booking-timezones",
+      "title": "Disambiguate repeated wall time",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Select New York 2026-11-01 01:30.",
+      "explanation": "A repeated clock reading needs an offset choice. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Present both supported instants with offsets. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Choices have different instants."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Selected offset persists."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Summary identifies the occurrence."
+        }
+      ],
+      "experiment": "Reload before confirmation. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Add a saved ambiguity preference. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-cross-midnight",
+      "parentId": "effect-booking-timezones",
+      "title": "Show bookings spanning dates",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Book 23:30–00:30 at resource zone.",
+      "explanation": "One reservation may occupy two calendar dates. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Render both dates and preserve interval duration. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Duration is sixty minutes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "End date is visible."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Calendar blocks both portions."
+        }
+      ],
+      "experiment": "Switch viewer zone during editing. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Add multi-day resource rules. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-half-hour-zone",
+      "parentId": "effect-booking-timezones",
+      "title": "Handle non-hour UTC offsets",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Book 09:00 in Asia/Kolkata.",
+      "explanation": "Offsets cannot be rounded to whole hours. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use zone conversion for storage and display. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Stored instant matches fixture."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Display returns 09:00."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Duration is unchanged."
+        }
+      ],
+      "experiment": "View the booking from London. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Add quarter-hour-offset fixtures. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-resource-viewer-zone",
+      "parentId": "effect-booking-timezones",
+      "title": "Separate resource and viewer zones",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "View Tokyo room from Los Angeles.",
+      "explanation": "Changing display zone cannot reschedule a booking. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Store selected instant independently of view preference. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reservation ID is unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Both zones are labeled."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Edit confirms resource-local time."
+        }
+      ],
+      "experiment": "Toggle zone during a pending save. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Persist user display preference. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-elapsed-duration",
+      "parentId": "effect-booking-timezones",
+      "title": "Define duration across clock changes",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Reserve across a spring-forward transition.",
+      "explanation": "Elapsed duration and wall-clock difference are distinct. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Declare the resource duration policy. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Stored duration follows policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Summary explains clock jump."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Validation uses the same policy."
+        }
+      ],
+      "experiment": "Repeat during fall-back transition. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Show elapsed duration beside local times. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-zone-change",
+      "parentId": "effect-booking-timezones",
+      "title": "Protect bookings when a resource moves zones",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Change virtual room zone from London to Berlin.",
+      "explanation": "Changing zone metadata cannot reinterpret stored instants. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Preserve bookings and preview display changes. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Existing instants stay fixed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Future schedule uses new zone."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Admin sees affected display."
+        }
+      ],
+      "experiment": "Change zone while creating a booking. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Version recurring schedule zones. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-date-only-filter",
+      "parentId": "effect-booking-timezones",
+      "title": "Search by local calendar date",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Search New York bookings on clock-change Sunday.",
+      "explanation": "A day filter must use zone-specific instant boundaries. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Derive half-open day boundaries via zone library. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All local-day bookings appear."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Neighboring dates are excluded."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Short day is handled."
+        }
+      ],
+      "experiment": "Include bookings exactly at midnight. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Compare resource-date and viewer-date filters. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-timezone-agent-audit",
+      "parentId": "effect-booking-timezones",
+      "title": "Review timezone conversion code",
+      "concept": "Local time · explicit ambiguity",
+      "brief": "Agent patch uses server Date parsing for local input.",
+      "explanation": "Machine-local defaults must not decide customer times. A local clock reading is not always one instant. Use the installed time-zone library and a declared ambiguity policy, retain the resource zone, and distinguish displayed wall time from stored instants.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Replace implicit conversion with explicit zone interpretation. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Server zone changes no result."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Ambiguous input is explicit."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Tests pin representative instants."
+        }
+      ],
+      "experiment": "Run fixtures under two process zones. Record persisted state and a recovery action.",
+      "review": "Ask the agent to show actual library behavior for the fixture. Avoid approving hand-written offsets or assumptions that every day has twenty-four hours.",
+      "stretch": "Document supported input formats. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-adjacent-slots",
+      "parentId": "effect-booking-overlap",
+      "title": "Allow exactly adjacent reservations",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Book 10–11 and 11–12 in Room A.",
+      "explanation": "Half-open intervals may touch without overlapping. The end instant belongs to the next interval; changing either comparison to inclusive can incorrectly reject back-to-back appointments. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Encode the chosen boundary convention. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both bookings commit."
+        },
+        {
+          "id": "criterion-2",
+          "label": "10:59 overlap fails."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Stored endpoints stay exact."
+        }
+      ],
+      "experiment": "Submit with millisecond boundaries. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Document display rounding. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-contained-interval",
+      "parentId": "effect-booking-overlap",
+      "title": "Reject enclosed reservations",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Existing reservation spans 09–17.",
+      "explanation": "Containment is overlap even when starts differ. Checking only whether the new start matches an existing start misses both fully enclosed and fully enclosing intervals. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Attempt 11–12 under database protection. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Inner booking fails."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Outer booking remains."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Conflict identifies permitted availability."
+        }
+      ],
+      "experiment": "Reverse which reservation arrives first. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Add enclosing interval tests. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-simultaneous-create",
+      "parentId": "effect-booking-overlap",
+      "title": "Race identical booking commands",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Send two distinct 10–11 requests concurrently.",
+      "explanation": "Exclusive capacity permits one committed owner. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Synchronize writers after availability reads. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly one booking commits."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Loser receives conflict."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No partial attendees remain."
+        }
+      ],
+      "experiment": "Run clients through separate server processes. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Measure contention latency. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-zero-duration",
+      "parentId": "effect-booking-overlap",
+      "title": "Reject empty intervals",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Submit start and end both 14:00.",
+      "explanation": "An empty interval is not a valid reservation. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Validate positive duration before protected insert. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No booking row appears."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Field error explains duration."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Adjacent valid slot succeeds."
+        }
+      ],
+      "experiment": "Send reversed start and end. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Add maximum-duration limits. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-cleanup-rollback",
+      "parentId": "effect-booking-overlap",
+      "title": "Roll back dependent reservation writes",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Create booking with required participant record.",
+      "explanation": "A booking cannot survive failed required attendee persistence. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Write booking and participants transactionally. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Participant failure leaves no booking."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Capacity remains available."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry succeeds."
+        }
+      ],
+      "experiment": "Fail participant insert after booking insert. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Add transactional audit evidence. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-multi-resource",
+      "parentId": "effect-booking-overlap",
+      "title": "Reserve room and equipment together",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Reserve Room A and Projector P for 15–16.",
+      "explanation": "A composite booking must acquire all resources or none. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Lock resource rows in consistent order. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both allocations commit together."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Conflict preserves neither partial allocation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Deadlock retry is bounded."
+        }
+      ],
+      "experiment": "Race inverse resource order requests. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Support optional equipment explicitly. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-buffer-time",
+      "parentId": "effect-booking-overlap",
+      "title": "Include preparation buffers in conflicts",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Book 10–11 with fifteen-minute cleanup.",
+      "explanation": "Displayed meeting time differs from blocked occupancy. The cleanup buffer is part of resource allocation even though the customer's meeting ends earlier on the confirmation screen. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Protect expanded occupancy interval. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "11:05 conflicts."
+        },
+        {
+          "id": "criterion-2",
+          "label": "11:15 is allowed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "UI explains buffer."
+        }
+      ],
+      "experiment": "Edit buffer policy after reservations exist. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Version occupancy policy per booking. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-capacity-two",
+      "parentId": "effect-booking-overlap",
+      "title": "Enforce shared-resource capacity",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Allow two simultaneous desks in Pool A.",
+      "explanation": "Pairwise overlap rejection does not model multiple seats. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Count protected occupancy across interval segments. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Two overlaps commit."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Third conflicts."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Nonoverlapping third succeeds."
+        }
+      ],
+      "experiment": "Race three clients at the same barrier. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Test staggered partial overlaps. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-constraint-mapping",
+      "parentId": "effect-booking-overlap",
+      "title": "Translate storage conflicts accurately",
+      "concept": "Interval invariants · concurrent reservations",
+      "brief": "Trigger the database overlap constraint.",
+      "explanation": "Expected overlap is not an unknown server failure. A preflight availability read guides the user but cannot guarantee a reservation. Protect interval invariants at the storage boundary and turn conflicts into recoverable domain results across multiple application instances.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Map only identified constraint failure to domain conflict. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Conflict becomes recoverable UI."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unrelated database error stays distinct."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Draft interval remains."
+        }
+      ],
+      "experiment": "Trigger a different unique constraint. Record persisted state and a recovery action.",
+      "review": "Point to the committed-state constraint or locking protocol. Explain why the test exercises actual competing transactions rather than sequential mock calls.",
+      "stretch": "Record safe diagnostic identifiers. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-expiry-equality",
+      "parentId": "effect-booking-holds",
+      "title": "Decide the exact expiry boundary",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Confirm hold H1 exactly at expiresAt.",
+      "explanation": "Equality with expiration needs a single declared outcome. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use the same comparison in confirmation and availability. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Boundary outcome matches policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Capacity is consistent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "UI explains expired state."
+        }
+      ],
+      "experiment": "Race cleanup at the identical instant. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Add precision-rounding fixtures. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-late-cleanup",
+      "parentId": "effect-booking-holds",
+      "title": "Ignore expired uncleaned holds",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Leave expired H2 untouched by cleanup.",
+      "explanation": "Delayed workers cannot block availability forever. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Evaluate active holds using authoritative time. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Slot becomes available."
+        },
+        {
+          "id": "criterion-2",
+          "label": "H2 cannot confirm."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Cleanup later is harmless."
+        }
+      ],
+      "experiment": "Pause cleanup for an hour. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Expose expired backlog separately. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-extend-limit",
+      "parentId": "effect-booking-holds",
+      "title": "Bound repeated hold extensions",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Extend a five-minute hold repeatedly.",
+      "explanation": "Extensions cannot monopolize a resource indefinitely. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Enforce a maximum lifetime from creation. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Allowed extension succeeds."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Lifetime cap rejects excess."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Existing expiry stays intact."
+        }
+      ],
+      "experiment": "Race two extension commands. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Limit active holds per user. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-confirm-retry",
+      "parentId": "effect-booking-holds",
+      "title": "Replay confirmation consistently",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Lose response after H3 becomes confirmed.",
+      "explanation": "Repeated confirmation cannot create another booking. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Persist command result with transition. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Retry returns same booking."
+        },
+        {
+          "id": "criterion-2",
+          "label": "One allocation exists."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Changed payload is rejected."
+        }
+      ],
+      "experiment": "Restart server before retry. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Retain confirmation receipts by policy. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-hold-ownership",
+      "parentId": "effect-booking-holds",
+      "title": "Protect another customer's hold",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "User B attempts to confirm user A hold.",
+      "explanation": "Knowing a hold ID is insufficient authorization. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Resolve owner from authenticated command context. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "B is denied."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A retains hold."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Response hides customer details."
+        }
+      ],
+      "experiment": "Swap hold ID in checkout request. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Support explicit transferable holds. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-countdown-resume",
+      "parentId": "effect-booking-holds",
+      "title": "Refresh stale browser countdowns",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Suspend tab until H4 expires.",
+      "explanation": "Suspended tabs must not display authoritative availability. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Refresh server state when tab resumes. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Expired hold is identified."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Confirm control updates."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Entered details remain recoverable."
+        }
+      ],
+      "experiment": "Resume without network. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Show last-verified status clearly. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-hold-cancel",
+      "parentId": "effect-booking-holds",
+      "title": "Release a cancelled hold once",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Cancel H5 twice while worker also expires it.",
+      "explanation": "Repeated cancellation must not inflate capacity. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use conditional state transition for release. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One terminal state wins."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Capacity releases once."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Repeated request is stable."
+        }
+      ],
+      "experiment": "Race confirm against cancellation. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Record winning transition reason. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-worker-batches",
+      "parentId": "effect-booking-holds",
+      "title": "Expire holds in bounded batches",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Seed 1201 expired holds with batch size 100.",
+      "explanation": "Cleanup needs progress without monopolizing database locks. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Checkpoint deterministic batch processing. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All eligible holds finish."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Live holds remain."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Restart resumes safely."
+        }
+      ],
+      "experiment": "Crash after the fourth committed batch. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Measure oldest expired-hold age. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-hold-agent-debug",
+      "parentId": "effect-booking-holds",
+      "title": "Find a hidden clock dependency",
+      "concept": "Temporary ownership · clock-controlled transitions",
+      "brief": "Inject test clock while one helper calls Date.now.",
+      "explanation": "Tests must reveal a service reading real time unexpectedly. Holds are state transitions with authoritative expiry and bounded lifetime. A browser countdown is advisory; confirmation and cleanup must agree on eligibility even when workers run late or clients retry.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Trace every expiry-time dependency. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Boundary test is deterministic."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Helper uses declared clock."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Production behavior is unchanged."
+        }
+      ],
+      "experiment": "Run test with far-future fake time. Record persisted state and a recovery action.",
+      "review": "Trace which clock decides validity and where capacity changes. Demonstrate the exact expiry boundary with deterministic time instead of waiting in real time.",
+      "stretch": "Add time-source review guidance. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-occupied-destination",
+      "parentId": "effect-booking-reschedule",
+      "title": "Keep the original on destination conflict",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Move B1 from 09–10 into occupied 11–12.",
+      "explanation": "Failed replacement cannot erase accepted capacity. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Attempt replacement within one transaction. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Original remains reserved."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Destination remains unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "User sees conflict."
+        }
+      ],
+      "experiment": "Reserve destination after preview. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Suggest nearby alternatives. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-stale-reschedule",
+      "parentId": "effect-booking-reschedule",
+      "title": "Reject competing booking edits",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Two tabs move revision 3 to different hours.",
+      "explanation": "Only one update can consume a displayed revision. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Compare expected revision during replacement. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One update commits."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Other sees current time."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No second booking appears."
+        }
+      ],
+      "experiment": "Delay the winning response. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Offer conflict-aware retry. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-cancel-cutoff",
+      "parentId": "effect-booking-reschedule",
+      "title": "Enforce cancellation cutoffs server-side",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Cancel five minutes after a one-hour cutoff.",
+      "explanation": "A stale browser cannot extend cancellation rights. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Evaluate policy from trusted time. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Late cancellation fails."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Booking remains."
+        },
+        {
+          "id": "criterion-3",
+          "label": "UI states cutoff reason."
+        }
+      ],
+      "experiment": "Manipulate browser clock backward. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Add administrator override evidence. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-cancel-idempotent",
+      "parentId": "effect-booking-reschedule",
+      "title": "Make repeated cancellation stable",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Retry cancel B2 after lost response.",
+      "explanation": "Cancellation cannot release occupied capacity twice. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Persist or derive established cancellation result. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Booking stays cancelled."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Availability is correct."
+        },
+        {
+          "id": "criterion-3",
+          "label": "History has one transition."
+        }
+      ],
+      "experiment": "Race retries across two servers. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Include refund-intent identity. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-transfer-resource",
+      "parentId": "effect-booking-reschedule",
+      "title": "Move between resources atomically",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Move B3 from Room A to Room B.",
+      "explanation": "A resource transfer must not leave dual ownership. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Protect both resource allocations consistently. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "B3 has one resource."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Old capacity releases."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Failure preserves Room A."
+        }
+      ],
+      "experiment": "Race another transfer in reverse direction. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Compare ordered locking strategies. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-partial-series",
+      "parentId": "effect-booking-reschedule",
+      "title": "Edit one recurring occurrence",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Move only Tuesday in a weekly series.",
+      "explanation": "A single-occurrence edit cannot rewrite the whole series. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Model an occurrence exception with stable identity. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Other dates stay unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Exception is visible."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reminder targets moved occurrence."
+        }
+      ],
+      "experiment": "Regenerate series after exception. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Add future-occurrences scope preview. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-waitlist-promote",
+      "parentId": "effect-booking-reschedule",
+      "title": "Promote one waiting customer per vacancy",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Cancel a full session with two waiting people.",
+      "explanation": "Competing workers cannot consume one vacancy twice. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Protect vacancy claim and promotion transaction. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One person is promoted."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Queue order follows policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Other remains waiting."
+        }
+      ],
+      "experiment": "Run two promotion workers simultaneously. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Support promotion offer expiry. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-reason-retention",
+      "parentId": "effect-booking-reschedule",
+      "title": "Retain user reasons during conflicts",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Enter a long reschedule reason in stale tab.",
+      "explanation": "A rejected edit must not discard written context. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Preserve local reason while refreshing booking state. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reason survives conflict."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Current booking is shown."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry needs explicit user action."
+        }
+      ],
+      "experiment": "Fail network after conflict response. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Add draft recovery after reload. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-replacement-history",
+      "parentId": "effect-booking-reschedule",
+      "title": "Record the actual replaced revision",
+      "concept": "Atomic replacement · recoverable conflicts",
+      "brief": "Reschedule B4 twice within one second.",
+      "explanation": "History must explain both old and new intervals. Changing a booking is a protected replacement of accepted state. Preserve the original when the destination fails, bind edits to a revision, and publish downstream work only after the replacement commits.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Commit revision-linked change events. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each move has correct predecessor."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Equal times sort stably."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Rollback adds no event."
+        }
+      ],
+      "experiment": "Fail history insert before commit. Record persisted state and a recovery action.",
+      "review": "Review every destructive write before the destination is secured. Explain the state after each injected failure, including history and related reminder intent.",
+      "stretch": "Build a booking history diff. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-cancelled-reminder",
+      "parentId": "effect-booking-reminders",
+      "title": "Suppress a cancelled booking reminder",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Cancel B8 after reminder R8 is queued.",
+      "explanation": "Queued work does not override current booking state. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Recheck booking state before provider call. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No message is sent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Job is marked obsolete."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Cancellation history remains."
+        }
+      ],
+      "experiment": "Pause worker before eligibility read. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Record suppression categories. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-rescheduled-reminder",
+      "parentId": "effect-booking-reminders",
+      "title": "Invalidate reminders from old revisions",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Move B9 after an old reminder is scheduled.",
+      "explanation": "A reminder must describe the current reservation. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Bind jobs to booking revision. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old job is suppressed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New time has one intent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Message uses current details."
+        }
+      ],
+      "experiment": "Deliver old job after new job. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Choose overdue reminder policy. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-provider-timeout",
+      "parentId": "effect-booking-reminders",
+      "title": "Represent uncertain reminder delivery",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Provider accepts then drops its response.",
+      "explanation": "Timeout does not prove provider rejection. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use provider identity and an uncertain state. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No false delivered claim appears."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Retry follows contract."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Operator sees uncertainty."
+        }
+      ],
+      "experiment": "Restart before recording timeout. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Add provider lookup reconciliation. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-duplicate-worker",
+      "parentId": "effect-booking-reminders",
+      "title": "Protect one reminder claim",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Acquire R10 concurrently from two processes.",
+      "explanation": "Two workers must not blindly send the same job. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use expiring claims with guarded completion. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One active claim exists."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Losing worker skips."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Restart can recover abandoned claim."
+        }
+      ],
+      "experiment": "Let claim expire during a slow call. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Add fencing or provider idempotency. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-quiet-hours",
+      "parentId": "effect-booking-reminders",
+      "title": "Schedule around customer quiet hours",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Reminder falls at 02:00 customer time.",
+      "explanation": "Reminder timing must honor the declared local policy. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Calculate allowed delivery window explicitly. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Delivery moves to allowed time."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Booking cutoff is respected."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Zone is recorded."
+        }
+      ],
+      "experiment": "Change customer zone before sending. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Define preference-change semantics. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-address-change",
+      "parentId": "effect-booking-reminders",
+      "title": "Choose the correct recipient snapshot",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Change email after reminder intent is committed.",
+      "explanation": "Mutable contact data needs a declared send-time policy. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Resolve recipient under documented snapshot policy. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Chosen address is explainable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unauthorized address is rejected."
+        },
+        {
+          "id": "criterion-3",
+          "label": "History records source revision."
+        }
+      ],
+      "experiment": "Remove email before worker runs. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Support verified destination changes. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-restore-isolation",
+      "parentId": "effect-booking-reminders",
+      "title": "Prevent restored jobs contacting real customers",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Restore a backup containing pending reminders.",
+      "explanation": "A test restore must not inherit live delivery capability. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use isolated provider configuration and delivery guard. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No live call occurs."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Jobs remain inspectable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Rehearsal results are recorded."
+        }
+      ],
+      "experiment": "Start worker before opening UI. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Make environment checks explicit. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-lag-alert",
+      "parentId": "effect-booking-reminders",
+      "title": "Detect reminders that miss their useful window",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Pause worker until reminders are overdue.",
+      "explanation": "Queue count alone hides time-sensitive failure. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Measure oldest eligible age and overdue outcome. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Alert identifies stale work."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Expired reminders follow policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Fresh reminders continue."
+        }
+      ],
+      "experiment": "Mix one poison job with healthy jobs. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Create a recovery runbook. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-booking-reminder-release",
+      "parentId": "effect-booking-reminders",
+      "title": "Verify delivery across a schema upgrade",
+      "concept": "Delayed work · external delivery evidence",
+      "brief": "Upgrade reminder payload version with queued v1 jobs.",
+      "explanation": "Old pending jobs must remain understandable after deployment. A reminder is a delayed effect based on mutable booking state. Check current eligibility before sending, record durable intent, and distinguish provider acceptance from a response that was merely lost.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Decode supported versions and migrate deliberately. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "V1 jobs remain actionable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "V2 jobs render correctly."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unsupported jobs quarantine safely."
+        }
+      ],
+      "experiment": "Roll back after producing v2 intent. Record persisted state and a recovery action.",
+      "review": "Examine whether the provider contract supports idempotency. Describe any remaining ambiguity honestly and show how an operator can resolve uncertain delivery.",
+      "stretch": "Document version overlap. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ],
+  "track": "Project practice"
+}

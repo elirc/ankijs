@@ -1,0 +1,5012 @@
+{
+  "effect-tracker-create": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tracker-edit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tracker-layers": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tracker-accessible": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tracker-bulk": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tracker-migration": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-normalize-before-measuring": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-preserve-a-rejected-draft": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-separate-empty-from-loading": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-defeat-double-submission": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-keep-time-deterministic": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-map-unknown-rejections": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-choose-a-duplicate-name-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-cancel-without-imaginary-rollback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-keep-form-text-inert": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-reject-stale-editor-revisions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-search-literal-punctuation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-archive-during-editing": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-navigate-away-from-dirty-input": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-missing-record-recovery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-make-clear-search-predictable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-distinguish-patch-from-replacement": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-sort-without-losing-identity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-undo-only-your-archive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-specify-repository-ordering": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-remove-shared-fake-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-model-failure-before-mutation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-keep-execution-at-the-edge": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-close-owned-resources-once": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-keep-storage-types-private": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-use-a-controlled-id-stream": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-contract-test-missing-updates": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-prove-dependency-replacement": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-focus-the-first-actionable-error": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-announce-one-save-outcome": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-return-focus-after-archive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-handle-composition-input": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-reveal-errors-without-color": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-label-repeated-row-actions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-respect-reduced-motion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-keep-pending-controls-understandable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-make-shortcuts-conflict-aware": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-define-page-selection-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-report-partial-archive-results": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-prove-an-atomic-batch-rollback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-handle-selection-after-filtering": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-reject-stale-selected-rows": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-cancel-long-batches-honestly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-make-bulk-undo-conditional": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-keep-checkbox-navigation-usable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-audit-batch-payload-construction": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-default-absent-priority-only": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-preserve-historical-timestamps": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-recover-a-failed-upgrade": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-handle-an-older-open-tab": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-import-an-old-backup-after-upgrade": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-avoid-destructive-downgrade-assumptions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-budget-upgrade-storage": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-check-malformed-legacy-rows": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-tracker-prove-migration-idempotence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-milestones-crud": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-milestones-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-milestones-atomic": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-milestones-dependencies": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-milestones-summary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-milestones-retrieval": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-reject-an-orphan-task": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-interpret-date-only-deadlines": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-keep-task-order-stable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-archive-a-parent-with-children": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-move-tasks-across-projects": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-distinguish-clear-from-omit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-restore-a-deleted-task-draft": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-enforce-title-limits-centrally": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-keep-list-counts-truthful": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-require-evidence-before-completion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-validate-evidence-links-safely": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-keep-evidence-ownership-intact": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-reopen-when-proof-changes": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-prevent-duplicate-evidence-links": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-separate-observation-from-claim": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-retain-evidence-across-reopen": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-make-uploads-independent-of-completion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-export-meaningful-completion-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-complete-task-and-update-summary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-delete-a-task-with-edges": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-move-a-task-with-summary-counters": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-keep-network-work-outside-transactions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-avoid-caught-transaction-failures": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-validate-batch-reassignment-atomically": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-distinguish-rollback-from-compensation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-test-transaction-scope-wiring": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-serialize-completion-with-deletion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-reject-a-direct-self-edge": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-detect-an-indirect-cycle": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-race-two-harmless-looking-edges": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-block-premature-completion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-handle-prerequisite-deletion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-explain-blocked-work-accessibly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-keep-cross-project-rules-explicit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-bound-graph-traversal-work": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-reopen-prerequisite-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-choose-the-completion-denominator": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-handle-zero-task-progress": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-calculate-overdue-by-project-date": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-avoid-count-multiplication-in-joins": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-retain-last-good-summary-on-refresh": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-make-aggregate-updates-race-safe": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-drill-from-summary-to-exact-rows": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-explain-weighted-progress": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-detect-inconsistent-cached-summaries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-turn-a-failure-into-a-focused-card": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-link-learning-without-copying-secrets": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-deduplicate-repeated-lessons": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-preserve-source-provenance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-write-falsifiable-debugging-prompts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-separate-solution-from-retrieval-cue": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-update-a-lesson-after-correction": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-create-contrastive-implementation-reviews": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-project-milestones-measure-transfer-with-a-new-task": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-import-decode": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-import-commit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-import-roundtrip": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-import-csv": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-import-bounded": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-import-compatibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-separate-syntax-from-row-errors": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-treat-decoded-input-as-unknown": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-report-multiple-row-problems": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-normalize-identity-consistently": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-bound-diagnostic-size": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-handle-empty-input-deliberately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-preserve-original-row-references": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-validate-finite-numbers": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-keep-previews-free-of-side-effects": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-bind-confirmation-to-one-plan": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-detect-changes-since-preview": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-make-duplicate-ids-explicit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-prove-all-or-nothing-import": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-explain-merge-versus-replace": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-make-repeated-commit-safe": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-validate-selected-row-imports": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-keep-secrets-out-of-merge-logs": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-review-generated-merge-code": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-round-trip-relationships": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-preserve-unicode-text": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-keep-timestamps-unambiguous": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-exclude-transient-ui-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-verify-a-consistent-snapshot": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-test-malformed-restore-recovery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-export-without-hidden-omissions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-handle-browser-download-failures": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-compare-semantic-equality": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-parse-quoted-commas": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-support-multiline-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-handle-byte-order-marks": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-map-headers-deliberately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-protect-spreadsheet-exports": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-treat-locale-numbers-explicitly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-retain-empty-versus-missing-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-limit-unclosed-quoted-input": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-test-delimiter-detection-ambiguity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-chunk-validation-without-freezing": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-cancel-the-current-parse-only": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-virtualize-preview-rows-accessibly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-bound-concurrent-enrichment": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-report-monotonic-progress": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-release-canceled-buffers": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-separate-validation-from-commit-batching": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-apply-backpressure-to-parsing": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-keep-error-pages-bounded": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-reject-unknown-future-versions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-adapt-renamed-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-keep-canonical-fixtures-immutable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-handle-added-required-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-define-unknown-field-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-version-enum-changes": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-preserve-stable-identities-across-conversion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-negotiate-export-targets-honestly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-import-preview-review-compatibility-as-a-release-gate": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sharing-auth": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sharing-members": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sharing-conflicts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sharing-invitations": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sharing-rls": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sharing-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-authorize-the-addressed-project": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-ignore-forged-ownership-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-expire-sessions-during-editing": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-authorize-nested-resources": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-prevent-client-chosen-roles": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-choose-nondisclosing-missing-responses": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-apply-authorization-to-exports": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-recheck-access-at-mutation-time": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-separate-authorization-from-validation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-protect-the-last-owner": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-prevent-role-escalation-by-editors": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-paginate-comments-with-stable-cursors": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-authorize-comment-edits-by-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-handle-removed-members-in-history": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-filter-comments-before-pagination": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-validate-membership-changes-against-self-lockout": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-make-comments-text-safe": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-review-list-query-tenant-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-return-a-useful-conflict-snapshot": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-keep-revision-checks-atomic": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-avoid-whole-object-conflict-merges": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-handle-archived-conflicts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-roll-out-a-nullable-column-first": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-backfill-without-overwriting-edits": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-validate-conflict-retries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-keep-migrations-reversible-in-meaning": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-test-old-clients-after-new-writes": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-hash-invitation-secrets": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-enforce-expiry-at-acceptance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-make-acceptance-single-use": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-bind-invitations-to-intended-identity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-recheck-inviter-authority": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-prevent-open-redirects-after-acceptance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-keep-token-urls-out-of-referrers": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-handle-existing-membership": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-rate-limit-token-guessing-safely": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-test-anonymous-reads": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-test-insert-ownership-checks": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-test-update-before-and-after": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-verify-delete-restrictions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-exercise-service-role-boundaries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-check-membership-changes-promptly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-prevent-policy-recursion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-scope-joins-and-views": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-make-policy-tests-mutation-sensitive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-record-actor-from-trusted-context": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-commit-access-change-with-its-event": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-capture-before-and-after-roles": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-protect-audit-visibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-keep-audit-events-append-only": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-order-events-deterministically": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-distinguish-attempted-from-committed": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-retain-meaningful-deleted-references": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-shared-projects-export-audit-evidence-consistently": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sync-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sync-outbox": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sync-lifecycle": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sync-cache": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sync-concurrency": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-sync-reconcile": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-retry-only-transient-failures": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-cap-total-retry-duration": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-jitter-synchronized-clients": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-respect-server-retry-guidance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-keep-timeout-outcomes-honest": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-stop-retries-on-cancellation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-preserve-the-original-cause": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-avoid-nested-retry-multiplication": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-test-retry-schedules-deterministically": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-commit-intent-with-local-mutation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-deduplicate-remote-delivery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-delete-only-acknowledged-entries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-preserve-per-entity-order": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-handle-poison-entries-visibly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-coalesce-only-compatible-edits": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-survive-browser-restart": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-keep-payload-versions-explicit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-separate-discard-from-undo": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-own-one-worker-per-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-release-connectivity-listeners": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-observe-background-failures": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-stop-work-on-account-switch": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-bound-diagnostic-history": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-distinguish-paused-from-failed": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-redact-diagnostic-requests": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-avoid-busy-polling-when-idle": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-make-shutdown-observable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-key-cache-by-principal": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-ignore-obsolete-search-responses": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-invalidate-exact-affected-queries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-roll-back-optimistic-patches-conditionally": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-set-freshness-by-data-meaning": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-deduplicate-concurrent-reads": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-cache-failures-deliberately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-bound-cache-growth": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-keep-offline-freshness-visible": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-bound-active-deliveries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-keep-entity-lanes-ordered": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-claim-work-across-tabs": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-renew-leases-safely": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-prevent-starvation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-apply-rate-limits-globally": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-separate-concurrency-from-throughput": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-stop-scheduling-after-fatal-configuration": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-test-scheduler-invariants-under-reorder": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-compare-revisions-before-repair": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-respect-deletion-tombstones": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-repair-missing-local-receipts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-resolve-divergent-field-edits": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-reconcile-pagination-snapshots": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-quarantine-unrecognized-remote-data": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-keep-reconciliation-resumable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-audit-repair-decisions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-reliable-sync-prove-convergence-after-repeated-sync": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tickets-slice": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tickets-workflow": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tickets-release": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tickets-attachments": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tickets-sla": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-tickets-contracts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-trace-one-ticket-through-the-stack": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-validate-server-side-title-limits": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-map-missing-tickets-separately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-preserve-ticket-drafts-after-failure": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-prevent-duplicate-ticket-creation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-keep-sql-parameters-separate": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-paginate-with-a-stable-order": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-preserve-immutable-ticket-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-make-create-errors-accessible": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-define-allowed-status-transitions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-assign-only-eligible-agents": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-audit-status-with-the-mutation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-reject-stale-assignments": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-separate-public-replies-from-notes": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-make-reassignment-notifications-idempotent": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-preserve-conversation-ordering": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-require-resolution-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-undo-a-mistaken-assignment-safely": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-compose-search-filters-consistently": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-index-the-actual-query": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-avoid-n-plus-one-assignee-reads": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-restore-a-production-like-backup": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-check-deep-links-after-deployment": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-make-rollback-compatible-with-new-data": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-measure-end-to-end-loading": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-handle-failed-deployment-assets": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-review-release-evidence-by-claim": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-authorize-upload-intent": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-verify-uploaded-object-metadata": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-keep-object-keys-unguessable-and-scoped": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-finalize-once-after-upload": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-clean-up-orphaned-uploads": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-authorize-downloads-at-access-time": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-delete-metadata-and-bytes-safely": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-preview-untrusted-attachments-safely": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-show-upload-progress-honestly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-define-the-response-clock": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-pause-only-for-defined-states": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-separate-first-response-from-resolution": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-avoid-duplicate-escalation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-recalculate-priority-changes-deliberately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-use-trusted-event-timestamps": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-render-countdowns-without-excessive-work": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-keep-historical-policies-stable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-explain-breach-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-version-response-envelopes": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-keep-error-codes-stable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-specify-patch-nullability": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-validate-pagination-cursors": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-keep-optional-fields-additive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-constrain-enum-expansion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-test-handlers-through-real-serialization": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-document-idempotency-lifetime": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-support-desk-review-breaking-changes-deliberately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-inventory-catalog": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-inventory-race": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-inventory-lifecycle": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-inventory-transfer": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-inventory-count": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-inventory-load": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-separate-product-identity-from-sku": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-validate-integral-stock-units": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-keep-the-ledger-append-only": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-derive-availability-from-explicit-components": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-enforce-unique-normalized-skus": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-keep-opening-stock-auditable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-archive-without-erasing-stock-history": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-search-barcode-values-literally": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-reconcile-cached-balances-with-ledger": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-reserve-the-final-unit-atomically": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-reserve-multiple-products-in-one-order": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-order-locks-consistently": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-keep-availability-checks-in-sql": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-avoid-lost-balance-updates": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-bind-reservation-to-expected-product-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-prove-isolation-assumptions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-handle-conditional-update-misses": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-review-race-fixes-against-the-invariant": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-make-release-idempotent": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-expire-only-active-reservations": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-use-trusted-expiration-time": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-extend-with-revision-checks": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-fulfill-quantity-exactly-once": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-recover-abandoned-in-flight-requests": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-prevent-unauthorized-cancellation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-distinguish-cancel-from-return": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-keep-cleanup-failure-recoverable": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-move-stock-without-creating-it": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-model-goods-in-transit-explicitly": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-reserve-source-capacity-atomically": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-reject-identical-locations": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-handle-partial-receipt": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-cancel-only-the-unreceived-remainder": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-authorize-both-transfer-endpoints": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-preserve-transfer-history-during-renames": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-reconcile-unmatched-movement-pairs": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-count-against-a-defined-snapshot": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-separate-observed-count-from-adjustment": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-require-approval-for-large-variances": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-prevent-duplicate-count-posting": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-handle-zero-as-an-observation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-use-blind-counts-intentionally": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-reconcile-reservations-with-shortages": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-keep-count-scope-explicit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-audit-count-to-ledger-provenance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-assert-conservation-under-load": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-measure-conflict-rate-separately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-use-independent-database-connections": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-bound-connection-demand": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-detect-hot-key-contention": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-test-long-tail-transaction-delays": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-verify-idempotency-at-scale": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-keep-benchmark-setup-reproducible": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-inventory-review-optimization-against-durable-guarantees": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-crm-directory": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-crm-pipeline": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-crm-deduplicate": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-crm-search": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-crm-activities": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-crm-portability": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-email-optional": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-company-archive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-unicode-name": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-contact-move": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-field-error-focus": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-phone-extension": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-delete-references": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-tenant-company": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-form-double-submit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-minor-units": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-currency-mismatch": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-stage-required": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-drag-conflict": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-probability-bounds": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-terminal-reopen": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-owner-deactivation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-negative-refund": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-board-keyboard": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-email-collision": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-winner-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-deal-links": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-cross-workspace-merge": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-preview-revision": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-merge-redirect": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-merge-concurrency": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-merge-undo": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-merge-agent-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-cursor-ties": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-search-race": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-accent-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-filter-cursor": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-scope-counts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-debounce-accessibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-index-measurement": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-url-search-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-deleted-selection": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-note-edit-history": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-activity-order": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-deleted-actor": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-private-note": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-outbox-activity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-rich-text-note": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-import-provenance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-attachment-removal": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-agent-timeline-debug": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-csv-formula": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-export-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-archive-bulk": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-restore-links": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-schema-upgrade": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-export-cancel": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-retention-hold": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-roundtrip-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-customer-crm-recovery-runbook": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-booking-resources": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-booking-timezones": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-booking-overlap": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-booking-holds": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-booking-reschedule": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-booking-reminders": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-weekly-hours": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-holiday-override": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-resource-archive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-capacity-edit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-schedule-keyboard": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-resource-rename": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-duration-step": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-schedule-conflict": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-resource-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-spring-gap": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-fall-fold": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-cross-midnight": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-half-hour-zone": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-resource-viewer-zone": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-elapsed-duration": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-zone-change": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-date-only-filter": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-timezone-agent-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-adjacent-slots": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-contained-interval": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-simultaneous-create": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-zero-duration": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-cleanup-rollback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-multi-resource": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-buffer-time": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-capacity-two": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-constraint-mapping": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-expiry-equality": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-late-cleanup": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-extend-limit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-confirm-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-hold-ownership": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-countdown-resume": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-hold-cancel": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-worker-batches": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-hold-agent-debug": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-occupied-destination": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-stale-reschedule": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-cancel-cutoff": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-cancel-idempotent": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-transfer-resource": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-partial-series": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-waitlist-promote": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-reason-retention": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-replacement-history": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-cancelled-reminder": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-rescheduled-reminder": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-provider-timeout": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-duplicate-worker": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-quiet-hours": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-address-change": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-restore-isolation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-lag-alert": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-booking-reminder-release": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-approval-drafts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-approval-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-approval-decisions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-approval-delegation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-approval-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-approval-release": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-partial-draft": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-snapshot-edit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-double-submit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-withdraw-edit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-draft-conflict": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-attachment-snapshot": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-submission-accessibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-request-clone": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-submission-rollback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-self-approval": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-revoked-role": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-unassigned-reviewer": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-threshold-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-team-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-policy-explanation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-admin-bypass": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-policy-table": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-agent-policy-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-opposing-decisions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-decision-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-payload-reuse": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-superseded-submission": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-two-reviewers": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-rejection-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-reason-draft": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-decision-audit-rollback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-decision-shortcuts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-future-window": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-expiry-window": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-revoke-open-page": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-scope-category": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-actor-provenance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-delegation-cycle": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-redelegation-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-overlapping-grants": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-grant-editor-a11y": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-same-time-history": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-snapshot-links": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-actor-deleted": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-history-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-projection-rebuild": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-redacted-reason": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-audit-export": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-missing-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-agent-audit-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-old-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-notification-failure": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-obsolete-message": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-payload-upgrade": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-restore-provenance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-rollback-status": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-canary-workflow": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-outbox-duplicates": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-approval-workflow-release-runbook": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-files-folders": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-files-intents": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-files-resume": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-files-finalize": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-files-download": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-files-retention": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-folder-cycle": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-sibling-name": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-root-move": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-breadcrumb-rename": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-destination-access": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-archive-descendants": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-tree-keyboard": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-deep-tree": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-stale-folder-move": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-intent-owner": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-size-ceiling": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-mime-claim": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-intent-expiry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-destination-archived": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-quota-race": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-filename-display": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-intent-idempotency": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-intent-agent-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-chunk-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-chunk-gap": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-resume-reload": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-session-expiry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-wrong-file-resume": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-cancel-transfer": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-progress-truth": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-bounded-parallelism": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-resume-debug": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-digest-mismatch": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-size-mismatch": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-finalize-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-scan-pending": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-version-race": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-metadata-rollback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-publish-permission": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-preview-safety": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-finalize-accessibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-foreign-file": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-link-expiry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-revoked-issued-link": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-filename-header": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-range-request": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-download-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-cache-leak": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-stream-cancel": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-download-focus": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-restore-version": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-soft-delete": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-shared-object": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-orphan-intent": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-cleanup-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-retention-hold": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-backup-manifest": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-storage-reconcile": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-file-library-retention-agent-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-notify-inbox": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-notify-preferences": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-notify-outbox": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-notify-providers": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-notify-callbacks": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-notify-digests": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-recipient-isolation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-read-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-mark-all-boundary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-inbox-pagination": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-optimistic-read": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-keyboard-inbox": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-deleted-target": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-inbox-delete": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-inbox-agent-debug": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-default-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-required-notices": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-queued-optout": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-channel-specific": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-preference-conflict": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-quiet-window": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-unsubscribe-token": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-settings-accessibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-preference-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-business-rollback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-commit-discovery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-outbox-identity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-claim-expiry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-batch-fairness": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-poison-intent": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-cancel-intent": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-outbox-query": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-agent-outbox-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-rate-limit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-bad-recipient": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-ambiguous-timeout": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-provider-swap": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-secret-redaction": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-timeout-budget": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-provider-response": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-fallback-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-provider-health": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-callback-signature": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-callback-duplicate": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-callback-order": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-unknown-message": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-bounce-after-delivery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-callback-tenant": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-callback-body-limit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-callback-read-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-callback-recovery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-window-boundaries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-digest-timezone": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-empty-digest": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-digest-resume": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-membership-snapshot": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-digest-optout": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-large-digest": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-late-events": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-notifications-digest-release": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-webhooks-receive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-webhooks-signatures": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-webhooks-deduplicate": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-webhooks-order": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-webhooks-replay": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-webhooks-operations": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-ack-before-commit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-malformed-envelope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-oversized-body": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-restart-pending": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-provider-identity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-content-type": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-backpressure": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-ingestion-dashboard": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-ingest-agent-debug": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-raw-whitespace": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-missing-signature": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-timestamp-expired": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-future-timestamp": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-key-overlap": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-signature-format": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-constant-time-check": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-secret-redaction": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-endpoint-confusion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-same-event-retry": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-digest-conflict": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-crash-mid-apply": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-crash-after-commit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-worker-race": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-multi-effect": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-receipt-retention": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-external-send": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-agent-idempotency-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-older-version": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-missing-predecessor": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-sequence-gap": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-same-version-conflict": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-terminal-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-fetch-race": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-independent-streams": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-timestamp-ties": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-reducer-permutations": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-replay-permission": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-dry-run-writes": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-bounded-selection": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-overlap-replay": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-handler-version": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-replay-cancel": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-replay-reason": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-replay-report": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-replay-agent-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-oldest-age": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-poison-isolation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-failure-categories": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-restart-accounting": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-redacted-inspection": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-retry-jitter": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-worker-shutdown": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-canary-repair": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-webhook-console-operations-accessibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-agent-specification": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-agent-context": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-agent-regression": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-agent-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-agent-refactor": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-agent-release": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-search-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-bulk-delete-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-empty-state-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-money-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-permission-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-offline-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-accessible-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-scope-cut": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-ambiguity-log": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-version-baseline": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-service-map": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-error-channel": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-existing-conventions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-dependency-surface": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-adapter-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-resource-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-context-minimum": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-api-proof": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-lost-update-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-search-order-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-duplicate-submit-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-permission-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-clock-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-rollback-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-accessibility-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-data-shape-repro": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-test-false-positive": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-missing-tenant-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-coercion-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-catch-all-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-mass-assignment-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-transaction-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-performance-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-dependency-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-destructive-default-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-review-findings": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-single-boundary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-typed-errors": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-injected-storage": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-runtime-edge": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-cleanup-refactor": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-parallel-reads": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-retry-boundary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-transaction-service": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-refactor-diff": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-evidence-record": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-migration-rehearsal": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-rollback-rehearsal": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-performance-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-release-note": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-independent-rebuild": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-failure-runbook": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-backup-recovery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-drill-agent-delivery-portfolio-retrospective": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-draft-ownership": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-list-transformations": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-async-order": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-closure-ownership": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-pure-core": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-integrated-editor": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-record-identity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-meaningful-defaults": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-empty-aggregation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-immutable-update": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-stale-load": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-await-batch": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-captured-command": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-loop-capture": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-module-boundary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-agent-review-core": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-snapshot-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-js-foundations-failure-narrative": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-decode-boundary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-state-union": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-exhaustive-handling": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-capability-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-patch-semantics": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-boundary-service": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-decode-nested": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-normalization-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-request-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-transition-table": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-narrow-null": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-honest-guards": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-generic-preservation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-extra-fields": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-optional-migration": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-patch-agent-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-contract-fake": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-typescript-domain-explain-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-describe-run": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-failure-channels": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-service-layer": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-resource-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-bounded-work": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-retry-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-lazy-values": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-compose-boundary": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-promise-adapter": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-recover-deliberately": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-layer-lifetime": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-service-agent-check": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-scope-placement": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-interrupted-cleanup": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-cancel-adapter": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-race-read": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-ambiguous-write": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-effect-runtime-runtime-teachback": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-model": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-constraints": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-queries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-transactions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-performance": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-migrations": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-junction": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-historical": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-active-unique": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-delete-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-null-logic": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-join-fanout": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-optimistic": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-isolation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-explain": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-cursor-contract": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-backfill": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-relational-foundations-migration-proof": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-lifecycle": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-contracts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-forms": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-state": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-validators": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-integration": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-methods": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-statuses": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-absence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-dates": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-error-focus": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-submission": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-races": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-optimistic-ui": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-cache-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-invalidate": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-fault-matrix": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-http-interface-agent-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-identity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-sessions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-tenant-scope": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-injection": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-uploads": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-privileges": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-permission-matrix": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-revocation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-session-life": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-origin-boundaries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-nested-access": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-bulk-authorization": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-query-shape": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-rich-content": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-bounded-input": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-storage-paths": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-safe-audit": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-secure-crud-regressions": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-requirements": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-capacity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-boundaries": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-async-path": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-cache": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-tradeoffs": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-latency-budget": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-scope-priorities": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-concurrency": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-storage-growth": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-invariants": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-dependency-direction": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-job-capacity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-job-ownership": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-cache-stampede": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-cache-versioning": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-diagram-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-system-design-foundations-design-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-consistency": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-outbox": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-retry-budget": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-queue-delivery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-slo": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-recovery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-partition-policy": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-concurrent-updates": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-idempotency": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-relay-recovery": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-backpressure": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-deadline-propagation": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-event-ordering": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-poison-messages": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-observability": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-burn-rate": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-recovery-integrity": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-distributed-reliability-incident-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-tenant-design": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-read-write-search": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-media-consistency": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-multi-region": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-schema-evolution": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-architecture-evidence": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-tenant-fairness": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-tenant-sharding": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-projection-rebuild": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-search-authorization": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-orphan-cleanup": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-media-deletion": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-failover-authority": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-region-conflicts": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-migration-load": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-deployment-compatibility": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-adversarial-review": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ],
+  "effect-architecture-studio-review-handoff": [
+    "criterion-1",
+    "criterion-2",
+    "criterion-3"
+  ]
+}

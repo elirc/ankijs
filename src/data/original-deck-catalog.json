@@ -1,0 +1,128 @@
+[
+  {
+    "id": "a0000000-0000-4000-8000-000000000002",
+    "name": "JavaScript & TypeScript",
+    "track": "Frontend",
+    "icon": "braces",
+    "color": "amber",
+    "description": "Know what your code actually does.",
+    "topics": [
+      "Async",
+      "Types",
+      "Closures"
+    ],
+    "resource": {
+      "label": "MDN · JavaScript guide",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide"
+    },
+    "cardCount": 16
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000000003",
+    "name": "React & frontend",
+    "track": "Frontend",
+    "icon": "react",
+    "color": "blue",
+    "description": "Build interfaces that stay predictable.",
+    "topics": [
+      "State",
+      "Effects",
+      "Accessibility"
+    ],
+    "resource": {
+      "label": "React · Learn",
+      "url": "https://react.dev/learn"
+    },
+    "cardCount": 16
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000000004",
+    "name": "System design",
+    "track": "Backend",
+    "icon": "network",
+    "color": "mint",
+    "description": "Think in tradeoffs, boundaries, and scale.",
+    "topics": [
+      "Caching",
+      "Reliability",
+      "Distribution"
+    ],
+    "resource": {
+      "label": "AWS · Builders’ Library",
+      "url": "https://aws.amazon.com/builders-library/"
+    },
+    "cardCount": 16
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000000005",
+    "name": "Databases & SQL",
+    "track": "Backend",
+    "icon": "database",
+    "color": "rose",
+    "description": "Ask better questions of your data.",
+    "topics": [
+      "Queries",
+      "Indexes",
+      "Transactions"
+    ],
+    "resource": {
+      "label": "PostgreSQL · Tutorial",
+      "url": "https://www.postgresql.org/docs/current/tutorial.html"
+    },
+    "cardCount": 16
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000000006",
+    "name": "APIs & networking",
+    "track": "Backend",
+    "icon": "globe",
+    "color": "blue",
+    "description": "Understand the request behind the response.",
+    "topics": [
+      "HTTP",
+      "Security",
+      "Web platform"
+    ],
+    "resource": {
+      "label": "MDN · HTTP",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP"
+    },
+    "cardCount": 16
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000000007",
+    "name": "Testing & debugging",
+    "track": "Practice",
+    "icon": "bug",
+    "color": "amber",
+    "description": "Find the cause. Ship with confidence.",
+    "topics": [
+      "Test design",
+      "Debugging",
+      "Reliability"
+    ],
+    "resource": {
+      "label": "Testing Library · Guiding principles",
+      "url": "https://testing-library.com/docs/guiding-principles/"
+    },
+    "cardCount": 16
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000000008",
+    "name": "Engineering craft",
+    "track": "Practice",
+    "icon": "git",
+    "color": "violet",
+    "description": "Read code, review changes, own the outcome.",
+    "topics": [
+      "Git",
+      "Code review",
+      "Architecture"
+    ],
+    "resource": {
+      "label": "Pro Git · The book",
+      "url": "https://git-scm.com/book/en/v2"
+    },
+    "cardCount": 16
+  }
+]

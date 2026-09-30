@@ -1,0 +1,427 @@
+{
+  "projects": 14,
+  "activities": 84,
+  "instructionalWords": 19590,
+  "identities": {
+    "effect-tracker-create": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tracker-edit": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tracker-layers": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tracker-accessible": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tracker-bulk": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tracker-migration": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-milestones-crud": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-milestones-evidence": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-milestones-atomic": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-milestones-dependencies": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-milestones-summary": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-milestones-retrieval": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-import-decode": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-import-commit": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-import-roundtrip": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-import-csv": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-import-bounded": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-import-compatibility": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sharing-auth": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sharing-members": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sharing-conflicts": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sharing-invitations": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sharing-rls": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sharing-audit": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sync-retry": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sync-outbox": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sync-lifecycle": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sync-cache": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sync-concurrency": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-sync-reconcile": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tickets-slice": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tickets-workflow": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tickets-release": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tickets-attachments": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tickets-sla": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-tickets-contracts": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-inventory-catalog": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-inventory-race": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-inventory-lifecycle": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-inventory-transfer": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-inventory-count": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-inventory-load": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-crm-directory": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-crm-pipeline": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-crm-deduplicate": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-crm-search": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-crm-activities": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-crm-portability": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-booking-resources": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-booking-timezones": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-booking-overlap": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-booking-holds": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-booking-reschedule": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-booking-reminders": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-approval-drafts": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-approval-policy": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-approval-decisions": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-approval-delegation": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-approval-audit": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-approval-release": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-files-folders": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-files-intents": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-files-resume": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-files-finalize": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-files-download": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-files-retention": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-notify-inbox": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-notify-preferences": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-notify-outbox": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-notify-providers": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-notify-callbacks": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-notify-digests": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-webhooks-receive": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-webhooks-signatures": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-webhooks-deduplicate": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-webhooks-order": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-webhooks-replay": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-webhooks-operations": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-agent-specification": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-agent-context": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-agent-regression": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-agent-review": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-agent-refactor": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ],
+    "effect-agent-release": [
+      "criterion-1",
+      "criterion-2",
+      "criterion-3"
+    ]
+  }
+}

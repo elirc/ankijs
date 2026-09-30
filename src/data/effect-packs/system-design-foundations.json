@@ -1,0 +1,835 @@
+{
+  "title": "System design foundations",
+  "summary": "Design a measured modular task board through requirements, capacity estimates, ownership, jobs, caching, and evidence-backed tradeoffs.",
+  "outcome": "A local architecture workbook and runnable task-board slices with numeric budgets, failure traces, and defensible component choices.",
+  "prerequisites": "Basic TypeScript, Effect services, and one working CRUD path. No distributed deployment is required.",
+  "model": [
+    "Task: tenantId, taskId, title, assigneeId, status, version, createdAt, updatedAt.",
+    "Requirements record measurement boundaries, workload assumptions, latency and freshness budgets, and exclusions.",
+    "Jobs and caches carry workflow or derived state; Tasks and Membership retain authoritative ownership."
+  ],
+  "boundaries": "Browser → Effect application services → module-owned repositories → one transactional database, with a bounded local worker for durable jobs. Justify each additional boundary.",
+  "resources": [
+    {
+      "label": "Google SRE: service-level objectives",
+      "url": "https://sre.google/sre-book/service-level-objectives/"
+    },
+    {
+      "label": "Effect: resource scopes",
+      "url": "https://effect.website/docs/v3/resource-management/scope"
+    },
+    {
+      "label": "PostgreSQL: transaction isolation",
+      "url": "https://www.postgresql.org/docs/current/transaction-iso.html"
+    }
+  ],
+  "id": "system-design-foundations",
+  "kind": "Standalone app",
+  "track": "System design",
+  "milestones": [
+    {
+      "id": "effect-system-design-foundations-requirements",
+      "title": "Turn product wishes into measurable promises",
+      "concept": "Functional scope and nonfunctional budgets",
+      "brief": "Design a shared task board for 200 teams. Tasks can be created, assigned, completed, and listed. Establish what a successful interaction actually promises before choosing components.",
+      "explanation": "A requirement names observable behavior; a design choice names one way to provide it. Keep these separate so an agent cannot turn an assumed queue into an accidental requirement. Start with a modular monolith and one transactional database. Define authorization, durability, latency, freshness, and availability independently. A fast response that loses a task is not success. A percentile target needs a workload, measurement boundary, and observation window; it does not promise that every request finishes within that duration.",
+      "steps": [
+        "Write five journeys and their failure responses, including a cross-team lookup and a save whose reply is lost.",
+        "Define a 300 ms server-side p95 create budget under 40 requests/s, one-second list freshness, and durable commit before success.",
+        "Create a requirements table with owner, measurement, local fixture, and exclusions; map each proposed component to a requirement."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "A successful save survives restarting persistent storage."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The latency boundary includes authorization and commit and states excluded network time."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Export failure cannot invalidate an already committed task."
+        }
+      ],
+      "experiment": "Inject 250 ms into persistence. Predict which latency promise fails while checking that the durability promise still holds.",
+      "review": "Reconstruct the promises without component names. Explain why choosing PostgreSQL is not itself a user requirement.",
+      "stretch": "Add an accessibility journey with an observable keyboard-only completion criterion.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "workedExample": "For 1,000 measured creates, the nearest-rank p95 is sorted item 950. If it is 280 ms, the 300 ms target passes for this sample; item 1,000 may still be 900 ms. Five lost acknowledged writes fail durability even when durations pass.",
+      "retrieval": [
+        {
+          "question": "Why must latency name its boundary?",
+          "answer": "Browser latency includes network and rendering; server latency does not. Different boundaries can yield different valid measurements."
+        },
+        {
+          "question": "Does passing p95 prove future capacity?",
+          "answer": "No. It describes the observed workload and interval; different concurrency, payloads, or failures need additional evidence."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-capacity",
+      "title": "Estimate workload with units",
+      "concept": "Rates, concurrency, storage, and assumptions",
+      "brief": "Estimate the board for 8,000 daily active users before selecting infrastructure. Keep every multiplier and unit visible in a small calculation workbook.",
+      "explanation": "Capacity estimates connect user behavior to resource demand. State assumptions rather than disguising guesses as precision. Daily averages hide bursts, and requests per second alone omit payload size and database cost. Estimate reads, writes, retained storage, and in-flight work separately. Little's Law connects averages in a stable system; it is not a p95 latency formula and cannot make an overloaded queue stable. Use calculations to choose an initial measurement, then replace assumptions with observed distributions. A large user count does not itself justify sharding or microservices.",
+      "steps": [
+        "Assume 30 reads and five writes per active user/day, an eight-hour busy window, and a fourfold peak; compute read and write rates separately.",
+        "Estimate an upper bound of 1.5 kB per new task with 90-day retention, assuming every write creates one retained task; exclude indexes, replicas, attachments, and backups. Then state how an actual create fraction would reduce this subtotal.",
+        "Run a bounded local fixture near the predicted peak and record latency, active requests, memory, and connection occupancy."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each result names units and decimal versus binary storage convention."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Peak rates are distinct from daily and busy-window averages."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The report identifies excluded overhead and a measurement that could change the design."
+        }
+      ],
+      "experiment": "Double requests per user while keeping user count fixed. Predict which estimates double and which architectural conclusions remain uncertain.",
+      "review": "Rederive peak writes without notes and explain why users alone cannot determine server count.",
+      "stretch": "Measure actual serialized task size and revise the initial storage estimate.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "workedExample": "8,000 users × five writes/user/day = 40,000 writes/day. Dividing by 28,800 busy seconds gives 1.39 writes/s; a fourfold peak is 5.56 writes/s. Assuming every write creates one retained 1.5 kB task gives a 90-day upper-bound raw payload of 5.4 GB in decimal units. If only 20% are creates, new-task payload is 1.08 GB; update history and other overhead need separate estimates.",
+      "retrieval": [
+        {
+          "question": "Why state a peak multiplier?",
+          "answer": "Averages conceal bursts; an explicit multiplier is a provisional model that real traffic can validate or replace."
+        },
+        {
+          "question": "What does Little's Law require?",
+          "answer": "Matching average throughput and average time over a stable boundary, giving average in-flight work with consistent units."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-boundaries",
+      "title": "Assign module ownership before splitting services",
+      "concept": "Modular monolith and data ownership",
+      "brief": "Implement Tasks, Membership, and Reporting inside one application. Define who can mutate each record before adding remote boundaries or separate deployments.",
+      "explanation": "A module boundary controls authority and dependencies; a process boundary additionally introduces network and deployment concerns. A modular monolith is a practical starting point when one team and database can meet the requirements. Tasks owns task mutations, Membership owns membership changes, and Reporting consumes approved queries or projections. Effect services make these dependencies explicit and replaceable. One transaction can still coordinate operations inside the monolith. Do not manufacture distributed coordination merely to match a fashionable diagram; instead identify the invariant and the smallest boundary that can enforce it.",
+      "steps": [
+        "Create an ownership matrix for tasks, memberships, and report projections, including allowed readers and writers.",
+        "Expose task commands and membership checks through service interfaces; keep UI and reporting code from writing task tables directly.",
+        "Implement assignment with a defined policy for a member being removed concurrently; verify the authoritative transaction behavior."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every mutable record has one documented authoritative owner."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Replacing Reporting with a fake leaves task invariants unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Assignment rejects a removed member according to the explicit concurrency policy."
+        }
+      ],
+      "experiment": "Ask an agent to implement a report-screen direct update, then review and repair the ownership violation through the task command.",
+      "review": "Distinguish code organization, transaction scope, deployment isolation, and data ownership using the implemented assignment flow.",
+      "stretch": "Name a measured scaling or isolation condition that would justify extracting Reporting.",
+      "stage": "Make it reliable",
+      "minutes": 90,
+      "workedExample": "Tasks performs 40 writes/s while Reporting performs two expensive reads/s. Bounded report processing may protect task latency without three services. Ownership stays Tasks→task writes, Membership→membership writes, Reporting→projection writes. Sharing a deployment does not grant every module permission to mutate every table.",
+      "retrieval": [
+        {
+          "question": "Does one database erase module boundaries?",
+          "answer": "No. Interfaces, repository access restrictions, and reviewable ownership rules can enforce boundaries within one deployment."
+        },
+        {
+          "question": "When is extraction warranted?",
+          "answer": "Measured independent scaling, failure isolation, release ownership, or security requirements may justify the additional operational and network costs."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-async-path",
+      "title": "Separate saved from finished",
+      "concept": "Synchronous paths and durable background jobs",
+      "brief": "Task persistence takes 80 ms and PDF generation takes four seconds. Design a responsive save flow with explicit export progress and recoverable intent.",
+      "explanation": "Asynchronous processing changes the meaning of success. Job acceptance should mean durable intent, not completed output. A detached in-memory fiber can disappear when the process exits and cannot alone support a durability promise. Commit the task and required job record together where a single database permits it. The worker can remain a separately supervised entry point in the same codebase, with bounded concurrency and scoped resources. A broker becomes useful when its scheduling or operational features solve a demonstrated problem, not merely because work is asynchronous.",
+      "steps": [
+        "Define queued, running, succeeded, and failed states with stable job identity, timestamps, and attempts.",
+        "Commit task and export intent together; return the saved task with queued status and expose a status lookup.",
+        "Implement bounded claiming, result recording, and abandoned-work recovery under a documented lease policy."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The response follows durable commit and does not await four-second generation."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Restart preserves queued jobs and their task references."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Completed output belongs to the existing job rather than a newly created task."
+        }
+      ],
+      "experiment": "Terminate after committing a job but before execution, restart, and observe the same identity progress to completion.",
+      "review": "Explain the different promises of task-saved, job-accepted, and export-ready, including what a caller may safely do next.",
+      "stretch": "Define cancellation separately for queued work and already-running generation.",
+      "stage": "Make it reliable",
+      "minutes": 90,
+      "workedExample": "Sequential save plus PDF generation takes about 80 ms + 4,000 ms = 4,080 ms before other overhead. Durable deferral can return after the commit path while generation remains queued or running. At that time, the task exists but the PDF is not yet promised ready.",
+      "retrieval": [
+        {
+          "question": "Why is a detached fiber insufficient?",
+          "answer": "Without persisted intent, process failure can lose the work even after a response claims it was accepted."
+        },
+        {
+          "question": "When may the UI say export-ready?",
+          "answer": "After output and authoritative completion state are committed and retrieval can succeed under the defined contract."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-cache",
+      "title": "Specify cache correctness before speed",
+      "concept": "Cache-aside, freshness, and invalidation",
+      "brief": "Cache tenant task lists for 30 seconds only after defining permitted staleness and authorization scope. Begin with measured indexed reads as the baseline.",
+      "explanation": "A cache is a derived copy with a consistency policy. TTL limits age since insertion, not necessarily time since the latest authoritative change. Cache-aside reads can race with invalidation: a reader fetches old data, a writer commits and invalidates, then the reader inserts that old value. Keys need tenant, relevant authorization scope, filters, and representation version as appropriate. Cache misses and outages require bounded fallback so a failed optimization does not overwhelm the database. A high hit rate says nothing by itself about correctness or useful end-to-end performance.",
+      "steps": [
+        "Write list freshness expectations and a stricter authoritative path for edits and permission decisions.",
+        "Implement tenant-scoped cache-aside with explicit TTL and documented invalidation or generation rules.",
+        "Measure 100 repeated reads mixed with ten writes, recording hit rate, database demand, and stale-read duration."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Tenant A never receives Tenant B's cached response."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Cache outage uses bounded fallback without retry fan-out."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The stale-refill fixture is prevented or its freshness consequence is explicitly accepted."
+        }
+      ],
+      "experiment": "Pause a miss after its database read, commit and invalidate a newer task, then resume the old reader and inspect the cache.",
+      "review": "Explain why correctness evidence requires tenant and version checks in addition to hit-rate statistics.",
+      "stretch": "Coalesce refreshes for a hot key and measure concurrent database reads.",
+      "stage": "Own the outcome",
+      "minutes": 90,
+      "workedExample": "A reader loads version 8 at t=0 s. A writer commits version 9 and invalidates at t=1 s. The reader inserts version 8 at t=2 s with a 30-second TTL, potentially retaining it until t=32 s. Invalidation alone failed to prevent stale refill.",
+      "retrieval": [
+        {
+          "question": "What is authoritative?",
+          "answer": "The owning database or service; cached data is derived and must be replaceable."
+        },
+        {
+          "question": "Why include tenant in the key?",
+          "answer": "Identical filters in different tenants must not collide or expose another tenant's response."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-tradeoffs",
+      "title": "Choose an architecture from evidence",
+      "concept": "Decision records and distinct diagram views",
+      "brief": "Compare one application plus database with separate Task, Membership, and Reporting services. Use the 200-team workload and observed limitations to decide.",
+      "explanation": "A useful decision record states the problem, alternatives, evidence, consequences, and revisit trigger. More components are not evidence of improvement. Remote boundaries introduce independently failing calls, identity propagation, deployment coordination, and additional observation needs. A modular monolith still supports durable jobs and strong ownership. Separate context, sequence, and deployment diagrams so module responsibility is not mistaken for physical topology. Ask an agent to challenge assumptions and cite measurements, then verify the most consequential claim against the underlying artifact.",
+      "steps": [
+        "Draw browser, application, database, and worker, labeling synchronous calls, durable records, and authoritative ownership.",
+        "Compare alternatives against 300 ms p95, 40 requests/s, one engineering team, and explicit recovery needs.",
+        "Record the simplest adequate choice, its disadvantages, and an observable trigger for revisiting service extraction."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Diagrams distinguish independently failing arrows and shared transactions."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The record includes a concrete cost of the selected design."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Latency and capacity claims point to fixtures or measurements instead of agent confidence."
+        }
+      ],
+      "experiment": "Increase report duration from 50 ms to two seconds. Evaluate query tuning and bounded scheduling before choosing deployment separation.",
+      "review": "Redraw the selected design from memory and name evidence that could reverse the choice.",
+      "stretch": "Diagram rollback with old and new application versions sharing the same database.",
+      "stage": "Own the outcome",
+      "minutes": 90,
+      "workedExample": "At 40 requests/s, the local monolith measures 240 ms p95 against 300 ms, giving 60 ms observed margin for this fixture. Three remote boundaries have no demonstrated benefit yet. Keep modules local and reconsider report isolation if tuned, bounded reporting still causes create latency to miss its target.",
+      "retrieval": [
+        {
+          "question": "What makes a useful revisit trigger?",
+          "answer": "An observable condition connected to the tradeoff, such as sustained latency failure after a specified simpler mitigation."
+        },
+        {
+          "question": "Why separate logical and deployment diagrams?",
+          "answer": "Modules describe responsibilities; deployment nodes describe processes and failure boundaries. Their mappings need not be one-to-one."
+        }
+      ],
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-latency-budget",
+      "title": "Allocate the request budget",
+      "concept": "Critical paths and percentile reasoning",
+      "brief": "Break the board's 300 ms create target into authentication, validation, database work, encoding, and reserve. Use traces to check the planning allocations.",
+      "explanation": "Sequential work accumulates along a request's critical path; independent parallel work contributes approximately the slowest branch plus coordination overhead. Component percentiles cannot generally be added to obtain an end-to-end percentile because their slow samples may belong to different requests. Budgets are allocations, while request traces establish actual behavior. Keep reserve visible for connection acquisition, scheduling, and uncommon branches. Effect service boundaries permit timing and failure injection without requiring remote services. Measure queue waiting separately from database execution so a saturated pool is not mistaken for a slow query.",
+      "steps": [
+        "Allocate 30 ms authentication, 20 ms validation, 160 ms transaction work, 20 ms encoding, and 70 ms reserve.",
+        "Record request traces with monotonic elapsed times, including connection acquisition; distinguish overlapping spans from sequential spans.",
+        "Run 100 seeded requests with ten slow database operations and compare request totals with the budget."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Allocations sum to 300 ms with consistent units."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Measured total duration includes connection waiting."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The reported critical path does not add overlapping spans twice."
+        }
+      ],
+      "experiment": "Make an independent lookup take 180 ms. Compare sequential and concurrent execution only if both preserve operation semantics.",
+      "review": "Explain which work could leave the synchronous path and what durable promise would replace awaiting its completion.",
+      "stretch": "Introduce expensive authorization for a second workload and decide whether it needs a separate budget.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "A request spends 25 ms authenticating, 15 ms validating, 145 ms committing, and 15 ms encoding: 200 ms total, leaving 100 ms against the target. Concurrent 80 ms and 120 ms branches contribute approximately 120 ms, not 200 ms, before coordination overhead.",
+      "retrieval": [
+        {
+          "question": "Can stage p95 values be summed?",
+          "answer": "Not generally; correlation and different tail samples matter. Measure the end-to-end distribution."
+        },
+        {
+          "question": "Why preserve reserve?",
+          "answer": "It makes overhead and variation explicit; allocating every millisecond optimistically leaves no margin for actual execution."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-requirements",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-scope-priorities",
+      "title": "Define degraded behavior before implementing it",
+      "concept": "Essential outcomes and partial success",
+      "brief": "The board must save tasks when preview generation is unavailable for 15 minutes. Define the user's visible state and the recovery promise.",
+      "explanation": "Graceful degradation is a product contract, not a catch-all that converts failures into success. Separate essential invariants from optional enhancements. Saved tasks remain readable and authorized while previews can be pending or unavailable. Express partial results in typed response models so the UI does not invent certainty. A worker in the same application can demonstrate this boundary locally; separate deployment is warranted only by measured workload or isolation needs. If preview completion is promised, persist recoverable intent before claiming acceptance. An untracked background fiber alone cannot survive process termination.",
+      "steps": [
+        "Classify commit and authorization as essential, with previews deferrable under an explicit completion target.",
+        "Model saved-with-preview-pending separately from save-failed and persist required preview work with the task transaction.",
+        "Exercise normal, preview-unavailable, and database-unavailable cases through the UI; inspect responses and durable records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Preview failure returns an existing saved task with an honest pending state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Database failure preserves the draft without reporting save success."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery completes previews for existing tasks without creating duplicate tasks."
+        }
+      ],
+      "experiment": "Pause previews for 15 simulated minutes while creating 30 tasks, then resume processing and inspect backlog age.",
+      "review": "Name the guarantee carried by each response variant and explain why swallowing a commit failure is a correctness defect.",
+      "stretch": "Specify expiry behavior for preview jobs whose source task has since been deleted.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "At two tasks/minute during a 15-minute interruption, 30 preview jobs accumulate. A restored worker completes six jobs/minute while two arrive, providing four jobs/minute net drain. Under constant rates, the initial backlog clears in 7.5 minutes.",
+      "retrieval": [
+        {
+          "question": "When is partial success honest?",
+          "answer": "When the essential outcome committed and the response explicitly identifies incomplete work and recovery behavior."
+        },
+        {
+          "question": "Does deferral remove capacity requirements?",
+          "answer": "No. Work accumulates and recovery needs spare capacity, reduced arrivals, or an explicit discard policy."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-requirements",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-concurrency",
+      "title": "Translate latency into bounded concurrency",
+      "concept": "Little's Law and connection pools",
+      "brief": "A handler receives 50 requests/s and averages 120 ms in the application. Distinguish active handlers, active queries, and callers waiting for connections.",
+      "explanation": "Concurrency measures work in progress, not desired throughput. A larger pool can merely move waiting into the database and slow every query. Measure the boundary carefully: a handler may perform multiple queries, wait for a connection, or spend most of its time elsewhere. Little's Law uses matching averages during stable operation. Sustained arrivals above completions cause a growing queue, invalidating a steady-state interpretation. Bound Effect concurrency and pool waiting so overload has an explicit response rather than using all available memory as an accidental queue.",
+      "steps": [
+        "Calculate average in-flight handlers and instrument them separately from checked-out database connections.",
+        "Use a local repository with configurable 40 ms and 200 ms queries and cap repository concurrency at four.",
+        "Record completion rate, connection wait, service time, and admission rejections once a finite waiting limit is reached."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Convert 120 ms to 0.12 seconds before multiplying."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No more than four repository calls execute simultaneously."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Slower queries produce visible waiting or admission failure instead of unbounded task creation."
+        }
+      ],
+      "experiment": "Sustain 50 requests/s while each request holds one connection for 200 ms. Predict whether four connections can keep up.",
+      "review": "Explain why increasing the pool is a hypothesis that needs a database-load measurement, not an automatic remedy.",
+      "stretch": "Compare one long query with ten short sequential queries having equal total connection occupancy.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "50 requests/s × 0.12 s/request = six handlers in flight on average. Four connections at 0.2 s/query ideally complete 20 queries/s. At 50 arrivals/s, the deficit is 30 queries/s; queued work grows unless admission, arrivals, or capacity changes.",
+      "retrieval": [
+        {
+          "question": "Is six the necessary pool size?",
+          "answer": "Not necessarily. Handler duration includes time without a connection; pool demand requires a matching connection-boundary measurement."
+        },
+        {
+          "question": "What reveals instability?",
+          "answer": "A sustained arrival rate above completion rate with increasing queued work, rather than a bounded steady population."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-capacity",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-storage-growth",
+      "title": "Account for retained data and amplification",
+      "concept": "Retention, indexes, replicas, and recovery copies",
+      "brief": "Estimate 100,000 task events/day at 800 bytes/event. Separate live operational storage from historical recovery copies and document retention assumptions.",
+      "explanation": "Raw payload is an input to a storage estimate, not a complete disk requirement. Indexes, row metadata, free space, transaction logs, and temporary operations add overhead. Replicas copy changes, including accidental deletion, so they serve a different purpose from historical backups. Retention controls both steady-state volume and cleanup work. Choose a simple model with explicit uncertainty and compare it with a seeded local dataset. Avoid unsupported compression or price claims. Ask the coding agent to check dimensions and cutoff semantics before turning a calculation into infrastructure guidance.",
+      "steps": [
+        "Compute 30-day raw volume, then model an assumed 1.8× primary-storage factor and one equal-sized replica.",
+        "Implement bounded retention batches that report oldest timestamp and rows processed, using an explicit inclusive or exclusive cutoff.",
+        "Measure table and index size on a smaller fixture where supported; describe overheads this local dataset cannot represent."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Raw, primary, replicated, and backup estimates remain separately labeled."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Boundary timestamps follow the documented retention cutoff."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Restarted cleanup resumes safely without deleting newer records or requiring one enormous transaction."
+        }
+      ],
+      "experiment": "Pause retention for seven days and calculate extra volume before inspecting whether cleanup capacity can recover.",
+      "review": "Explain why two current copies are not equivalent to a historical restore point after accidental deletion.",
+      "stretch": "Compare snapshot and incremental-log retention with an explicit recovery schedule.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "100,000 events/day × 800 bytes/event × 30 days = 2.4 GB raw. An assumed 1.8× factor gives 4.32 GB primary; one equal replica brings live storage to 8.64 GB. Seven missed cleanup days add 560 MB raw before overhead.",
+      "retrieval": [
+        {
+          "question": "Why call 1.8× an assumption?",
+          "answer": "Amplification depends on schema, indexes, layout, and churn; actual storage measurement can replace it."
+        },
+        {
+          "question": "What else must retention define?",
+          "answer": "Its timestamp, cutoff comparison, exceptions, and bounded recovery process, not merely a number of days."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-capacity",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-invariants",
+      "title": "Put invariants at the transaction boundary",
+      "concept": "Atomicity and concurrent decisions",
+      "brief": "A team may have at most three active projects. Two requests race when it already has two; design the authoritative rule before building the form.",
+      "explanation": "An early read or UI validation cannot enforce a concurrent quota. Both callers may see the same remaining slot. The mutation must coordinate competing decisions or use a database mechanism that rejects an invalid result. Unique constraints fit some rules, whereas a count-based quota needs an appropriate transaction, atomic reservation, or another proved mechanism. All entry points must follow that mechanism, including imports and agent tools. Model quota exhaustion separately from transient conflicts. Keep external notifications outside retried transactions because database rollback cannot undo an email.",
+      "steps": [
+        "Define activeProjects(team) ≤ 3 and decide whether archived projects consume capacity.",
+        "Implement an atomic team reservation or transaction strategy coordinating every creation path; keep counter and project creation consistent.",
+        "Run simultaneous creates at the two-project fixture and record successful IDs, typed failures, and durable count."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly one of the two new creates succeeds."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The final active count is three after restart."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Transaction retries do not repeat irreversible notifications."
+        }
+      ],
+      "experiment": "Pause both requests after their initial quota reads. Demonstrate the naive race, then repeat against the coordinated implementation.",
+      "review": "Explain why locking one endpoint is insufficient when a bulk import writes the same records without participating.",
+      "stretch": "Add archiving and prove that capacity release cannot diverge from the active-project state.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "Starting at two of three slots, A and B both read two. Independent inserts produce four projects, exceeding capacity by one. An atomic reservation lets A move occupancy to three; B finds no slot and changes neither occupancy nor project rows. The successful transaction keeps both representations consistent.",
+      "retrieval": [
+        {
+          "question": "Why is preflight validation insufficient?",
+          "answer": "The state can change between validation and mutation; the authoritative write needs concurrency control."
+        },
+        {
+          "question": "What may a retry safely repeat?",
+          "answer": "The whole transactional decision with fresh reads. External side effects need a separate durable or idempotent protocol."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-boundaries",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-dependency-direction",
+      "title": "Separate domain operations from adapters",
+      "concept": "Effect capabilities and adapter contracts",
+      "brief": "Swap a persistent task repository for a memory repository while retaining assignment rules. State exactly which claims the fake can and cannot support.",
+      "explanation": "Domain operations should depend on capabilities such as loading a task and committing an assignment, not concrete database clients or browser widgets. Effect requirements express needed capabilities and layers supply implementations at composition boundaries. Adapters translate infrastructure failures into expected operation errors. Fakes provide controlled logic and fault tests, but can conceal transaction, serialization, and persistence behavior. Preserve integration evidence beside unit fixtures. Replacing an adapter demonstrates a boundary only when the substitute respects the same observable contract, including conflicts and missing records.",
+      "steps": [
+        "Define a repository capability with atomic assignment and explicit Missing, Conflict, and Unavailable outcomes.",
+        "Implement a deterministic memory adapter and a persistent adapter; run the same ordinary behavior fixtures against both.",
+        "Add persistent restart and concurrent-update checks, recording which properties cannot be substantiated by the memory implementation."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The domain operation imports no concrete database client or UI component."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Both adapters expose the same expected error categories."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Durability and concurrency claims cite persistent-adapter evidence."
+        }
+      ],
+      "experiment": "Make the fake accept two conflicting assignments while the persistent adapter rejects one. Identify the false confidence and strengthen the contract fixture.",
+      "review": "Trace where infrastructure errors are translated and where the application decides what a user sees.",
+      "stretch": "Add a cancellation contract without assuming every underlying provider operation is interruptible.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "Task T is at version seven. A and B both propose version eight. A conditional persistent update matches version seven once: A changes one row and B changes zero, yielding Conflict. A naive Map.set fake accepts both writes, so it models different concurrency semantics.",
+      "retrieval": [
+        {
+          "question": "What does an Effect requirement communicate?",
+          "answer": "The capability a computation needs, allowing a concrete implementation to be supplied at the composition boundary."
+        },
+        {
+          "question": "Can the fake prove durability?",
+          "answer": "No. It supports behavior against its own model; persistence and restart behavior need actual storage evidence."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-boundaries",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-job-capacity",
+      "title": "Calculate backlog recovery capacity",
+      "concept": "Queue stability and spare throughput",
+      "brief": "A worker generates three exports/minute while users submit two/minute. Estimate a 20-minute interruption and verify recovery with a local simulator.",
+      "explanation": "A queue absorbs temporary imbalance but cannot fix permanent overload. Arrival rate, service rate, retry traffic, and oldest-job age describe different aspects of health. Recovery depends on spare capacity after new arrivals are served. More workers help only while shared CPU, disk, database, or downstream capacity remains available. Bound concurrent Effect jobs and scope their resources; logical interruption does not guarantee every external operation was canceled. A constant-rate simulation teaches the arithmetic, while a small real workload exposes resource contention and duration variance.",
+      "steps": [
+        "Simulate two arrivals/minute, three completions/minute, and a 20-minute processing pause using controlled time.",
+        "Calculate initial backlog and net drain, then compare the trace with oldest-job age and completion count.",
+        "Run two workers against a shared fake bottleneck and document whether total throughput increases or merely moves waiting."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The pause accumulates 40 jobs under constant arrivals."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Recovery has one job/minute spare throughput."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Worker concurrency and resource occupancy stay within configured bounds."
+        }
+      ],
+      "experiment": "Raise arrivals to four/minute. Demonstrate growing backlog and replace the impossible drain promise with admission control or measured capacity work.",
+      "review": "Explain why backlog divided by total service rate underestimates drain time while new jobs continue arriving.",
+      "stretch": "Model variable export sizes and compare job-count backlog with estimated processing-time backlog.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "20 minutes × two jobs/minute = 40 queued jobs. After recovery, three completions/minute minus two arrivals/minute gives one job/minute net drain, so the original backlog takes 40 minutes to clear. If arrivals stop, 40/3 ≈ 13.3 minutes suffices.",
+      "retrieval": [
+        {
+          "question": "What makes the simple queue stable?",
+          "answer": "Long-run service capacity exceeds arrivals with margin for variation and interruptions."
+        },
+        {
+          "question": "Why inspect oldest-job age?",
+          "answer": "A small queue may contain a stuck old job; counts alone do not expose starvation or user waiting time."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-async-path",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-job-ownership",
+      "title": "Reject completion by stale workers",
+      "concept": "Leases and generation guards",
+      "brief": "Worker A claims job J for 30 seconds, stalls for 40, and resumes after B reclaims it. Protect the authoritative result from stale completion.",
+      "explanation": "A lease grants time-limited permission but does not physically stop an old worker. Completion must compare a stored claim generation or equivalent token and reject stale ownership. Choose and document the time source used for expiry. The generation check protects only the state whose write actually enforces it. An external email or object upload remains a separate side-effect problem and may require idempotency or versioned output. Keeping this distinction explicit prevents the common mistake of describing lease-based workers as automatically exactly-once.",
+      "steps": [
+        "Persist claim generation and expiry; acquire or reclaim atomically under the chosen clock policy.",
+        "Require heartbeats and completion updates to match the current generation and expose LostLease distinctly.",
+        "Use a controlled clock to pause A, let B reclaim, and deliver A's late completion while recording every transition."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "B receives a newer generation after expiry."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A's completion changes zero authoritative job rows."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The final pointer names the current generation and side effects are accounted for separately."
+        }
+      ],
+      "experiment": "Pause A just before an external write, then expire its lease. Explain why rejecting its later database completion cannot undo that write.",
+      "review": "Identify the exact guarded operation in the claim-work-complete sequence and distinguish permission from actual execution.",
+      "stretch": "Use generation-specific output keys and an authoritative result pointer to prevent stale replacement.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "At t=0 s, A owns generation 4 until t=30 s. B claims generation 5 at t=35 s. A resumes at t=40 s and attempts completion with generation 4; the conditional update affects zero rows. B completes generation 5 at t=42 s and becomes authoritative.",
+      "retrieval": [
+        {
+          "question": "Does expiry halt A?",
+          "answer": "No. Shared state changes permission; A may continue executing unless each relevant resource rejects stale authority."
+        },
+        {
+          "question": "What can a fencing token protect?",
+          "answer": "Only operations and resources that compare and enforce it; it cannot guard arbitrary uncooperative external effects."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-async-path",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-cache-stampede",
+      "title": "Bound hot-key refreshes",
+      "concept": "Request coalescing and fallback budgets",
+      "brief": "One hundred simultaneous requests miss the same expired dashboard key. Its query takes 200 ms; protect the database while preserving an honest response contract.",
+      "explanation": "A stampede turns many equivalent misses into duplicated expensive work. Coalescing shares one in-flight computation per key, while a separate global limit protects against many distinct keys. Process-local coalescing does not coordinate multiple application instances. Distributed locking introduces expiry and stale-owner concerns, so first measure whether local coordination suffices. Stale-while-refresh behavior requires an explicit maximum age and must not silently extend authorization validity. Every caller also needs a finite wait policy, because shared work can fail or hang just as independent work can.",
+      "steps": [
+        "Implement one in-flight refresh per tenant-scoped key and remove its entry after either success or failure.",
+        "Set a finite caller wait budget with explicit unavailable or permitted-stale outcomes; bound refresh concurrency across keys.",
+        "Fire 100 reads at one key, then at 20 distinct keys, and inspect underlying calls and waiting counts."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One hot-key wave launches one local refresh."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A failed refresh releases the in-flight marker so later calls can recover."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Distinct keys cannot exceed the global refresh limit."
+        }
+      ],
+      "experiment": "Reject the shared refresh after 200 ms. Verify every waiter gets the documented result and a later request starts a fresh attempt.",
+      "review": "Explain the scope of the guarantee and predict behavior when two processes receive the same hot-key wave.",
+      "stretch": "Add TTL jitter and compare synchronized expiration with dispersed refresh arrivals.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "Without coalescing, 100 misses launch up to 100 queries, totaling 20 query-seconds at 0.2 s each. One shared refresh uses 0.2 query-seconds for that key. Two independent processes may still refresh twice; the local mechanism makes no global-lock claim.",
+      "retrieval": [
+        {
+          "question": "Why remove failed entries?",
+          "answer": "Otherwise a rejected or stuck computation can poison the key and prevent recovery."
+        },
+        {
+          "question": "Does coalescing solve overload?",
+          "answer": "No. Many distinct keys and slow refreshes still need bounded concurrency, admission policy, and capacity evidence."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-cache",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-cache-versioning",
+      "title": "Stop old responses replacing new state",
+      "concept": "Versioned reads and read-after-write",
+      "brief": "A task changes from version 12 to 13 while a list refresh is delayed. Make the author's confirmation reliable without promising instant global cache convergence.",
+      "explanation": "Versions make stale content detectable only within a defined authority and scope. Versioned keys prevent old values from replacing a newer generation if the pointer and comparison protocol is enforced. They do not automatically make all related reads atomic. For a small app, returning committed data and reading immediate edits from the primary may be sufficient. Keep local author confirmation distinct from other users' list freshness. A per-task version orders that task's changes, not unrelated entities or all events across the system.",
+      "steps": [
+        "Return task version 13 from the committed mutation and merge it into the author's UI state.",
+        "Use an authoritative generation for cached lists or bypass the list cache for the immediate confirmation read.",
+        "Deliver a delayed version-12 response after version 13 and verify both UI and cache-pointer rules."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The author sees committed version 13 after success."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The delayed older response cannot overwrite the newer task."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Other readers' allowed staleness is stated with its enforcement mechanism."
+        }
+      ],
+      "experiment": "Reverse network response order deliberately and inspect visible task versions rather than relying on request completion order.",
+      "review": "Explain why a higher version is meaningful only for its entity or explicitly coordinated stream.",
+      "stretch": "Add deletion and prevent an old list response from resurrecting a removed task.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "The UI holds T at version 13 after commit. A delayed response carries T at version 12, so its per-task merge rule rejects the older value. U at version 20 provides no ordering information about T: independent version counters cannot establish which entity changed first.",
+      "retrieval": [
+        {
+          "question": "What does returning committed data provide?",
+          "answer": "A concrete writer confirmation without waiting for every derived representation to converge."
+        },
+        {
+          "question": "Are entity versions a global timeline?",
+          "answer": "No. They normally order changes to one entity or another explicitly coordinated scope, not the entire application."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-cache",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-diagram-review",
+      "title": "Trace a failure through the diagram",
+      "concept": "Sequence diagrams and commit ambiguity",
+      "brief": "Draw create-task authorization, transaction commit, durable job acceptance, and response. Include the case where the response disappears after commit.",
+      "explanation": "Diagrams are useful when they expose challengeable claims. Sequence views reveal ordering and acknowledgment, deployment views reveal independently failing components, and ownership views reveal authority. Mark commit points and ambiguity explicitly. A timeout after commit means the caller may not know the result; it does not prove rollback. Keep the diagram tied to an executable local fixture so a polished picture cannot drift from implementation. Agents may draft Mermaid, but should label uncertain edges rather than inventing atomicity across database and external-service boundaries.",
+      "steps": [
+        "Draw normal and lost-response sequences with the durable operation identity used for reconciliation.",
+        "Mark each arrow as in-process, database, or external network, and label the authoritative commit point.",
+        "Replay the sequence through failure injection and compare persisted task and operation records with the diagram's states."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The lost-response view shows a committed task and uncertain caller."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No arrow claims a transaction spans an unrelated external provider."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A repeat of the same operation resolves to the existing outcome under its contract."
+        }
+      ],
+      "experiment": "Drop the connection after commit, reload, and reconcile using the operation identity rather than submitting a new create.",
+      "review": "Describe what client, process, and database each know at the failure point and which knowledge is durable.",
+      "stretch": "Draw a crash-before-commit sequence and compare recovery behavior.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "At t=70 ms, task T and operation K commit. At t=75 ms, the response connection closes. At t=300 ms, the client reports a timeout while storage still contains one task. Repeating K can recover T; using a new key represents a new operation and may create another task.",
+      "retrieval": [
+        {
+          "question": "Why label commit points?",
+          "answer": "They separate reversible transaction work from durable outcomes and expose ambiguous response failures."
+        },
+        {
+          "question": "Can timeout prove no mutation happened?",
+          "answer": "No. Commit may precede a lost response; an authoritative lookup or durable operation identity is needed."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-tradeoffs",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-system-design-foundations-design-review",
+      "title": "Make agent proposals falsifiable",
+      "concept": "Evidence-based architecture review",
+      "brief": "An agent proposes sharding, Redis, and a broker for 40 requests/s. Review each component against the board's requirements and actual bottlenecks.",
+      "explanation": "Effective agentic review uses bounded experiments and falsifiable questions. Require every component to name the requirement it satisfies, current limitation, alternatives, and new failure modes. Distinguish observations from assumptions and estimates. An empty-dataset benchmark cannot establish hot-tenant behavior, write contention, or recovery performance. Keep a decision log so later agents do not reintroduce discarded complexity without new evidence. The human reviewer remains responsible for interpreting tradeoffs and checking artifacts; fluent summaries and plausible component names do not replace reproducible proof.",
+      "steps": [
+        "Create a ledger of component, claimed benefit, evidence, uncertainty, and smallest experiment that could reject the claim.",
+        "Ask the agent for one reversible local measurement per important claim, with fixed dataset and workload.",
+        "Record keep, defer, or reject decisions, linking commands and artifacts and stating concrete revisit conditions."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each accepted component addresses a measured or explicitly required need."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The ledger labels estimates and includes dataset size and concurrency."
+        },
+        {
+          "id": "criterion-3",
+          "label": "At least one proposal is revised when its experiment fails to support its benefit."
+        }
+      ],
+      "experiment": "Supply a one-tenant benchmark and challenge the claim that it proves tenant isolation or fairness; require a corrected fixture.",
+      "review": "Explain how to check the strongest claim independently of the agent's written conclusion and identify remaining uncertainty.",
+      "stretch": "Review the best rejected alternative again, allowing a changed decision only with new evidence.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "A cache reduces a query from 20 ms to 2 ms, but the 240 ms p95 is dominated by a 190 ms authorization path. The isolated 18 ms saving is real yet does not establish the claimed bottleneck. Defer caching and measure authorization before accepting stale-data complexity.",
+      "retrieval": [
+        {
+          "question": "What belongs with benchmark evidence?",
+          "answer": "Command, data, workload, measurement boundary, environment, distribution, and limitations sufficient to reproduce and interpret it."
+        },
+        {
+          "question": "Why preserve rejected alternatives?",
+          "answer": "Their reasoning and revisit triggers prevent repeated proposals driven by forgotten context rather than changed requirements."
+        }
+      ],
+      "parentId": "effect-system-design-foundations-tradeoffs",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ]
+}

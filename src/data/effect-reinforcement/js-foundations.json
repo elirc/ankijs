@@ -1,0 +1,637 @@
+{
+  "project": {
+    "id": "js-foundations",
+    "title": "JavaScript foundations: a predictable task editor",
+    "kind": "Standalone app",
+    "track": "Fundamentals",
+    "summary": "Learn JavaScript by building a small task editor whose drafts, transformations, asynchronous saves, and modules behave predictably.",
+    "outcome": "A framework-free CRUD core with isolated drafts, deterministic list transformations, controlled asynchronous operations, and an explicit persistence boundary.",
+    "prerequisites": "Basic familiarity with variables, function calls, and running a JavaScript file. Each milestone explains the language mechanism before using it.",
+    "model": [
+      "Task: { id: string, title: string, done: boolean, details: { estimate: number } }. Seed t1 as Read with estimate 0 and t2 as Write with estimate 30.",
+      "Treat a saved task and an editable draft as different ownership domains. IDs identify records; object references identify particular in-memory objects.",
+      "Use a tiny in-memory repository first. Promise gates control completion order; a fake clock and ID supplier make creation reproducible."
+    ],
+    "boundaries": "Editor command → pure task transformation → repository adapter → saved snapshot. Keep DOM handlers thin and introduce no framework or database until the behavior is demonstrated.",
+    "resources": [
+      {
+        "label": "MDN: working with objects",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Working_with_objects"
+      },
+      {
+        "label": "MDN: using promises",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises"
+      }
+    ],
+    "milestones": [
+      {
+        "id": "effect-js-foundations-draft-ownership",
+        "title": "Separate saved tasks from editable drafts",
+        "concept": "Primitive values, references, shallow copies",
+        "brief": "Build Edit and Cancel for t1 without letting keystrokes change the saved row. Start with a plain object and inspect both objects in code before connecting any input elements.",
+        "explanation": "JavaScript assignment copies a value. For an object, that value refers to an object rather than containing an independent copy of its properties. Two variables can therefore reach the same mutable object. A const binding prevents rebinding the variable, not editing the object. Object spread creates a new outer object but retains references to nested objects, so draft isolation depends on every path you plan to change.",
+        "steps": [
+          "Create saved = {id:'t1',title:'Read',done:false,details:{estimate:0}} and first reproduce leakage with draft = saved; then draw the shared reference.",
+          "Create a draft with a new outer object and a new details object. Change title and estimate in the draft, then implement Cancel by discarding that draft.",
+          "Implement Save as replacing the saved record with the completed draft snapshot. Keep the previous snapshot available long enough to inspect its properties."
+        ],
+        "checks": [
+          "Typing Study and estimate 15 leaves the saved title Read and estimate 0 until Save.",
+          "Cancel restores a fresh draft containing Read and 0; reopening does not resurrect discarded edits.",
+          "After Save, the new saved snapshot contains Study and 15 while the earlier snapshot still contains Read and 0."
+        ],
+        "experiment": "Remove only the nested details copy. Editing estimate should leak while editing title remains isolated. Capture this asymmetry before restoring the copy.",
+        "review": "Teach back why copying an outer object fixes one field but not the other. Review an agent's claim that const or a single spread makes an object immutable.",
+        "stretch": "Add an array of label objects and document exactly which levels require copying when renaming one label.",
+        "stage": "Build independently",
+        "minutes": 65,
+        "workedExample": "With draft = {...saved}, draft === saved is false but draft.details === saved.details is true. Assigning draft.title = 'Study' changes only draft. Assigning draft.details.estimate = 15 changes the one shared details object. Replacing details with {...saved.details} first creates the missing ownership boundary.",
+        "retrieval": [
+          {
+            "question": "Does const prevent changing a task's title?",
+            "answer": "No. It prevents rebinding the variable; the referenced object's properties may still change."
+          },
+          {
+            "question": "When is a shallow copy sufficient?",
+            "answer": "When changed fields contain primitive values, or nested references will never be mutated through the copy."
+          }
+        ]
+      },
+      {
+        "id": "effect-js-foundations-list-transformations",
+        "title": "Derive visible tasks without rewriting storage",
+        "concept": "map, filter, reduce, and stable ownership",
+        "brief": "Build an active-task view from t1 Read, t2 Write, and t3 Review. Show titles, count unfinished tasks, and sort a visible copy while preserving repository order.",
+        "explanation": "An array is an ordered collection of references or primitive values. filter chooses elements, map computes one output per element, and reduce accumulates a result. These operations describe different questions and should not hide writes inside their callbacks. A new array can still contain the original objects. Sorting an array in place changes that array's order, so a view must own the array it sorts.",
+        "steps": [
+          "Seed t1 done:false estimate:0, t2 done:true estimate:30, and t3 done:false estimate:10. Derive unfinished tasks, their titles, and total remaining estimate.",
+          "Sort a copied visible array alphabetically. Capture repository ID order before and after rendering the view to prove rendering is observational.",
+          "Implement completeTask as a transformation that returns a new array and a new t1 object while retaining unaffected task references."
+        ],
+        "checks": [
+          "The unfinished titles are Read and Review, and remaining estimate totals 10.",
+          "Rendering a sorted view leaves repository order t1,t2,t3 unchanged.",
+          "Completing t1 changes the resulting count from two to one without mutating the original t1."
+        ],
+        "experiment": "Put task.done = true inside a map callback used to render labels. Observe that reading the list now changes saved state, then remove the write.",
+        "review": "Teach back the output shape of filter, map, and reduce. Review an agent's transformation for hidden assignment, sort, splice, or nested-object mutation.",
+        "stretch": "Add a deterministic secondary ID comparison for equal titles and explain why stable ordering helps pagination.",
+        "stage": "Build independently",
+        "minutes": 65,
+        "workedExample": "Filtering the fixture by !task.done yields references to t1 and t3 in a new array. Mapping those references to title yields ['Read','Review']. Reducing estimates with initial total 0 gives 0 + 0 + 10 = 10. None of these results requires writing into a task object.",
+        "retrieval": [
+          {
+            "question": "Does filter deep-copy the retained task objects?",
+            "answer": "No. The array is new, but retained objects are the original references."
+          },
+          {
+            "question": "Why provide an initial value when summing estimates?",
+            "answer": "It defines the empty-list result and keeps the accumulator a number even when there are no tasks."
+          }
+        ]
+      },
+      {
+        "id": "effect-js-foundations-async-order",
+        "title": "Observe when an asynchronous save really finishes",
+        "concept": "Promises, await, and the microtask queue",
+        "brief": "Build a save indicator around a manually controlled promise. Record start, requested, saved, and handler-returned events so the user-visible sequence follows completion rather than request initiation.",
+        "explanation": "An async function returns a promise. Its synchronous prefix runs immediately until it reaches an await that suspends continuation; the caller can continue while the awaited work is unresolved. Promise continuations run after the current synchronous work finishes. Calling a save function therefore does not establish that a write has completed. The success UI belongs after awaited fulfillment, while failure needs its own branch.",
+        "steps": [
+          "Create a deferred repository save whose resolve and reject functions are controlled by the exercise. Record requested when called and leave it pending.",
+          "Implement a handler that sets saving, awaits the repository, then sets saved; catch rejection into an error state and retain the draft.",
+          "Invoke the handler without resolving the gate. Inspect the log and state, then resolve and inspect again after the continuation runs."
+        ],
+        "checks": [
+          "Before resolution, saving is visible and no saved event appears.",
+          "After resolution, saved appears exactly once and the returned handler promise fulfills.",
+          "After rejection, an error is visible, the draft survives, and no success message appears."
+        ],
+        "experiment": "Move the success indicator immediately after calling save without awaiting it. Reject the gate and demonstrate the false success claim.",
+        "review": "Explain which statements execute before the caller regains control and which require promise settlement. Review an agent diff for an unreturned promise in a helper.",
+        "stretch": "Add a pending counter for two overlapping writes and prove why a single boolean can misrepresent unfinished work.",
+        "stage": "Build independently",
+        "minutes": 65,
+        "workedExample": "A handler logs start, calls the gated save, and suspends at await. The caller then logs handler-returned, so the initial log is ['start','requested','handler-returned']. Resolving the gate queues the continuation; afterward saved is appended. The order follows suspension and settlement, not the apparent visual order of unrelated source lines.",
+        "retrieval": [
+          {
+            "question": "Does calling an async save wait for persistence?",
+            "answer": "No. It returns a promise; awaiting or chaining that promise observes eventual completion."
+          },
+          {
+            "question": "Can a promise continuation run in the middle of the current synchronous stack?",
+            "answer": "No. It runs after the current synchronous work has completed."
+          }
+        ]
+      },
+      {
+        "id": "effect-js-foundations-closure-ownership",
+        "title": "Give each editor its own private draft",
+        "concept": "Lexical scope and closures",
+        "brief": "Implement createEditor(task) returning setTitle, inspect, and save methods. Open two editors and show that their private drafts do not overwrite each other.",
+        "explanation": "A closure is a function together with access to bindings from its surrounding lexical scope. Returning a function does not destroy the bindings it uses. Calling a factory twice creates two separate sets of local bindings, which is useful for isolating editor state. Capturing a binding does not automatically freeze its value: later calls can observe later assignments to that binding.",
+        "steps": [
+          "Create a factory with a local draft copied from its task and methods that read or replace that draft. Return snapshots from inspect so callers cannot mutate private state indirectly.",
+          "Open editor A for t1 and editor B for t2. Change A to Study and B to Draft; inspect both and save them independently.",
+          "Move the draft variable to module scope temporarily to demonstrate interference, then return it to factory scope and explain which lifetime changed."
+        ],
+        "checks": [
+          "Editing A never changes B's draft or saved task.",
+          "Repeated inspect calls reflect the current draft but do not expose a mutable reference into private state.",
+          "Saving A submits t1 with Study even if editor B was created more recently."
+        ],
+        "experiment": "Return the internal draft directly from inspect and mutate its title externally. Restore defensive snapshot behavior after documenting how the closure boundary was bypassed.",
+        "review": "Teach back why two calls to one factory have separate state. Review an agent patch that places mutable editor state beside exported module functions.",
+        "stretch": "Add discard and reopen behavior, deciding whether an editor instance can be reused after its record is deleted.",
+        "stage": "Make it reliable",
+        "minutes": 65,
+        "workedExample": "createEditor(t1) allocates binding draftA; createEditor(t2) allocates draftB. A.setTitle('Study') replaces draftA. B.inspect() still reads draftB and returns Write. A.inspect() later reads the changed binding and returns Study, showing that closures retain access to bindings rather than taking automatic value snapshots.",
+        "retrieval": [
+          {
+            "question": "What does a closure keep access to?",
+            "answer": "Bindings in its lexical environment, including values assigned to those bindings later."
+          },
+          {
+            "question": "Why can a getter break private-state isolation?",
+            "answer": "Returning a mutable internal object gives outside code a reference through which it can change that state."
+          }
+        ]
+      },
+      {
+        "id": "effect-js-foundations-pure-core",
+        "title": "Extract a deterministic CRUD core",
+        "concept": "Pure functions and explicit inputs",
+        "brief": "Move task creation rules into createTask(input,{id,now}) so a caller supplies identity and time. Keep saving and notifications outside the function.",
+        "explanation": "A pure function derives a result from its inputs without changing external state. It can still allocate new objects and perform substantial validation. Reading the clock, generating randomness, mutating storage, and displaying a toast are observable effects because repeated calls may differ or change the world. Passing time and identity as ordinary inputs turns hidden choices into inspectable values.",
+        "steps": [
+          "Define createTask to trim the title, reject an empty normalized title, and return a new task with supplied id and createdAt. Avoid calling Date.now or a random-ID function internally.",
+          "Call it twice with title ' Read ', id t1, and now 1000. Compare both results and confirm that the input object remains unchanged.",
+          "Write a thin shell that obtains an ID and time, invokes the core, then saves a valid result and reports success only after persistence."
+        ],
+        "checks": [
+          "Equal inputs produce deeply equal task values with title Read and createdAt 1000.",
+          "Whitespace-only input returns a validation result and the shell makes zero repository calls.",
+          "Running the core alone changes no saved rows, log counters, or notification state."
+        ],
+        "experiment": "Move ID generation into the core and call it twice with the same visible input. Demonstrate the lost reproducibility, then restore explicit inputs.",
+        "review": "Explain which layer owns business rules and which owns interaction with the world. Review an agent's proposed utility that secretly imports the repository.",
+        "stretch": "Represent the shell's requested actions as data so a preview can show a planned create without executing it.",
+        "stage": "Make it reliable",
+        "minutes": 65,
+        "workedExample": "For input {title:' Read '} and environment values {id:'t1',now:1000}, normalization gives Read and the returned task has done:false. A second evaluation gives the same fields without consuming another ID. The shell may save that value once; calling the pure function itself never creates a persistent record.",
+        "retrieval": [
+          {
+            "question": "Can a pure function allocate a new object?",
+            "answer": "Yes. Purity concerns observable behavior and input relationships, not whether allocation occurs."
+          },
+          {
+            "question": "Why pass time into the core?",
+            "answer": "It removes a hidden changing input and makes the result reproducible from explicit arguments."
+          }
+        ]
+      },
+      {
+        "id": "effect-js-foundations-integrated-editor",
+        "title": "Ship the editor with an explainable command flow",
+        "concept": "Composition of ownership, identity, and asynchronous boundaries",
+        "brief": "Connect create, list, rename, complete, and delete into a small editor. Use all five earlier mechanisms in one interaction trace rather than treating them as disconnected language facts.",
+        "explanation": "Language fundamentals become design tools when every boundary has an explicit owner. The draft owns temporary edits, a command snapshot owns submitted intent, the pure core owns transformations, and the repository owns saved state. Promise settlement determines when persistence has completed. IDs connect those layers without relying on array position or object-reference equality.",
+        "steps": [
+          "Start with saved t1 Read and t2 Write. Create t3 Review, edit t1 through a separate draft, and sort the view while preserving repository order.",
+          "Gate the rename save, continue editing the draft, then resolve the earlier command. Show both the saved earlier title and the newer unsaved title without confusing them.",
+          "Delete t2, reload through serialization, and inspect selection, derived counts, old snapshots, and empty-state behavior. Write a short boundary diagram beside the implementation."
+        ],
+        "checks": [
+          "CRUD commands target IDs and preserve prior snapshots; view sorting has no repository side effect.",
+          "The gated save persists its submitted value while newer edits remain visible and unsaved.",
+          "A reload preserves valid selection and derived totals, and deleting all tasks produces a defined empty view."
+        ],
+        "experiment": "Have an agent collapse core, adapter, and handler into one convenience helper. Use the trace to identify any newly hidden input, shared mutation, or premature success signal.",
+        "review": "Teach back the complete path of one rename from keystroke to durable result. Name the owner of each value and the evidence that its lifetime is correct.",
+        "stretch": "Replace the memory adapter with durable storage while retaining the same command and transformation contracts.",
+        "stage": "Own the outcome",
+        "minutes": 65,
+        "workedExample": "The initial saved t1 title is Read. Editing creates draft Study; submit captures Study. A later keystroke changes draft to Study deeply. Persistence then stores Study, and revision ownership leaves Study deeply in the editor. Reload constructs a fresh t1 object, but selectedId t1 still resolves to that saved entity.",
+        "retrieval": [
+          {
+            "question": "What ties a reloaded row to a pending editor selection?",
+            "answer": "Its stable domain ID, rather than its newly allocated object reference."
+          },
+          {
+            "question": "Why keep submitted and current draft values separate?",
+            "answer": "They represent different moments of user intent and may legitimately differ when an older save finishes."
+          }
+        ]
+      }
+    ]
+  },
+  "drills": [
+    {
+      "id": "effect-js-foundations-record-identity",
+      "title": "Find records by identity after reloading",
+      "concept": "Reference equality versus domain equality",
+      "brief": "Serialize and reload t1, then make a selection survive the reload. A saved ID should keep meaning even though the loader constructs a new JavaScript object.",
+      "explanation": "Strict equality between objects asks whether they are the same object. It does not compare their properties. Persistence and network responses ordinarily construct fresh objects, so using an entire object as a selection token couples identity to a particular load. Domain identity is an explicit policy: here, equal task IDs identify the same task, while equal titles do not.",
+      "steps": [
+        "Store selectedTask as the original t1 object, reload tasks through JSON serialization, and demonstrate that loadedTasks.includes(selectedTask) is false.",
+        "Replace selectedTask with selectedId and derive the current task using find. Decide that a deleted selection produces an explicit no-selection state.",
+        "Add two tasks titled Read with different IDs. Rename t1 and verify that selection follows the ID rather than the label."
+      ],
+      "checks": [
+        "Reload retains the selection of t1 even though its object reference changes.",
+        "Selecting t2 does not select t1 when both titles are Read.",
+        "Deleting t1 clears or reports the missing selection without silently choosing another row."
+      ],
+      "experiment": "Ask an agent to repair selection by comparing JSON strings. Rename the selected task and show why comparing full content breaks identity.",
+      "review": "Explain the three different questions: same object, same saved entity, and same visible content. Identify which comparison the selection feature needs.",
+      "stretch": "Introduce a revision number and distinguish same entity from same version of that entity.",
+      "stage": "Build independently",
+      "minutes": 35,
+      "workedExample": "Let original = {id:'t1',title:'Read'} and loaded = JSON.parse(JSON.stringify(original)). original === loaded evaluates false; original.id === loaded.id evaluates true. If loaded.title becomes Study, the ID comparison remains true. A second task {id:'t2',title:'Read'} has matching content in one field but remains a different task.",
+      "retrieval": [
+        {
+          "question": "Why does includes miss a reloaded task object?",
+          "answer": "It compares object identity; the reloaded value is a newly allocated object."
+        },
+        {
+          "question": "What should a selected ID resolve to after deletion?",
+          "answer": "An explicit missing selection, because no current record has that identity."
+        }
+      ],
+      "parentId": "effect-js-foundations-draft-ownership"
+    },
+    {
+      "id": "effect-js-foundations-meaningful-defaults",
+      "title": "Keep zero, false, and empty input distinct",
+      "concept": "Truthiness and nullish defaulting",
+      "brief": "Add an estimate editor whose valid estimate includes zero. Keep missing input separate from an explicitly chosen zero, and preserve done:false when applying defaults.",
+      "explanation": "JavaScript conditions classify several values as falsy, including 0, false, and the empty string. A fallback with || treats all of them as reasons to choose the fallback. The ?? operator falls back only for null or undefined. Neither operator validates a value's meaning: deciding whether an empty title is acceptable still requires an explicit rule.",
+      "steps": [
+        "Seed estimate 0 and render it through value || 30 to expose the wrong default. Replace the expression only after writing down the intended missing-value policy.",
+        "Handle a cleared numeric input as a draft string until validation. Reject an empty submission rather than relying on Number(''), which becomes zero.",
+        "Build a table for undefined, null, 0, 15, false, and an empty string, marking which values are legal for each field."
+      ],
+      "checks": [
+        "A stored zero displays as zero and saving without changes keeps it zero.",
+        "Missing estimate receives the documented default of 30, while a cleared editor receives a validation message.",
+        "done:false remains false; no generic fallback turns it into true."
+      ],
+      "experiment": "Replace an explicit empty-string check with if (!value). Show that this newly rejects numeric zero, then restore the field-specific condition.",
+      "review": "Explain why nullish defaulting solves default selection but cannot prove that an estimate is a nonnegative number. Review any agent patch that uses one truthiness rule for every field.",
+      "stretch": "Add a finite-number check so NaN and Infinity cannot enter saved task estimates.",
+      "stage": "Build independently",
+      "minutes": 35,
+      "workedExample": "For {estimate:0}, estimate || 30 produces 30 because zero is falsy, whereas estimate ?? 30 produces 0. For {estimate:undefined}, both produce 30. Meanwhile Number('') produces 0, so coercing an empty draft before checking presence loses information the editor needs.",
+      "retrieval": [
+        {
+          "question": "Which values activate a ?? fallback?",
+          "answer": "Only null and undefined, leaving zero, false, and empty strings intact."
+        },
+        {
+          "question": "Why check an empty numeric draft before conversion?",
+          "answer": "Conversion can turn an absent-looking string into zero and erase the distinction between missing and explicitly entered zero."
+        }
+      ],
+      "parentId": "effect-js-foundations-draft-ownership"
+    },
+    {
+      "id": "effect-js-foundations-empty-aggregation",
+      "title": "Give the empty list a defined answer",
+      "concept": "Reduction identities and explicit accumulators",
+      "brief": "Create a dashboard showing unfinished count and total estimate when every task has been deleted. Empty data is a normal CRUD state, not an exceptional arithmetic case.",
+      "explanation": "An aggregation starts from an identity value: adding zero changes nothing, so zero is the natural seed for a numeric sum. Without an initial value, reduce uses the first element as the accumulator and cannot start on an empty array. If elements are objects, that implicit accumulator is also the wrong shape for an intended numeric total.",
+      "steps": [
+        "Write examples for [], one task with estimate 0, and tasks with estimates 5 and 15. Predict both count and estimate sum before implementing the functions.",
+        "Implement sumRemaining with filter and reduce using numeric zero as the initial accumulator. Keep count as a separate derivation so the two meanings remain visible.",
+        "Run create, complete, and delete commands against the fixture and recompute the dashboard from the resulting state after each command."
+      ],
+      "checks": [
+        "The empty list renders count 0 and estimate 0 without exceptions or placeholder NaN.",
+        "The two unfinished estimates 5 and 15 produce count 2 and sum 20.",
+        "Completing the 15-minute task leaves count 1 and sum 5; deleting the final task returns both values to zero."
+      ],
+      "experiment": "Remove the initial zero and run the empty fixture, then inspect the accumulator on the two-object fixture. Record both the thrown case and the shape mismatch.",
+      "review": "Explain an identity value without referring to reduce syntax. Ask an agent why starting from the first task object is unsuitable for adding numeric estimates.",
+      "stretch": "Compute a grouped count using an explicitly initialized Map and compare its accumulator shape with the numeric case.",
+      "stage": "Build independently",
+      "minutes": 35,
+      "workedExample": "For estimates [5,15], a seed of 0 enters the first callback as total = 0 and produces 5; the second callback produces 20. For [], no callbacks run, so the seed itself becomes the answer 0. This makes the empty result follow from the algorithm rather than a special UI patch.",
+      "retrieval": [
+        {
+          "question": "What happens to a seeded reduce on an empty array?",
+          "answer": "It returns the initial accumulator without calling the callback."
+        },
+        {
+          "question": "Why is count different from estimate sum?",
+          "answer": "Count measures records; sum measures their numeric estimates, so zero-minute tasks still contribute one to count."
+        }
+      ],
+      "parentId": "effect-js-foundations-list-transformations"
+    },
+    {
+      "id": "effect-js-foundations-immutable-update",
+      "title": "Change one row while preserving its neighbors",
+      "concept": "Structural sharing and update targeting",
+      "brief": "Implement renameTask(tasks,'t2','Draft') and prove that exactly one row changes. Include a missing-ID command whose behavior is explicitly documented.",
+      "explanation": "Immutable updates construct the next state instead of editing the previous state. Structural sharing reuses unchanged objects so copying remains proportional to the paths that change. This is safe only if those shared objects are treated as immutable thereafter. Targeting by array position is fragile because views may reorder or filter rows; the command must carry the task's ID.",
+      "steps": [
+        "Seed t1 Read and t2 Write, save references to the original array and both objects, and implement a map-based rename by matching ID.",
+        "Return the existing task reference for nonmatching rows and an object copy with the new title for the matching row. Decide whether a missing ID returns a typed result or an unchanged list.",
+        "Sort the visible list in reverse order and issue a rename from that view using the row's ID, then inspect the underlying records."
+      ],
+      "checks": [
+        "The output array differs from the original; t1 retains its reference and title.",
+        "The output t2 has title Draft and a new reference, while the original t2 still says Write.",
+        "Renaming missing t9 follows the documented missing-record path and never edits a neighboring row."
+      ],
+      "experiment": "Replace the ID match with a visible row index and reorder the view. Demonstrate the wrong target before restoring identity-based commands.",
+      "review": "Draw the old and new array reference graphs. Review an agent patch that spreads the array but edits next[index].title, and identify the shared object it still mutates.",
+      "stretch": "Make a rename to the existing title return the original state and explain the tradeoff between simpler code and preserving no-change identity.",
+      "stage": "Build independently",
+      "minutes": 35,
+      "workedExample": "Starting with old = [a,b], map returns next = [a,b2] when b.id is t2. next !== old, next[0] === old[0], and next[1] !== old[1]. b.title remains Write while b2.title is Draft. These relationships are stronger evidence than checking only the final rendered text.",
+      "retrieval": [
+        {
+          "question": "Why reuse the unchanged row's reference?",
+          "answer": "It preserves structural sharing and avoids copying data that did not change."
+        },
+        {
+          "question": "Why is spreading an array insufficient before editing an element?",
+          "answer": "The spread copies element references, so the old and new arrays still point at the same task objects."
+        }
+      ],
+      "parentId": "effect-js-foundations-list-transformations"
+    },
+    {
+      "id": "effect-js-foundations-stale-load",
+      "title": "Prevent an older read from replacing a newer view",
+      "concept": "Completion order and request generations",
+      "brief": "Select t1 and then t2 while their repository reads are independently gated. Finish the t2 read first and the t1 read last; keep the editor on t2.",
+      "explanation": "Starting requests in order does not guarantee they finish in order. A continuation captures the work of its own request, but the UI may have moved on by the time that continuation runs. A generation counter marks which request owns the current view. Comparing the captured generation to the latest generation before committing a result prevents an obsolete completion from taking ownership.",
+      "steps": [
+        "Create separate read gates for t1 and t2. Increment a selection generation for each selection and capture both the ID and generation inside that request.",
+        "Resolve t2 with title Write before resolving t1 with title Read. Apply a result only if its generation still matches the active selection.",
+        "Repeat the exercise with t1 rejecting late. Ensure an obsolete error also cannot replace t2's successful editor."
+      ],
+      "checks": [
+        "After t2 resolves, the selected ID and visible title are t2 and Write.",
+        "Late t1 fulfillment leaves the t2 editor intact.",
+        "Late t1 rejection does not display an error belonging to the current t2 selection."
+      ],
+      "experiment": "Guard successful responses but leave the catch branch unguarded. Reject the obsolete request and capture the misleading error, then guard both paths.",
+      "review": "Explain why checking only completion order is insufficient. Review an agent's suggestion to use a fixed timeout and identify the missing correctness guarantee.",
+      "stretch": "Use an abort-capable adapter to reduce unnecessary work while retaining the generation check for sources that cannot stop promptly.",
+      "stage": "Make it reliable",
+      "minutes": 35,
+      "workedExample": "Selection t1 captures generation 1; selection t2 advances the shared generation to 2. The t2 result compares 2 with 2 and commits. The t1 result compares 1 with 2 and is discarded. Its data can be valid while its authority to update this particular view has expired.",
+      "retrieval": [
+        {
+          "question": "What does a generation number represent?",
+          "answer": "Ownership of the current request's result, rather than the age or validity of the underlying record."
+        },
+        {
+          "question": "Why also guard the rejection path?",
+          "answer": "An old request's failure is just as stale as its success and must not overwrite the newer view."
+        }
+      ],
+      "parentId": "effect-js-foundations-async-order"
+    },
+    {
+      "id": "effect-js-foundations-await-batch",
+      "title": "Wait for all requested deletions",
+      "concept": "Async iteration and promise composition",
+      "brief": "Delete t1 and t2 through a bulk action while each deletion is separately gated. Close the dialog only when the chosen batch completion policy has actually been satisfied.",
+      "explanation": "Array forEach invokes callbacks but ignores their returned promises. Making its callback async does not make the outer forEach await anything. Promise.all composes a list of promises and fulfills when all fulfill, while a for...of loop with await starts operations sequentially. Neither arrangement provides database transaction semantics; a failed batch can have partial writes, which the interface must represent honestly.",
+      "steps": [
+        "Reproduce the bug with ids.forEach(async id => await remove(id)) followed by closing the dialog. Keep both gates unresolved and observe premature closure.",
+        "Choose sequential deletion for this lab. Use for...of with await and collect completed IDs before attempting the next deletion.",
+        "Reject t2 after t1 succeeds. Keep t1 removed, show that t2 remains, and offer a retry for the remaining ID rather than pretending the batch rolled back."
+      ],
+      "checks": [
+        "The dialog remains pending while the first deletion is unresolved.",
+        "The second delete starts only after the first succeeds under the sequential policy.",
+        "A t2 failure reports one completed deletion and one remaining task, with no claim of atomic rollback."
+      ],
+      "experiment": "Replace the loop with Promise.all and reject t1 while t2 is pending. Observe that aggregate rejection does not automatically cancel or undo t2.",
+      "review": "Teach back the difference between awaiting completion, controlling concurrency, and making writes atomic. Review any agent patch that treats those as interchangeable.",
+      "stretch": "Implement a separate concurrent mode using settled results and document the per-item success report.",
+      "stage": "Make it reliable",
+      "minutes": 35,
+      "workedExample": "In the sequential fixture, start(t1) is followed by success(t1), then start(t2), then failure(t2). The repository ends with t2 only. With async forEach, both starts occur and the close instruction runs before either success. The callback promises exist, but nobody at the batch boundary awaits them.",
+      "retrieval": [
+        {
+          "question": "Why does await ids.forEach(async ...) fail to wait?",
+          "answer": "forEach returns undefined and discards callback return values, so it provides no batch promise."
+        },
+        {
+          "question": "Does Promise.all rejection undo successful deletions?",
+          "answer": "No. Promise composition does not add transactions or rollback to the repository."
+        }
+      ],
+      "parentId": "effect-js-foundations-async-order"
+    },
+    {
+      "id": "effect-js-foundations-captured-command",
+      "title": "Capture the submitted draft at the command boundary",
+      "concept": "Live bindings versus explicit snapshots",
+      "brief": "Submit title First, keep the save pending, then change the editor to Second. Ensure the first request records First and does not clear the newer draft when it finishes.",
+      "explanation": "An asynchronous continuation can read a mutable binding after it has changed. A submission should therefore create a command snapshot at a clearly defined instant. That snapshot describes the user's submitted intent, while the live editor continues to represent newer intent. Capturing the command and tracking its editor revision solve different problems: one stabilizes payload, and the other controls whether completion may reset the editor.",
+      "steps": [
+        "Keep a draft revision that increments on every edit. At submit, copy the payload and capture the revision before awaiting a gated repository operation.",
+        "Change the live title from First to Second while the gate is pending. Resolve the request and clear the editor only if the captured revision still matches.",
+        "Inspect both the repository payload and the visible draft, then repeat with no intervening edit to demonstrate the allowed reset path."
+      ],
+      "checks": [
+        "The first request payload contains First even after the editor displays Second.",
+        "The successful older request leaves Second in the editor and does not claim it was saved.",
+        "A save with no intervening edit can reset the draft according to the documented UI policy."
+      ],
+      "experiment": "Construct the payload after awaiting an unrelated gate. Observe the command accidentally taking Second, then move snapshot creation back to submission time.",
+      "review": "Explain why retaining a closure over draft is different from retaining a copied submitted value. Ask an agent to justify every reset against the captured revision.",
+      "stretch": "Track server revisions separately from editor revisions and explain why local edit ownership does not detect concurrent remote writes.",
+      "stage": "Make it reliable",
+      "minutes": 35,
+      "workedExample": "At submit, draft is First and revision is 4; command becomes {title:'First'} and submittedRevision becomes 4. Editing produces draft Second and revision 5. Save success persists command First, but 4 !== 5 prevents a reset. The old request succeeded without exhausting the user's newer work.",
+      "retrieval": [
+        {
+          "question": "When should the submitted payload be captured?",
+          "answer": "At the action boundary, before asynchronous gaps allow the live draft to change."
+        },
+        {
+          "question": "Why compare revisions after success?",
+          "answer": "To avoid clearing edits created after that particular request began."
+        }
+      ],
+      "parentId": "effect-js-foundations-closure-ownership"
+    },
+    {
+      "id": "effect-js-foundations-loop-capture",
+      "title": "Bind row actions to the correct task",
+      "concept": "Block scope and per-iteration bindings",
+      "brief": "Render three delete buttons from tasks t1, t2, and t3, store their handlers, and invoke the first handler after the loop completes. It must delete t1.",
+      "explanation": "Handlers commonly execute later than the loop that creates them. A function using a shared mutable loop binding will observe that binding when invoked, which may be after it has reached its final value. Block-scoped iteration bindings or an explicit per-row function argument associate a handler with the intended record. IDs also protect the handler from later reordering of the array.",
+      "steps": [
+        "Build a minimal handler array and first demonstrate a var index captured by all callbacks. Invoke callbacks only after the loop finishes and inspect the observed index.",
+        "Replace the index dependency with a per-iteration task ID using for...of with const or a handler factory receiving id.",
+        "Reverse the displayed task list after constructing the handlers, then invoke the originally first button's handler and inspect the deleted ID."
+      ],
+      "checks": [
+        "The first stored handler requests deletion of t1, the second t2, and the third t3.",
+        "No handler reads tasks[tasks.length] after loop completion.",
+        "Reordering the list does not retarget an already-created command to a different task."
+      ],
+      "experiment": "Use a block-scoped index but let handlers resolve tasks[index] from a later reordered array. Show why solving scope alone does not solve identity.",
+      "review": "Teach back two independent hazards: shared loop bindings and position-based targeting. Review an agent fix that changes var to let but still dereferences a mutable array later.",
+      "stretch": "Add a confirmation dialog that captures the selected ID and rechecks existence before committing deletion.",
+      "stage": "Make it reliable",
+      "minutes": 35,
+      "workedExample": "With var i, all callbacks read the same i, which is 3 after a three-item loop. tasks[3] is undefined. With const id = task.id inside each iteration, the first closure reads its own id value t1. Even if the array later becomes [t3,t2,t1], that stored ID remains t1.",
+      "retrieval": [
+        {
+          "question": "Why can all callbacks see the final var index?",
+          "answer": "They share one function-scoped binding that the loop repeatedly updates."
+        },
+        {
+          "question": "Why capture an ID instead of an array index?",
+          "answer": "The ID retains domain meaning when the array is sorted, filtered, or otherwise reordered."
+        }
+      ],
+      "parentId": "effect-js-foundations-closure-ownership"
+    },
+    {
+      "id": "effect-js-foundations-module-boundary",
+      "title": "Make imports describe dependencies without starting work",
+      "concept": "ES modules and import-time effects",
+      "brief": "Split the lab into task-core, repository, and app modules. Importing task-core should define reusable behavior without opening storage or creating sample tasks.",
+      "explanation": "Modules give names explicit import and export boundaries. Top-level module code is evaluated when the module is loaded, so an import can unexpectedly perform work if that code starts a connection or writes data. Exporting a factory or start function lets the application edge decide when work begins. This makes reuse in a test, a command-line script, or another editor easier to reason about.",
+      "steps": [
+        "Place validation and transformations in task-core and export named functions. Ensure it imports neither a browser global nor the concrete repository.",
+        "Export createMemoryRepository from the adapter module and startApp from the application module. Instantiate the adapter only inside the composition entry point.",
+        "Import task-core in a minimal script with no DOM. Track an adapter-construction counter and verify that merely loading the core leaves it at zero."
+      ],
+      "checks": [
+        "Core functions run with ordinary input objects in an environment without document or localStorage.",
+        "Importing the core creates no rows and opens no repository.",
+        "Calling startApp explicitly constructs the adapter and connects it to the command handlers exactly once."
+      ],
+      "experiment": "Add a top-level seed write in an imported module. Import it from a second consumer and explain the surprising lifecycle coupling before moving seeding behind an explicit action.",
+      "review": "Draw the dependency arrows and identify the one place that selects concrete storage. Review an agent change for an innocent-looking import that starts background work.",
+      "stretch": "Provide a separate seed command that is safe to invoke deliberately and reports which fixture records it created.",
+      "stage": "Own the outcome",
+      "minutes": 35,
+      "workedExample": "Before import, constructionCount is 0. Loading task-core evaluates function definitions and exported constants, leaving the count at 0. Calling startApp then calls createMemoryRepository and increments it to 1. The distinction is between describing a capability in a module and deciding to execute it at application startup.",
+      "retrieval": [
+        {
+          "question": "Can an import execute side effects?",
+          "answer": "Yes. A module's top-level code runs during module evaluation."
+        },
+        {
+          "question": "Why export a factory instead of an already-open repository?",
+          "answer": "The caller can choose construction time, configuration, and lifetime explicitly."
+        }
+      ],
+      "parentId": "effect-js-foundations-pure-core"
+    },
+    {
+      "id": "effect-js-foundations-agent-review-core",
+      "title": "Review a plausible but impure generated helper",
+      "concept": "Behavioral evidence for agent-written code",
+      "brief": "Give a coding agent the createTask contract, then review a deliberately flawed helper that trims the caller's object, reads the clock internally, and writes before checking length.",
+      "explanation": "Readable code can violate a contract through hidden inputs and ordering. Reviewing only types or the happy-path screenshot misses these defects. A focused review reconstructs what the function reads, changes, and can fail after changing. The evidence should compare externally visible behavior against the written contract, while keeping corrections scoped to the failing responsibility.",
+      "steps": [
+        "Write the contract in your own words: unchanged caller input, deterministic supplied time, nonempty trimmed title, maximum 80 characters, and no persistence for invalid data.",
+        "Trace the flawed helper with a whitespace title and an 81-character title. Count repository calls and record the input before and after invocation.",
+        "Ask for a repair confined to core and shell responsibilities. Inspect the actual diff and run the same examples against the corrected boundaries."
+      ],
+      "checks": [
+        "Invalid examples leave input objects unchanged and produce zero writes.",
+        "The valid example uses supplied time 1000 regardless of the machine clock.",
+        "The accepted diff explains the order normalize, validate, construct, persist and contains no hidden persistence call in the core."
+      ],
+      "experiment": "Supply a repository that records a write and then rejects. Ensure the reviewer recognizes that a rejection is not proof that no external change occurred.",
+      "review": "Teach back one defect using a concrete before-and-after state, rather than saying the code is cleaner. Identify which evidence would falsify the claimed repair.",
+      "stretch": "Ask a second agent to challenge the contract with Unicode or duplicate-submit cases, then decide which belong in this lab's scope.",
+      "stage": "Own the outcome",
+      "minutes": 35,
+      "workedExample": "Input {title:'   '} should normalize to an empty local string and return InvalidTitle, leaving the original three spaces intact. A flawed helper that first sets input.title = '' has already violated ownership even if it later rejects. If it also saves first, the empty record remains a separate failure requiring shell-level correction.",
+      "retrieval": [
+        {
+          "question": "Why inspect input state after a rejected command?",
+          "answer": "Failure does not imply the function avoided mutation before failing."
+        },
+        {
+          "question": "What makes an agent review actionable?",
+          "answer": "A specific violated contract, a reproducing fixture, and observable evidence that the proposed correction restores it."
+        }
+      ],
+      "parentId": "effect-js-foundations-pure-core"
+    },
+    {
+      "id": "effect-js-foundations-snapshot-audit",
+      "title": "Audit history without accidental retroactive changes",
+      "concept": "Reference graphs across a command sequence",
+      "brief": "Keep the last three task-list snapshots for an undo preview. Run rename, complete, and delete, then inspect every earlier snapshot for unexpected changes.",
+      "explanation": "An undo history is useful only if historical states stop changing. Saving references to arrays does not protect the objects inside them. Correct structural sharing lets snapshots reuse unchanged objects, but any later in-place mutation corrupts every snapshot sharing that object. This exercise makes ownership failures visible through time rather than only through two simultaneous editors.",
+      "steps": [
+        "Capture S0 with t1 Read and t2 Write. Produce S1 by renaming t1 to Study, S2 by completing t2, and S3 by deleting t1.",
+        "Print a compact table of IDs, titles, and done values for S0 through S3. Compare object references for changed and unchanged records at each transition.",
+        "Use the core's transformations to implement undo preview without modifying repository state until the user explicitly commits a restore."
+      ],
+      "checks": [
+        "S0 still contains Read and unfinished Write after all later commands.",
+        "S1 contains Study and unfinished Write; S2 contains Study and completed Write.",
+        "S3 contains only completed t2, while opening a history preview performs zero writes."
+      ],
+      "experiment": "Mutate t2.done in place while building S2. Show that S0 and S1 now falsely claim t2 was already complete, then repair the changed object path.",
+      "review": "Explain why historical corruption is an aliasing bug. Review an agent solution that deep-copies everything and discuss whether its broader cost is needed for these known fields.",
+      "stretch": "Add an explicit restore command that produces a new current state while retaining the history entries unchanged.",
+      "stage": "Own the outcome",
+      "minutes": 35,
+      "workedExample": "S0 = [a,b]. Rename produces S1 = [a1,b]. Completing t2 must produce S2 = [a1,b1], with b.done false and b1.done true. If completion edits b directly instead, both S0 and S1 point to the same now-complete b. The visible history changes retroactively despite no code assigning to either old array.",
+      "retrieval": [
+        {
+          "question": "Why can an old array change in meaning without being reassigned?",
+          "answer": "Its referenced objects can still be mutated through another alias."
+        },
+        {
+          "question": "What must change identity during an immutable update?",
+          "answer": "The changed object and each container along the path to it; untouched branches may remain shared."
+        }
+      ],
+      "parentId": "effect-js-foundations-integrated-editor"
+    },
+    {
+      "id": "effect-js-foundations-failure-narrative",
+      "title": "Produce a reproducible bug report from a race",
+      "concept": "Minimal evidence and deterministic reproduction",
+      "brief": "Write a small regression narrative for a renamed task whose success message appears before persistence. Replace timing guesses with a promise gate so another developer or agent can reproduce it reliably.",
+      "explanation": "A useful failure report states initial data, actions, controlled external behavior, and observed versus expected results. Sleeping for an arbitrary number of milliseconds does not establish what has completed and can hide a race on a faster machine. A controllable gate exposes the causal boundary directly: before settlement, the application cannot know whether persistence succeeded.",
+      "steps": [
+        "Create t1 Read, open its draft, enter Study, and submit against an unresolved save gate. Capture the repository call, visible message, and retained draft.",
+        "Reject the gate with a named storage failure. Record which parts of the UI change and whether the saved record remains Read.",
+        "Package the fixture, exact sequence, and expected state transitions into a short issue description. Ask an agent for a narrow repair and replay the same sequence after review."
+      ],
+      "checks": [
+        "The reproduction has no real sleeps and pauses exactly at the unresolved persistence boundary.",
+        "Before settlement, the expected UI is pending; after rejection, it is error with draft Study retained.",
+        "The repair removes the false success and a subsequent successful retry stores Study exactly once in this fixture."
+      ],
+      "experiment": "Let the agent add a 500-millisecond delay before showing success. Keep the gate unresolved longer and prove that elapsed time is not evidence of persistence.",
+      "review": "Teach back the causal claim established by the gate. Separate the observed local repository behavior from stronger guarantees such as remote idempotency that this fixture does not establish.",
+      "stretch": "Extend the report with a commit-then-response-loss adapter and identify the additional operation-ID contract required for safe retries.",
+      "stage": "Own the outcome",
+      "minutes": 35,
+      "workedExample": "The gate records save({id:'t1',title:'Study'}) but does not settle. At that instant saved data is Read and success is unjustified. Rejecting leaves the row Read and the draft Study. A corrected handler displays error. A later fresh attempt resolves, after which the row becomes Study and success finally has supporting evidence.",
+      "retrieval": [
+        {
+          "question": "Why is a deferred promise better than a sleep for this reproduction?",
+          "answer": "It controls the exact completion boundary rather than guessing how much time the environment needs."
+        },
+        {
+          "question": "What does a successful local retry test not prove?",
+          "answer": "It does not prove remote exactly-once behavior after an ambiguous commit; that requires a separate persistence contract."
+        }
+      ],
+      "parentId": "effect-js-foundations-integrated-editor"
+    }
+  ]
+}

@@ -1,0 +1,2051 @@
+{
+  "id": "inventory",
+  "title": "Inventory & reservations",
+  "kind": "Standalone app",
+  "summary": "Build products, locations, stock movements, and reservations that remain correct under concurrency.",
+  "outcome": "A second full-stack app where the last item cannot be reserved twice and retries cannot duplicate stock changes.",
+  "prerequisites": "Finish Support-ticket app and the transaction/idempotency milestones. Use a disposable PostgreSQL database for race experiments.",
+  "model": [
+    "Product: id, sku (unique within owner), name, archivedAt. Location: id, ownerId, name.",
+    "Stock: productId, locationId, onHand, reserved; unique pair and constraints 0 ≤ reserved ≤ onHand.",
+    "Reservation: id, operationId, productId, locationId, quantity, status, expiresAt. StockMovement records every accepted stock adjustment."
+  ],
+  "boundaries": "Authenticated command → inventory service → one SQL transaction for conditional stock mutation, reservation, and receipt. Read availability is advisory until the write commits.",
+  "milestones": [
+    {
+      "id": "effect-inventory-catalog",
+      "title": "Build the catalog and stock ledger",
+      "concept": "Refined inputs · database constraints",
+      "brief": "Implement product/location CRUD and auditable stock adjustments with integer quantities.",
+      "explanation": "A schema catches bad input early; a database constraint protects stored truth under every writer. Use integer quantities for indivisible items and choose an explicit unit/precision policy for measured goods. A stock adjustment is a command with a reason, not an arbitrary overwrite of a displayed total.",
+      "steps": [
+        "Define product SKU uniqueness, archival behavior, location ownership, and positive integer adjustment quantities. Add SQL constraints and foreign keys.",
+        "Build product/location forms, lists, and archive actions. Implement stock receipt and removal commands with an actor and reason.",
+        "Write the balance change and stock movement in one transaction. Reject removal below reserved stock and test direct SQL constraint violations in a disposable database."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Duplicate scoped SKUs, fractional quantities, and invalid relationships are rejected."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Stock balances and movement records agree after accepted adjustments."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Archived catalog entries preserve history and cannot receive disallowed new operations."
+        }
+      ],
+      "experiment": "Try removing five items when only three unreserved items remain. Inspect balance and ledger to confirm neither changed.",
+      "review": "Explain why UI validation and an integer TypeScript annotation cannot replace database constraints.",
+      "stretch": "Support moving stock between locations with an atomic debit, credit, and paired movement records.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-inventory-race",
+      "title": "Reserve the last item safely",
+      "concept": "Atomic conditional updates · typed conflicts",
+      "brief": "Make two concurrent reservation requests compete for one remaining item without overselling.",
+      "explanation": "Reading available=1 and later writing reserved=1 is unsafe when two requests race. Perform a conditional update or acquire appropriate row locks inside the transaction. Treat insufficient stock as a domain failure. If the database requires transaction retries, retry the complete transaction within a bound.",
+      "steps": [
+        "Define availability as onHand minus reserved and write the accepted/rejected reservation responses before implementing them.",
+        "Atomically increment reserved only when sufficient stock remains, then insert the reservation in the same transaction. Use consistent lock order for multi-row operations.",
+        "Launch two requests concurrently against PostgreSQL with one item available. Inspect both responses, reservation rows, and final balances."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly one of two competing requests reserves the last item."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No committed balance has reserved greater than onHand or below zero."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A reservation insertion failure rolls back the stock update."
+        }
+      ],
+      "experiment": "Use a barrier so both clients begin together. A sequential test cannot demonstrate protection against this race.",
+      "review": "Show the exact SQL predicate or locking strategy. An in-process mutex does not protect against a second server instance.",
+      "stretch": "Reserve a basket across multiple products and demonstrate all-or-nothing allocation with consistent lock ordering.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-inventory-lifecycle",
+      "title": "Retry, release, and expire reservations",
+      "concept": "Idempotency · scoped workers · lifecycle rules",
+      "brief": "Finish the reservation lifecycle with duplicate-safe requests and single-application release or expiry.",
+      "explanation": "A reservation can leave active state once. Release, fulfilment, and expiration may race; guard the transition and stock update in one transaction. Durable receipts make a retried request return its prior result. A worker should not decrement reserved again for an already released record.",
+      "steps": [
+        "Define active → fulfilled/released/expired transitions. Specify how onHand and reserved change for each and use a controllable clock for expiry tests.",
+        "Store a unique operation receipt with each accepted command. Reject reuse with different parameters and test a lost response followed by retry.",
+        "Run an expiry worker with bounded batches and clean shutdown. Race user release against expiry, then deploy and verify backup restoration preserves balances and history."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Duplicate requests return the established outcome without extra balance changes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Release and expiry racing each other apply the stock correction only once."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Restored reservations, receipts, movements, and balances satisfy the same invariants."
+        }
+      ],
+      "experiment": "Freeze time just before expiry, start a release, advance time, and run expiry concurrently. Repeat with a dropped response and request retry.",
+      "review": "Check receipt uniqueness, retention, transaction scope, and worker restart behavior. Reconcile the ledger against balances as an independent check.",
+      "stretch": "Add reconciliation that reports inconsistencies without silently rewriting stock, and rehearse a repair procedure.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-inventory-transfer",
+      "title": "Move stock between locations",
+      "concept": "Transactions · consistent lock ordering",
+      "brief": "Transfer available stock from one location to another with paired ledger records and no intermediate loss or duplication.",
+      "explanation": "A transfer is a single business operation with two balance changes. Check ownership and available quantity, acquire locks in a consistent order, and commit debit, credit, and movements together. Reversing a transfer is a new auditable operation; deleting its history would make later reconciliation harder.",
+      "steps": [
+        "Define transfer identity, source, destination, quantity, actor, and reason. Reject identical locations and cross-owner transfers.",
+        "Implement one transaction for both balances and paired movement records. Choose deterministic row lock ordering for concurrent opposite transfers.",
+        "Test insufficient availability, a failed destination write, duplicate submission, and two opposing transfers started together."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Accepted transfers conserve total on-hand stock."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Any intermediate failure rolls back both balances and ledger records."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Concurrent opposing transfers terminate safely under the retry policy."
+        }
+      ],
+      "experiment": "Run A-to-B and B-to-A transfers concurrently while one location contains reserved stock. Verify both conservation and the reserved-stock invariant.",
+      "review": "Explain why two separate successful HTTP updates are insufficient. A timeout after commit also requires the same idempotency policy as other stock commands.",
+      "stretch": "Add an in-transit state for physical movements whose dispatch and receipt occur at different times.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-inventory-count",
+      "title": "Reconcile a physical stock count",
+      "concept": "Versioned observations · adjustment commands",
+      "brief": "Record a physical count without blindly overwriting stock movements that happened while the count was being performed.",
+      "explanation": "A count is an observation taken at a particular time or ledger position. If stock moves during counting, the observed number cannot simply replace the latest balance. Define a freeze, snapshot, or reconciliation policy, then make the adjustment an explicit, authorized ledger event with supporting evidence.",
+      "steps": [
+        "Model count session, scope, observed quantity, baseline revision, counter, and approval status. Decide which movements are permitted during counting.",
+        "Compute proposed adjustments against the declared baseline and show them before approval. Require a revision check or recalculation if relevant stock has changed.",
+        "Test receipts and reservations during a count, rejected approval, duplicate approval, and a count lower than currently reserved stock."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Intervening stock movements are never silently discarded."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Approved adjustments have an actor, reason, and count-session link."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The resulting balances satisfy reserved and nonnegative constraints."
+        }
+      ],
+      "experiment": "Count ten items, receive five more before approval, then apply the count. Explain why a naive overwrite to ten would lose a valid receipt.",
+      "review": "Distinguish observed quantity from a command to set current balance. Record the business choice for disputed counts instead of inventing certainty.",
+      "stretch": "Require a second person to approve unusually large discrepancies and test that approval cannot be self-granted.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-inventory-load",
+      "title": "Measure correctness under contention",
+      "concept": "Load experiments · invariant monitoring",
+      "brief": "Run a bounded load experiment that measures latency and errors while independently checking stock invariants and ledger agreement.",
+      "explanation": "A fast response is not useful if the final state is wrong. Define a workload with competing reservations, releases, and transfers, then verify the resulting data independently of the request handlers. Report percentiles, rejection categories, and database contention together; expected out-of-stock responses are not the same as infrastructure failures.",
+      "steps": [
+        "Seed a disposable dataset and specify client count, duration, request mix, and starting balances. Establish a low-load baseline first.",
+        "Run increasing bounded concurrency, recording durations and categorized outcomes. Inspect lock waits and query plans before changing the code.",
+        "After each run, reconcile balances, active reservations, receipts, and movements. Repeat after one targeted change and compare both performance and correctness."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every run ends with valid balances and reconcilable ledger totals."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Reports separate business rejections from technical failures."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Performance claims include workload, environment, and before/after measurements."
+        }
+      ],
+      "experiment": "Disable a revision guard in a disposable branch. Verify that your independent invariant check catches the resulting corruption even if request latency improves.",
+      "review": "Avoid selecting only the fastest successful requests. Keep the failure rate and workload constant enough that before/after results remain comparable.",
+      "stretch": "Add a rollback rehearsal after deploying the measured optimization and verify that old code still reads the resulting records.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-separate-product-identity-from-sku",
+      "parentId": "effect-inventory-catalog",
+      "title": "Separate product identity from SKU",
+      "concept": "Catalog modeling",
+      "brief": "Rename SKU BLUE-MUG to MUG-BLUE after ledger entries already reference the product.",
+      "explanation": "A mutable business label should not replace stable identity in historical relationships.",
+      "steps": [
+        "Create a repeatable fixture: Rename SKU BLUE-MUG to MUG-BLUE after ledger entries already reference the product. Record the starting rows and relevant UI state before making the change.",
+        "Use an immutable product ID and an explicit SKU uniqueness rule.",
+        "Rename the SKU and inspect ledger, reservation, and search references. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All historical entries still point to the same product."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A rename never creates a second product or detaches stock history."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Attempt renaming to an existing normalized SKU. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Attempt renaming to an existing normalized SKU.",
+      "review": "Review the agent's proposed diff: Does every relationship use stable identity rather than display text?",
+      "stretch": "Add SKU alias history for scans of older packaging.",
+      "minutes": 30,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-validate-integral-stock-units",
+      "parentId": "effect-inventory-catalog",
+      "title": "Validate integral stock units",
+      "concept": "Quantity schemas",
+      "brief": "Receive quantities 3, 3.5, negative two, and an oversized integer for a countable item.",
+      "explanation": "Countable inventory requires finite integral quantities within a defined range.",
+      "steps": [
+        "Create a repeatable fixture: Receive quantities 3, 3.5, negative two, and an oversized integer for a countable item. Record the starting rows and relevant UI state before making the change.",
+        "Decode quantity and unit semantics before ledger mutation.",
+        "Submit each quantity through both UI and direct operation calls. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Valid counts create the intended ledger movement."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fractions and unsafe numeric values never enter countable stock."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Use a decimal-measured product under a separate unit policy. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Use a decimal-measured product under a separate unit policy.",
+      "review": "Review the agent's proposed diff: Does the model distinguish unit types instead of globally rounding quantities?",
+      "stretch": "Represent measured quantities in a documented smallest unit.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-keep-the-ledger-append-only",
+      "parentId": "effect-inventory-catalog",
+      "title": "Keep the ledger append-only",
+      "concept": "Inventory history",
+      "brief": "Correct a mistaken receipt of ten units that should have been eight.",
+      "explanation": "Corrections should preserve the original movement and record an explicit compensating adjustment.",
+      "steps": [
+        "Create a repeatable fixture: Correct a mistaken receipt of ten units that should have been eight. Record the starting rows and relevant UI state before making the change.",
+        "Append a minus-two correction linked to the mistaken entry.",
+        "Inspect history and recompute stock from all movements. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The resulting stock is eight with both events visible."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The original receipt cannot be silently edited into a different fact."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Submit the same correction command twice. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Submit the same correction command twice.",
+      "review": "Review the agent's proposed diff: Does compensation have its own stable identity and reason?",
+      "stretch": "Add a review workflow for adjustments above a configured threshold.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-derive-availability-from-explicit-components",
+      "parentId": "effect-inventory-catalog",
+      "title": "Derive availability from explicit components",
+      "concept": "Stock semantics",
+      "brief": "A product has ten on-hand units, three reserved, and two damaged units.",
+      "explanation": "Available quantity must follow a documented relationship among stock categories.",
+      "steps": [
+        "Create a repeatable fixture: A product has ten on-hand units, three reserved, and two damaged units. Record the starting rows and relevant UI state before making the change.",
+        "Define whether damaged units are part of on-hand and encode the chosen equation.",
+        "Calculate availability by hand and compare every UI surface. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Displayed availability matches the declared component model."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The same damaged units cannot be subtracted twice."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Move one damaged unit back to sellable condition. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Move one damaged unit back to sellable condition.",
+      "review": "Review the agent's proposed diff: Does the ledger represent category changes without inventing physical receipts?",
+      "stretch": "Show the component breakdown beside the available quantity.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-enforce-unique-normalized-skus",
+      "parentId": "effect-inventory-catalog",
+      "title": "Enforce unique normalized SKUs",
+      "concept": "Domain constraints",
+      "brief": "Create products with SKU abc-10 and space-ABC-10-space concurrently.",
+      "explanation": "SKU uniqueness depends on an explicit normalization rule enforced at the durable boundary.",
+      "steps": [
+        "Create a repeatable fixture: Create products with SKU abc-10 and space-ABC-10-space concurrently. Record the starting rows and relevant UI state before making the change.",
+        "Normalize before validation and use a matching storage constraint.",
+        "Race both creates and inspect product and stock rows. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly the allowed normalized identity exists."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The losing create leaves no orphan initial-stock movement."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Restore an archived product with the same SKU. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Restore an archived product with the same SKU.",
+      "review": "Review the agent's proposed diff: Does the uniqueness policy state whether archived SKUs remain reserved?",
+      "stretch": "Support explicit SKU reassignment with history when business rules permit it.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-keep-opening-stock-auditable",
+      "parentId": "effect-inventory-catalog",
+      "title": "Keep opening stock auditable",
+      "concept": "Initialization",
+      "brief": "Create a product with an opening quantity of twenty-five units.",
+      "explanation": "Initial stock is a movement with provenance, not an unexplained mutable balance.",
+      "steps": [
+        "Create a repeatable fixture: Create a product with an opening quantity of twenty-five units. Record the starting rows and relevant UI state before making the change.",
+        "Create the product and opening ledger event in one transaction.",
+        "Fail the ledger insertion after product creation is staged. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Either both records exist or neither does."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A product cannot silently claim stock without a corresponding source event."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Retry the same creation command after rollback. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Retry the same creation command after rollback.",
+      "review": "Review the agent's proposed diff: Does the opening movement include actor, reason, and stable command identity?",
+      "stretch": "Allow zero-stock creation without manufacturing a meaningless zero movement.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-archive-without-erasing-stock-history",
+      "parentId": "effect-inventory-catalog",
+      "title": "Archive without erasing stock history",
+      "concept": "Product lifecycle",
+      "brief": "Archive a product that has past receipts and one active reservation.",
+      "explanation": "Archiving changes availability for future operations but must preserve existing obligations and history.",
+      "steps": [
+        "Create a repeatable fixture: Archive a product that has past receipts and one active reservation. Record the starting rows and relevant UI state before making the change.",
+        "Define blocked operations and handling of active reservations before archive.",
+        "Attempt new reservation, release, and historical read after archiving. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Historical data and permitted cleanup operations remain available."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Archive never deletes ledger entries or strands unreleasable reservations."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Expire the active reservation after the product is archived. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Expire the active reservation after the product is archived.",
+      "review": "Review the agent's proposed diff: Does every operation check the lifecycle rule appropriate to its purpose?",
+      "stretch": "Add an archive preview summarizing outstanding stock and reservations.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-search-barcode-values-literally",
+      "parentId": "effect-inventory-catalog",
+      "title": "Search barcode values literally",
+      "concept": "Lookup inputs",
+      "brief": "Scan a barcode with leading zeros and compare it with a manually typed numeric-looking value.",
+      "explanation": "Identifiers are text whose leading zeros and exact representation may be significant.",
+      "steps": [
+        "Create a repeatable fixture: Scan a barcode with leading zeros and compare it with a manually typed numeric-looking value. Record the starting rows and relevant UI state before making the change.",
+        "Decode barcode strings without numeric coercion and define whitespace handling.",
+        "Search 001234, 1234, and a scanner-supplied trailing newline. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The intended barcode maps to the correct product."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Leading-zero identifiers never collapse into another product's code."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Scan an unknown barcode repeatedly at high speed. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Scan an unknown barcode repeatedly at high speed.",
+      "review": "Review the agent's proposed diff: Does lookup cancellation prevent old results from replacing the latest scan?",
+      "stretch": "Add a reviewed alias mapping for multiple barcodes on one product.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-reconcile-cached-balances-with-ledger",
+      "parentId": "effect-inventory-catalog",
+      "title": "Reconcile cached balances with ledger",
+      "concept": "Derived storage",
+      "brief": "A product's cached on-hand balance says twelve while its ledger sums to eleven.",
+      "explanation": "A cached balance needs an authoritative reconciliation source and repair policy.",
+      "steps": [
+        "Create a repeatable fixture: A product's cached on-hand balance says twelve while its ledger sums to eleven. Record the starting rows and relevant UI state before making the change.",
+        "Compare ledger totals with cached values using the documented movement semantics.",
+        "Run read-only comparison, then an authorized repair. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The repaired cache equals the authoritative total."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repair never alters ledger entries just to match a bad cache."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Append a receipt while reconciliation is calculating. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Append a receipt while reconciliation is calculating.",
+      "review": "Review the agent's proposed diff: Does repair validate the ledger version or execute under a consistent snapshot?",
+      "stretch": "Schedule bounded audits that report drift without exposing unrelated inventory details.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-reserve-the-final-unit-atomically",
+      "parentId": "effect-inventory-race",
+      "title": "Reserve the final unit atomically",
+      "concept": "Conditional writes",
+      "brief": "Two customers simultaneously reserve the only available unit of SKU LAST-1.",
+      "explanation": "Availability checking and reservation mutation must share one atomic authority boundary.",
+      "steps": [
+        "Create a repeatable fixture: Two customers simultaneously reserve the only available unit of SKU LAST-1. Record the starting rows and relevant UI state before making the change.",
+        "Use a conditional stock update or locking strategy with documented isolation.",
+        "Coordinate both requests immediately before their stock mutation. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly one reservation succeeds."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Available stock never becomes negative."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Repeat through two independent database connections. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Repeat through two independent database connections.",
+      "review": "Review the agent's proposed diff: Does the test prove the race rather than execute requests sequentially?",
+      "stretch": "Measure conflict outcomes separately from infrastructure failures.",
+      "minutes": 30,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-reserve-multiple-products-in-one-order",
+      "parentId": "effect-inventory-race",
+      "title": "Reserve multiple products in one order",
+      "concept": "Transaction scope",
+      "brief": "Reserve one unit each of A and B when B has no available stock.",
+      "explanation": "An all-or-nothing order must not retain partial reservations after one item fails.",
+      "steps": [
+        "Create a repeatable fixture: Reserve one unit each of A and B when B has no available stock. Record the starting rows and relevant UI state before making the change.",
+        "Validate and mutate all requested product reservations transactionally.",
+        "Fail the second product reservation after staging the first. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Neither product remains reserved after rejection."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The order cannot appear confirmed with only A reserved."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reverse product order in the request. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reverse product order in the request.",
+      "review": "Review the agent's proposed diff: Does business outcome depend on input iteration order?",
+      "stretch": "Offer partial fulfillment only as a separately explicit product contract.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-order-locks-consistently",
+      "parentId": "effect-inventory-race",
+      "title": "Order locks consistently",
+      "concept": "Deadlock avoidance",
+      "brief": "Two orders reserve A then B and B then A at the same time.",
+      "explanation": "Multi-row locking needs consistent ordering and a bounded deadlock recovery policy.",
+      "steps": [
+        "Create a repeatable fixture: Two orders reserve A then B and B then A at the same time. Record the starting rows and relevant UI state before making the change.",
+        "Sort lock acquisition by stable product identity.",
+        "Run the opposing-order fixture through separate connections. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both operations settle with valid stock outcomes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No request waits indefinitely while holding a conflicting partial set."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Inject a database deadlock result despite the ordering rule. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Inject a database deadlock result despite the ordering rule.",
+      "review": "Review the agent's proposed diff: Does retry preserve command identity and recheck current availability?",
+      "stretch": "Record deadlock frequency to evaluate whether access patterns need redesign.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-keep-availability-checks-in-sql",
+      "parentId": "effect-inventory-race",
+      "title": "Keep availability checks in SQL",
+      "concept": "Authority boundaries",
+      "brief": "The browser displays one available unit while another session reserves it.",
+      "explanation": "A stale UI availability number cannot authorize a reservation.",
+      "steps": [
+        "Create a repeatable fixture: The browser displays one available unit while another session reserves it. Record the starting rows and relevant UI state before making the change.",
+        "Check capacity in the durable conditional mutation.",
+        "Submit from the old page after another reservation commits. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The stale request receives an out-of-stock or conflict result."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Client-provided available quantity is ignored as authority."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Forge a request claiming a much larger stock value. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Forge a request claiming a much larger stock value.",
+      "review": "Review the agent's proposed diff: Does the server calculate from authoritative stock components?",
+      "stretch": "Refresh the UI with the current availability while preserving the user's requested quantity.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-avoid-lost-balance-updates",
+      "parentId": "effect-inventory-race",
+      "title": "Avoid lost balance updates",
+      "concept": "Concurrent increments",
+      "brief": "Two receipts of five units each update an opening balance of ten.",
+      "explanation": "Read-modify-write in application memory can lose one accepted movement.",
+      "steps": [
+        "Create a repeatable fixture: Two receipts of five units each update an opening balance of ten. Record the starting rows and relevant UI state before making the change.",
+        "Use atomic arithmetic or derive balance transactionally from ledger events.",
+        "Synchronize both operations after reading the original balance. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Final on-hand equals twenty with both receipt events present."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A final balance of fifteen fails the invariant check."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Replay one receipt with its original command identity. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Replay one receipt with its original command identity.",
+      "review": "Review the agent's proposed diff: Does idempotency prevent the replay from adding another five?",
+      "stretch": "Add a contract test covering simultaneous receipt and reservation.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-bind-reservation-to-expected-product-state",
+      "parentId": "effect-inventory-race",
+      "title": "Bind reservation to expected product state",
+      "concept": "Lifecycle races",
+      "brief": "A reservation starts while an administrator archives the product.",
+      "explanation": "Concurrent lifecycle and stock operations must resolve according to a declared serial ordering.",
+      "steps": [
+        "Create a repeatable fixture: A reservation starts while an administrator archives the product. Record the starting rows and relevant UI state before making the change.",
+        "Include active-product eligibility in the reservation consistency boundary.",
+        "Race archive and reservation under controlled barriers. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The final state matches one permitted operation order."
+        },
+        {
+          "id": "criterion-2",
+          "label": "An archived product cannot accept a later unauthorized reservation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Restore the product and retry the rejected request. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Restore the product and retry the rejected request.",
+      "review": "Review the agent's proposed diff: Does restore retain previous reservation history and command receipts?",
+      "stretch": "Document how already accepted reservations behave after archive.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-prove-isolation-assumptions",
+      "parentId": "effect-inventory-race",
+      "title": "Prove isolation assumptions",
+      "concept": "Database semantics",
+      "brief": "A test passes in a single connection but production uses a different isolation level.",
+      "explanation": "Concurrency guarantees depend on the actual database transaction semantics.",
+      "steps": [
+        "Create a repeatable fixture: A test passes in a single connection but production uses a different isolation level. Record the starting rows and relevant UI state before making the change.",
+        "Run the race fixture with the production engine and configured isolation.",
+        "Record connection count, isolation level, and final stock invariants. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The guarantee holds under the deployed configuration."
+        },
+        {
+          "id": "criterion-2",
+          "label": "An in-memory fake is not treated as proof of row-lock behavior."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change isolation in the test to expose unsupported assumptions. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change isolation in the test to expose unsupported assumptions.",
+      "review": "Review the agent's proposed diff: Can the reviewer name the database mechanism preventing oversell?",
+      "stretch": "Add a deployment check verifying the expected transaction configuration.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-handle-conditional-update-misses",
+      "parentId": "effect-inventory-race",
+      "title": "Handle conditional-update misses",
+      "concept": "Typed domain failures",
+      "brief": "A reservation update affects zero rows because stock changed before mutation.",
+      "explanation": "A zero-row result needs a deliberate domain interpretation without inventing success.",
+      "steps": [
+        "Create a repeatable fixture: A reservation update affects zero rows because stock changed before mutation. Record the starting rows and relevant UI state before making the change.",
+        "Map the conditional miss to an availability conflict and authorized refresh.",
+        "Test missing product, archived product, and insufficient stock separately. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each case follows the documented external error policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No reservation row is inserted after a failed stock claim."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Make the diagnostic follow-up read fail. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Make the diagnostic follow-up read fail.",
+      "review": "Review the agent's proposed diff: Does failure mapping avoid replacing uncertainty with a false out-of-stock claim?",
+      "stretch": "Return a safe generic conflict when exact cause cannot be established.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-review-race-fixes-against-the-invariant",
+      "parentId": "effect-inventory-race",
+      "title": "Review race fixes against the invariant",
+      "concept": "Agentic review",
+      "brief": "An agent fixes overselling by disabling the Reserve button after click.",
+      "explanation": "UI guards reduce repeated clicks but do not serialize independent buyers.",
+      "steps": [
+        "Create a repeatable fixture: An agent fixes overselling by disabling the Reserve button after click. Record the starting rows and relevant UI state before making the change.",
+        "Require a backend invariant and a two-client race test in the proposed patch.",
+        "Run simultaneous reservations from separate clients. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The durable boundary accepts only available stock."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A frontend-only patch fails the controlled race fixture."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Bypass the browser and call the operation directly. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Bypass the browser and call the operation directly.",
+      "review": "Review the agent's proposed diff: Can the agent explain why the storage mechanism enforces the invariant?",
+      "stretch": "Compare conditional updates, explicit locks, and serializable transactions with evidence.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-make-release-idempotent",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Make release idempotent",
+      "concept": "Reservation state",
+      "brief": "Release a reservation for three units twice after the first response is lost.",
+      "explanation": "A reservation may return its quantity to availability only once.",
+      "steps": [
+        "Create a repeatable fixture: Release a reservation for three units twice after the first response is lost. Record the starting rows and relevant UI state before making the change.",
+        "Transition active to released conditionally and couple stock adjustment atomically.",
+        "Replay release concurrently and sequentially. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Availability increases by exactly three total."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repeated release cannot create extra stock."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Release an already expired reservation. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Release an already expired reservation.",
+      "review": "Review the agent's proposed diff: Does the state machine return a stable already-settled result?",
+      "stretch": "Record the original release receipt for ambiguous client recovery.",
+      "minutes": 30,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-expire-only-active-reservations",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Expire only active reservations",
+      "concept": "Scheduled transitions",
+      "brief": "A reservation is fulfilled one moment before the expiry worker processes it.",
+      "explanation": "Expiry must not restore stock already consumed by fulfillment.",
+      "steps": [
+        "Create a repeatable fixture: A reservation is fulfilled one moment before the expiry worker processes it. Record the starting rows and relevant UI state before making the change.",
+        "Condition expiry on current active state and relevant expiry time.",
+        "Race fulfillment and expiry with a shared starting reservation. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only one terminal transition wins."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The fulfilled quantity is never returned to available inventory."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reverse transaction ordering and compare permitted outcomes. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reverse transaction ordering and compare permitted outcomes.",
+      "review": "Review the agent's proposed diff: Does the worker recheck state inside the mutation boundary?",
+      "stretch": "Track expired, skipped-settled, and conflicted counts separately.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-use-trusted-expiration-time",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Use trusted expiration time",
+      "concept": "Clock authority",
+      "brief": "A client requests a reservation expiry two years in the future.",
+      "explanation": "Reservation lifetime must follow server-controlled policy rather than arbitrary client time.",
+      "steps": [
+        "Create a repeatable fixture: A client requests a reservation expiry two years in the future. Record the starting rows and relevant UI state before making the change.",
+        "Compute expiry from a trusted clock and validated allowed duration.",
+        "Submit past, excessive, and normal requested durations. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Accepted reservations receive policy-compliant expiry."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Client clock manipulation cannot hold stock indefinitely."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Advance the test clock to the exact expiry boundary. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Advance the test clock to the exact expiry boundary.",
+      "review": "Review the agent's proposed diff: Does the contract define whether equality counts as expired?",
+      "stretch": "Allow administrative extension through a separate authorized command.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-extend-with-revision-checks",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Extend with revision checks",
+      "concept": "Lease-like renewal",
+      "brief": "Two tabs extend the same reservation while another worker considers it expired.",
+      "explanation": "An extension must prove the reservation is still active under the current version.",
+      "steps": [
+        "Create a repeatable fixture: Two tabs extend the same reservation while another worker considers it expired. Record the starting rows and relevant UI state before making the change.",
+        "Condition extension on active state, expected revision, and allowed deadline rules.",
+        "Race extension with expiry and inspect the final state. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The winner's transition is internally consistent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A late extension cannot resurrect a completed release or fulfillment."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Retry an extension after losing its response. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Retry an extension after losing its response.",
+      "review": "Review the agent's proposed diff: Does identity distinguish replaying one extension from requesting another?",
+      "stretch": "Limit cumulative extension duration to prevent indefinite stock hoarding.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-fulfill-quantity-exactly-once",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Fulfill quantity exactly once",
+      "concept": "Consumption",
+      "brief": "Fulfill a reservation for four units and retry after a network timeout.",
+      "explanation": "Consumption and reservation settlement must be idempotent and transactionally linked.",
+      "steps": [
+        "Create a repeatable fixture: Fulfill a reservation for four units and retry after a network timeout. Record the starting rows and relevant UI state before making the change.",
+        "Record fulfillment identity with the stock movement and terminal reservation state.",
+        "Replay the same fulfillment command. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "On-hand decreases by four once and reserved quantity clears once."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repeated delivery cannot double-consume inventory."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reuse the command identity with a different quantity. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reuse the command identity with a different quantity.",
+      "review": "Review the agent's proposed diff: Does the receiver reject changed payload under an existing receipt?",
+      "stretch": "Support partial fulfillment through explicit remaining-quantity state transitions.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-recover-abandoned-in-flight-requests",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Recover abandoned in-flight requests",
+      "concept": "Ambiguous outcomes",
+      "brief": "The application crashes after sending a reservation request but before saving its receipt.",
+      "explanation": "Startup must reconcile unknown outcomes before issuing replacement intent.",
+      "steps": [
+        "Create a repeatable fixture: The application crashes after sending a reservation request but before saving its receipt. Record the starting rows and relevant UI state before making the change.",
+        "Persist command identity before sending and query its accepted outcome.",
+        "Restart with an unresolved request fixture. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The original accepted reservation is recovered when present."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A new reservation is not created merely because local receipt is absent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Make the server outcome lookup temporarily unavailable. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Make the server outcome lookup temporarily unavailable.",
+      "review": "Review the agent's proposed diff: Does the UI represent uncertainty instead of declaring failure?",
+      "stretch": "Add a bounded reconciliation queue for unresolved operation identities.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-prevent-unauthorized-cancellation",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Prevent unauthorized cancellation",
+      "concept": "Reservation ownership",
+      "brief": "Customer A attempts to release Customer B's reservation using a guessed ID.",
+      "explanation": "Knowing a reservation identity does not grant control over its held stock.",
+      "steps": [
+        "Create a repeatable fixture: Customer A attempts to release Customer B's reservation using a guessed ID. Record the starting rows and relevant UI state before making the change.",
+        "Authorize reservation ownership or staff capability before transition.",
+        "Attempt release and extension as owner, outsider, and authorized staff. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only permitted principals can alter the reservation."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unauthorized attempts leave stock and reservation state unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Include a forged owner ID in the request body. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Include a forged owner ID in the request body.",
+      "review": "Review the agent's proposed diff: Does authorization use trusted session context and current reservation data?",
+      "stretch": "Add a staff cancellation reason recorded in the audit event.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-distinguish-cancel-from-return",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Distinguish cancel from return",
+      "concept": "Business transitions",
+      "brief": "A fulfilled reservation is sent to the release endpoint.",
+      "explanation": "Releasing held stock and returning consumed goods are different domain operations.",
+      "steps": [
+        "Create a repeatable fixture: A fulfilled reservation is sent to the release endpoint. Record the starting rows and relevant UI state before making the change.",
+        "Reject release for fulfilled reservations and define a separate return flow.",
+        "Exercise active, released, expired, and fulfilled states. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Release affects only eligible held inventory."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A fulfilled order cannot manufacture returned stock through cancellation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Attempt the return flow with no received-return evidence. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Attempt the return flow with no received-return evidence.",
+      "review": "Review the agent's proposed diff: Does each transition have its own prerequisites and ledger movement type?",
+      "stretch": "Support partial returns with stable references to original fulfillment lines.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-keep-cleanup-failure-recoverable",
+      "parentId": "effect-inventory-lifecycle",
+      "title": "Keep cleanup failure recoverable",
+      "concept": "Worker resilience",
+      "brief": "An expiry batch contains one corrupted reservation followed by valid expired reservations.",
+      "explanation": "One poison record should be visible without permanently blocking independent cleanup.",
+      "steps": [
+        "Create a repeatable fixture: An expiry batch contains one corrupted reservation followed by valid expired reservations. Record the starting rows and relevant UI state before making the change.",
+        "Handle per-item failures with bounded retries and safe diagnostics.",
+        "Process the batch and inspect every reservation outcome. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Valid expired reservations settle according to policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The corrupted record remains identifiable and is not silently dropped."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Repair the corrupted fixture and rerun cleanup. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Repair the corrupted fixture and rerun cleanup.",
+      "review": "Review the agent's proposed diff: Does the batch report distinguish processed, skipped, and failed items?",
+      "stretch": "Add an operator repair preview with the proposed stock effect.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-move-stock-without-creating-it",
+      "parentId": "effect-inventory-transfer",
+      "title": "Move stock without creating it",
+      "concept": "Transfer invariant",
+      "brief": "Transfer seven units from Warehouse A to Warehouse B.",
+      "explanation": "A transfer changes location balances while preserving total stock across its defined boundary.",
+      "steps": [
+        "Create a repeatable fixture: Transfer seven units from Warehouse A to Warehouse B. Record the starting rows and relevant UI state before making the change.",
+        "Write linked debit and credit movements under one transfer identity.",
+        "Compare per-location and global totals before and after. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "A decreases seven, B increases seven, and global total is unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No transfer can produce only its credit movement."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Fail after staging the source debit. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Fail after staging the source debit.",
+      "review": "Review the agent's proposed diff: Does the transaction cover both locations and the transfer record?",
+      "stretch": "Add a receipt showing the conserved quantity and both location identities.",
+      "minutes": 30,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-model-goods-in-transit-explicitly",
+      "parentId": "effect-inventory-transfer",
+      "title": "Model goods in transit explicitly",
+      "concept": "Physical workflow",
+      "brief": "Dispatch stock from A today and receive it at B tomorrow.",
+      "explanation": "Physical transit may require a distinct inventory state rather than immediate destination availability.",
+      "steps": [
+        "Create a repeatable fixture: Dispatch stock from A today and receive it at B tomorrow. Record the starting rows and relevant UI state before making the change.",
+        "Define dispatched, in-transit, received, and canceled states.",
+        "Dispatch without receiving and inspect availability by location. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Destination availability increases only at the declared receiving event."
+        },
+        {
+          "id": "criterion-2",
+          "label": "In-transit goods cannot be sold from both locations."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Lose a receiving response and retry. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Lose a receiving response and retry.",
+      "review": "Review the agent's proposed diff: Does global stock include in-transit units without double-counting them?",
+      "stretch": "Add partial receiving with documented shortage and damage handling.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-reserve-source-capacity-atomically",
+      "parentId": "effect-inventory-transfer",
+      "title": "Reserve source capacity atomically",
+      "concept": "Transfer races",
+      "brief": "Two transfers each request six units from a source holding ten.",
+      "explanation": "Concurrent dispatches must share the same source-stock invariant as reservations.",
+      "steps": [
+        "Create a repeatable fixture: Two transfers each request six units from a source holding ten. Record the starting rows and relevant UI state before making the change.",
+        "Claim transferable quantity in the authoritative transaction.",
+        "Release both transfer requests through a barrier. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Accepted dispatch quantities never exceed available source stock."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A failed transfer creates no orphan destination expectation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Race a customer reservation against one transfer. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Race a customer reservation against one transfer.",
+      "review": "Review the agent's proposed diff: Does the transferable equation account for already reserved units?",
+      "stretch": "Document priorities between sales reservations and internal transfers.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-reject-identical-locations",
+      "parentId": "effect-inventory-transfer",
+      "title": "Reject identical locations",
+      "concept": "Domain validation",
+      "brief": "Submit a transfer whose source and destination are both Warehouse A.",
+      "explanation": "A same-location transfer is either a deliberate reclassification or an invalid operation.",
+      "steps": [
+        "Create a repeatable fixture: Submit a transfer whose source and destination are both Warehouse A. Record the starting rows and relevant UI state before making the change.",
+        "Reject identical location IDs in the transfer contract.",
+        "Call the operation directly with equal IDs and a positive quantity. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The invalid command creates no ledger movements."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A paired debit and credit cannot hide meaningless or misleading activity."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Use two aliases referring to the same canonical location. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Use two aliases referring to the same canonical location.",
+      "review": "Review the agent's proposed diff: Does identity validation happen after alias resolution?",
+      "stretch": "Implement reclassification as a separately named operation if the business needs it.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-handle-partial-receipt",
+      "parentId": "effect-inventory-transfer",
+      "title": "Handle partial receipt",
+      "concept": "Quantity state",
+      "brief": "Dispatch ten units but receive eight, with two still unresolved.",
+      "explanation": "A partial receipt must track received and outstanding quantities without closing the entire transfer prematurely.",
+      "steps": [
+        "Create a repeatable fixture: Dispatch ten units but receive eight, with two still unresolved. Record the starting rows and relevant UI state before making the change.",
+        "Record cumulative received quantity and enforce its upper bound.",
+        "Receive five, then three, then attempt another three. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Eight units become destination stock and two remain unresolved."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Over-receipt beyond dispatched quantity is rejected."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Replay the second receipt after a timeout. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Replay the second receipt after a timeout.",
+      "review": "Review the agent's proposed diff: Does each receiving event have stable idempotent identity?",
+      "stretch": "Add explicit loss or damage resolution for the remaining quantity.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-cancel-only-the-unreceived-remainder",
+      "parentId": "effect-inventory-transfer",
+      "title": "Cancel only the unreceived remainder",
+      "concept": "Compensation",
+      "brief": "Dispatch ten units, receive four, then cancel the remaining transfer.",
+      "explanation": "Cancellation cannot reverse units already physically received through an unrelated lifecycle shortcut.",
+      "steps": [
+        "Create a repeatable fixture: Dispatch ten units, receive four, then cancel the remaining transfer. Record the starting rows and relevant UI state before making the change.",
+        "Define how unreceived stock returns or is reclassified before cancellation.",
+        "Cancel the remainder and inspect all location and transit balances. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Already received units remain at the destination."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Cancellation never credits the entire original quantity back to source."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Receive another unit concurrently with cancellation. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Receive another unit concurrently with cancellation.",
+      "review": "Review the agent's proposed diff: Does the consistency boundary protect the remaining-quantity calculation?",
+      "stretch": "Require a documented physical return event before restoring source availability.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-authorize-both-transfer-endpoints",
+      "parentId": "effect-inventory-transfer",
+      "title": "Authorize both transfer endpoints",
+      "concept": "Access scope",
+      "brief": "A warehouse operator can manage A but has no authority over B.",
+      "explanation": "Transfer permission may require capabilities on both source and destination.",
+      "steps": [
+        "Create a repeatable fixture: A warehouse operator can manage A but has no authority over B. Record the starting rows and relevant UI state before making the change.",
+        "Evaluate the full endpoint policy before recording movements.",
+        "Attempt A-to-B, A-to-AliasA, and authorized A-to-C transfers. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only transfers satisfying the declared endpoint policy proceed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "An authorized source cannot be used to write arbitrary destination stock."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Revoke destination access after a transfer preview is built. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Revoke destination access after a transfer preview is built.",
+      "review": "Review the agent's proposed diff: Does final commit recheck current capabilities?",
+      "stretch": "Support approved cross-team transfers through an explicit request-and-accept workflow.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-preserve-transfer-history-during-renames",
+      "parentId": "effect-inventory-transfer",
+      "title": "Preserve transfer history during renames",
+      "concept": "Stable references",
+      "brief": "Rename Warehouse A after several dispatch and receipt events.",
+      "explanation": "Historical transfer references must remain attached to stable locations.",
+      "steps": [
+        "Create a repeatable fixture: Rename Warehouse A after several dispatch and receipt events. Record the starting rows and relevant UI state before making the change.",
+        "Store location IDs and intentionally chosen historical labels.",
+        "Rename the location and render old transfer receipts. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Receipts still identify the correct source and destination."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Renaming never breaks linked movements or changes totals."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Archive a location with outstanding in-transit stock. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Archive a location with outstanding in-transit stock.",
+      "review": "Review the agent's proposed diff: Does the lifecycle policy permit necessary receiving and reconciliation operations?",
+      "stretch": "Display current and historical location names when they differ.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-reconcile-unmatched-movement-pairs",
+      "parentId": "effect-inventory-transfer",
+      "title": "Reconcile unmatched movement pairs",
+      "concept": "Repair diagnostics",
+      "brief": "Corrupt a fixture so one completed transfer has a debit but no matching credit.",
+      "explanation": "A repair tool must detect broken conservation without blindly adding guessed stock.",
+      "steps": [
+        "Create a repeatable fixture: Corrupt a fixture so one completed transfer has a debit but no matching credit. Record the starting rows and relevant UI state before making the change.",
+        "Compare transfer state and linked movement quantities under a consistent snapshot.",
+        "Run a read-only audit and inspect the identified discrepancy. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The exact unmatched transfer and quantity are reported."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The diagnostic never silently fabricates the missing movement."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add an in-transit transfer that correctly lacks a destination credit. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add an in-transit transfer that correctly lacks a destination credit.",
+      "review": "Review the agent's proposed diff: Does the audit distinguish legitimate staged transfers from corruption?",
+      "stretch": "Build an authorized repair plan requiring evidence of actual physical receipt.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-count-against-a-defined-snapshot",
+      "parentId": "effect-inventory-count",
+      "title": "Count against a defined snapshot",
+      "concept": "Reconciliation basis",
+      "brief": "Start counting a shelf when recorded stock is twenty, then receive five units during counting.",
+      "explanation": "A physical count needs a clear time or movement boundary for comparison.",
+      "steps": [
+        "Create a repeatable fixture: Start counting a shelf when recorded stock is twenty, then receive five units during counting. Record the starting rows and relevant UI state before making the change.",
+        "Record the count session's baseline and track intervening movements.",
+        "Enter a count and reconcile with the known receipt sequence. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The adjustment reflects the declared snapshot policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A concurrent receipt is not mistaken for unexplained surplus or loss."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Move units out between physical count and submission. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Move units out between physical count and submission.",
+      "review": "Review the agent's proposed diff: Does the interface ask when the count was observed rather than only submitted?",
+      "stretch": "Support a temporary count lock only if operational workflow permits it.",
+      "minutes": 30,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-separate-observed-count-from-adjustment",
+      "parentId": "effect-inventory-count",
+      "title": "Separate observed count from adjustment",
+      "concept": "Domain records",
+      "brief": "A worker counts eighteen units where the reconciled expected quantity is twenty.",
+      "explanation": "The physical observation and resulting minus-two adjustment are distinct facts.",
+      "steps": [
+        "Create a repeatable fixture: A worker counts eighteen units where the reconciled expected quantity is twenty. Record the starting rows and relevant UI state before making the change.",
+        "Persist the observation, basis, and approved adjustment linkage.",
+        "Inspect the count record and ledger after approval. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The observation remains eighteen and the ledger records minus two."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Editing the observation does not silently mutate an already posted movement."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Correct a mistakenly entered count after approval. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Correct a mistakenly entered count after approval.",
+      "review": "Review the agent's proposed diff: Does correction append a new reviewed event rather than rewrite history?",
+      "stretch": "Add a reversal-and-replacement workflow for approved count corrections.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-require-approval-for-large-variances",
+      "parentId": "effect-inventory-count",
+      "title": "Require approval for large variances",
+      "concept": "Workflow controls",
+      "brief": "A count proposes removing ninety units from a location expected to hold one hundred.",
+      "explanation": "Large adjustments may require explicit review under product-defined thresholds.",
+      "steps": [
+        "Create a repeatable fixture: A count proposes removing ninety units from a location expected to hold one hundred. Record the starting rows and relevant UI state before making the change.",
+        "Calculate variance and route qualifying adjustments to a pending approval state.",
+        "Test just-below, equal-to, and above-threshold cases. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The threshold boundary matches the documented approval rule."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Pending counts do not alter available stock prematurely."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change the approval threshold while a count awaits review. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change the approval threshold while a count awaits review.",
+      "review": "Review the agent's proposed diff: Does the count retain the policy version used for routing?",
+      "stretch": "Require a reason and supporting evidence for approved exceptional variances.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-prevent-duplicate-count-posting",
+      "parentId": "effect-inventory-count",
+      "title": "Prevent duplicate count posting",
+      "concept": "Idempotent settlement",
+      "brief": "Approve a count adjustment, lose the response, and press Approve again.",
+      "explanation": "One count session can post its approved stock effect only once.",
+      "steps": [
+        "Create a repeatable fixture: Approve a count adjustment, lose the response, and press Approve again. Record the starting rows and relevant UI state before making the change.",
+        "Transition pending to posted with the ledger entry in one transaction.",
+        "Replay approval concurrently and after restart. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly one adjustment movement is linked to the count."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repeated approval cannot repeatedly reduce stock."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reuse the approval command identity for a different count. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reuse the approval command identity for a different count.",
+      "review": "Review the agent's proposed diff: Does identity scope prevent cross-count receipt confusion?",
+      "stretch": "Display the existing posting receipt on valid replay.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-handle-zero-as-an-observation",
+      "parentId": "effect-inventory-count",
+      "title": "Handle zero as an observation",
+      "concept": "Input semantics",
+      "brief": "Count an empty bin and enter zero while another bin remains uncounted.",
+      "explanation": "Zero observed units differs from no observation submitted.",
+      "steps": [
+        "Create a repeatable fixture: Count an empty bin and enter zero while another bin remains uncounted. Record the starting rows and relevant UI state before making the change.",
+        "Represent absent count separately from a validated nonnegative quantity.",
+        "Submit zero, empty, whitespace, and a positive count. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Zero is retained as an explicit observation."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Empty input cannot silently become a zero-stock adjustment."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Import a count sheet containing blank cells and zeros. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Import a count sheet containing blank cells and zeros.",
+      "review": "Review the agent's proposed diff: Does numeric coercion erase the distinction before validation?",
+      "stretch": "Show uncounted, counted-zero, and counted-positive states separately.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-use-blind-counts-intentionally",
+      "parentId": "effect-inventory-count",
+      "title": "Use blind counts intentionally",
+      "concept": "Count UX",
+      "brief": "A worker counts a bin while the system optionally hides its expected quantity.",
+      "explanation": "Blind counting can reduce anchoring but must still preserve reconciliation context.",
+      "steps": [
+        "Create a repeatable fixture: A worker counts a bin while the system optionally hides its expected quantity. Record the starting rows and relevant UI state before making the change.",
+        "Separate count-entry view from review view and enforce the chosen workflow.",
+        "Enter observations without expected quantities, then open review. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The reviewer can compare observation with the correct baseline."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The entry form does not reveal expected values through hidden labels or hints."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Recount a disputed bin under a second observer. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Recount a disputed bin under a second observer.",
+      "review": "Review the agent's proposed diff: Does the model retain independent observations instead of replacing the first?",
+      "stretch": "Add a comparison workflow for two counts before choosing an approved adjustment.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-reconcile-reservations-with-shortages",
+      "parentId": "effect-inventory-count",
+      "title": "Reconcile reservations with shortages",
+      "concept": "Availability policy",
+      "brief": "Physical stock falls to two units while three units remain reserved.",
+      "explanation": "A shortage requires an explicit treatment of existing obligations.",
+      "steps": [
+        "Create a repeatable fixture: Physical stock falls to two units while three units remain reserved. Record the starting rows and relevant UI state before making the change.",
+        "Detect reservations exceeding sellable stock and route affected commitments for review.",
+        "Post the count under the chosen shortage policy. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Stock and reservation reports expose the shortfall consistently."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The system never invents extra physical units to hide the deficit."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Fulfill one reservation while shortage review is pending. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Fulfill one reservation while shortage review is pending.",
+      "review": "Review the agent's proposed diff: Does the workflow prevent double allocation of scarce remaining units?",
+      "stretch": "Add a documented prioritization process for resolving affected reservations.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-keep-count-scope-explicit",
+      "parentId": "effect-inventory-count",
+      "title": "Keep count scope explicit",
+      "concept": "Location coverage",
+      "brief": "A count sheet includes one shelf from a warehouse with ten shelves.",
+      "explanation": "A partial count must not treat unvisited locations as zero.",
+      "steps": [
+        "Create a repeatable fixture: A count sheet includes one shelf from a warehouse with ten shelves. Record the starting rows and relevant UI state before making the change.",
+        "Store the exact counted locations and product scope.",
+        "Import a sheet missing several warehouse locations. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only explicitly observed scope contributes to adjustments."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Absent rows never imply inventory deletion."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add a product discovered physically but absent from the planned count list. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add a product discovered physically but absent from the planned count list.",
+      "review": "Review the agent's proposed diff: Does the workflow distinguish unexpected stock from omitted observations?",
+      "stretch": "Allow reviewed scope expansion with a visible audit trail.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-audit-count-to-ledger-provenance",
+      "parentId": "effect-inventory-count",
+      "title": "Audit count-to-ledger provenance",
+      "concept": "Operational evidence",
+      "brief": "An auditor asks why one product's balance dropped by twelve units.",
+      "explanation": "Every adjustment should trace to an observation, approval, and movement identity.",
+      "steps": [
+        "Create a repeatable fixture: An auditor asks why one product's balance dropped by twelve units. Record the starting rows and relevant UI state before making the change.",
+        "Link count session, observer, approver, reason, and ledger entry.",
+        "Navigate from current stock through the adjustment to source evidence. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The complete adjustment rationale is discoverable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A generic adjustment label alone cannot satisfy the provenance check."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Delete an optional photo attachment from the count evidence. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Delete an optional photo attachment from the count evidence.",
+      "review": "Review the agent's proposed diff: Does essential provenance remain even when optional artifacts disappear?",
+      "stretch": "Export a focused adjustment report with safe actor and timing details.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-assert-conservation-under-load",
+      "parentId": "effect-inventory-load",
+      "title": "Assert conservation under load",
+      "concept": "Invariant testing",
+      "brief": "Run mixed receipts, reservations, releases, and fulfillments against a seeded product.",
+      "explanation": "Performance tests need correctness oracles as well as throughput numbers.",
+      "steps": [
+        "Create a repeatable fixture: Run mixed receipts, reservations, releases, and fulfillments against a seeded product. Record the starting rows and relevant UI state before making the change.",
+        "Compute expected stock from accepted unique ledger events and reservation states.",
+        "Compare database balances with the independent oracle after settling. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every final component satisfies the documented stock equations."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A fast run with negative availability or duplicate movements fails."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Introduce duplicate requests during the workload. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Introduce duplicate requests during the workload.",
+      "review": "Review the agent's proposed diff: Does the oracle avoid reusing the same implementation helper as production?",
+      "stretch": "Add deterministic seeds so a failing workload can be replayed.",
+      "minutes": 30,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-measure-conflict-rate-separately",
+      "parentId": "effect-inventory-load",
+      "title": "Measure conflict rate separately",
+      "concept": "Load interpretation",
+      "brief": "One hundred buyers compete for five available units.",
+      "explanation": "Expected business rejections are different from infrastructure failures.",
+      "steps": [
+        "Create a repeatable fixture: One hundred buyers compete for five available units. Record the starting rows and relevant UI state before making the change.",
+        "Classify success, out-of-stock conflict, timeout, and server failure separately.",
+        "Run the contention fixture and inspect categorized results. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly the permitted quantity succeeds logically."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Expected sold-out responses are not mislabeled as system crashes."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Increase stock to one hundred and repeat. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Increase stock to one hundred and repeat.",
+      "review": "Review the agent's proposed diff: Does the report explain how workload constraints determine expected success count?",
+      "stretch": "Graph latency for accepted and rejected commands independently.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-use-independent-database-connections",
+      "parentId": "effect-inventory-load",
+      "title": "Use independent database connections",
+      "concept": "Concurrency realism",
+      "brief": "A benchmark sends many promises through one serialized database connection.",
+      "explanation": "Apparent concurrency may not exercise the production locking behavior.",
+      "steps": [
+        "Create a repeatable fixture: A benchmark sends many promises through one serialized database connection. Record the starting rows and relevant UI state before making the change.",
+        "Run the test with multiple independent sessions matching deployment topology.",
+        "Compare one-connection and multi-connection results. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The multi-session run actually overlaps critical operations."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Passing a serialized benchmark is not claimed as race safety."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Pause sessions at the mutation barrier and inspect active transactions. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Pause sessions at the mutation barrier and inspect active transactions.",
+      "review": "Review the agent's proposed diff: Does connection-pool size limit the intended contention level?",
+      "stretch": "Document pool configuration alongside every reported throughput result.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-bound-connection-demand",
+      "parentId": "effect-inventory-load",
+      "title": "Bound connection demand",
+      "concept": "Resource control",
+      "brief": "A burst of reservation requests exceeds the database connection pool.",
+      "explanation": "Work admission should protect resources and provide bounded waiting behavior.",
+      "steps": [
+        "Create a repeatable fixture: A burst of reservation requests exceeds the database connection pool. Record the starting rows and relevant UI state before making the change.",
+        "Set concurrency and queue limits with explicit timeout responses.",
+        "Submit a burst larger than the pool and queue capacities. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Accepted work settles within the configured resource bounds."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The process does not accumulate unbounded waiting promises."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Cancel clients while they wait for a connection. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Cancel clients while they wait for a connection.",
+      "review": "Review the agent's proposed diff: Does cancellation remove abandoned work from the admission queue?",
+      "stretch": "Measure queue wait separately from database execution time.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-detect-hot-key-contention",
+      "parentId": "effect-inventory-load",
+      "title": "Detect hot-key contention",
+      "concept": "Workload distribution",
+      "brief": "Most requests target one popular SKU while the rest spread across many products.",
+      "explanation": "Uniform random tests can hide the dominant contention pattern of a real workload.",
+      "steps": [
+        "Create a repeatable fixture: Most requests target one popular SKU while the rest spread across many products. Record the starting rows and relevant UI state before making the change.",
+        "Run uniform, skewed, and single-hot-product distributions.",
+        "Compare lock waits, throughput, and invariant outcomes. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Correctness holds across all tested distributions."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A uniform-only result is not generalized to hot-key behavior."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Increase the hot product's share from half to nearly all traffic. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Increase the hot product's share from half to nearly all traffic.",
+      "review": "Review the agent's proposed diff: Does the design serialize only the necessary product scope?",
+      "stretch": "Consider partitioned read models while preserving one authoritative write invariant.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-test-long-tail-transaction-delays",
+      "parentId": "effect-inventory-load",
+      "title": "Test long-tail transaction delays",
+      "concept": "Latency resilience",
+      "brief": "One transaction pauses while holding a product lock and many buyers queue behind it.",
+      "explanation": "Tail latency can dominate user experience even when average execution is fast.",
+      "steps": [
+        "Create a repeatable fixture: One transaction pauses while holding a product lock and many buyers queue behind it. Record the starting rows and relevant UI state before making the change.",
+        "Inject controlled delays and enforce bounded transaction or request budgets.",
+        "Measure p50, p95, maximum latency, and settled outcomes. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Requests finish or fail according to documented bounds."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No abandoned transaction retains locks indefinitely."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Interrupt the delayed request before it commits. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Interrupt the delayed request before it commits.",
+      "review": "Review the agent's proposed diff: Does server cancellation actually release database work or only disconnect the client?",
+      "stretch": "Add diagnostics identifying long transactions without logging sensitive payloads.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-verify-idempotency-at-scale",
+      "parentId": "effect-inventory-load",
+      "title": "Verify idempotency at scale",
+      "concept": "Duplicate delivery",
+      "brief": "Replay ten percent of accepted reservation and fulfillment commands during a load run.",
+      "explanation": "Duplicate requests should affect transport counts without multiplying domain effects.",
+      "steps": [
+        "Create a repeatable fixture: Replay ten percent of accepted reservation and fulfillment commands during a load run. Record the starting rows and relevant UI state before making the change.",
+        "Generate stable command IDs and track logical commands separately from attempts.",
+        "Compare unique accepted commands with receipts and ledger rows. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each logical command has at most one intended durable effect."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Attempt count is never mistaken for sold or fulfilled quantity."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Send duplicates concurrently before the original response arrives. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Send duplicates concurrently before the original response arrives.",
+      "review": "Review the agent's proposed diff: Does receipt creation race safely with the protected mutation?",
+      "stretch": "Measure deduplication overhead and receipt-storage growth.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-keep-benchmark-setup-reproducible",
+      "parentId": "effect-inventory-load",
+      "title": "Keep benchmark setup reproducible",
+      "concept": "Measurement quality",
+      "brief": "Two performance runs use different stock totals, cache warmth, and database sizes.",
+      "explanation": "An optimization claim needs comparable workload and environment conditions.",
+      "steps": [
+        "Create a repeatable fixture: Two performance runs use different stock totals, cache warmth, and database sizes. Record the starting rows and relevant UI state before making the change.",
+        "Record fixture seed, database size, concurrency, cache state, and timing method.",
+        "Repeat baseline and candidate with the same setup. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reported differences can be traced to controlled conditions."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A warm-cache candidate is not compared silently with a cold baseline."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reverse run order to detect warmup bias. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reverse run order to detect warmup bias.",
+      "review": "Review the agent's proposed diff: Does the report retain raw categorized results rather than only a headline average?",
+      "stretch": "Automate a small repeatable benchmark before expanding to expensive load tests.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-inventory-review-optimization-against-durable-guarantees",
+      "parentId": "effect-inventory-load",
+      "title": "Review optimization against durable guarantees",
+      "concept": "Agentic performance",
+      "brief": "An agent speeds reservations by reading cached availability and removing the SQL condition.",
+      "explanation": "An optimization is acceptable only if it preserves the stock invariant under contention.",
+      "steps": [
+        "Create a repeatable fixture: An agent speeds reservations by reading cached availability and removing the SQL condition. Record the starting rows and relevant UI state before making the change.",
+        "Compare the proposed patch against the controlled last-unit race and load oracle.",
+        "Measure latency and run correctness checks on both versions. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Any accepted speedup retains correct durable stock outcomes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A faster overselling implementation is rejected despite better latency."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Expire the cache during a concurrent reservation burst. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Expire the cache during a concurrent reservation burst.",
+      "review": "Review the agent's proposed diff: Can the agent explain exactly which authority boundary still prevents oversell?",
+      "stretch": "Explore faster projections for reads while keeping the conditional write authoritative.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ],
+  "track": "Project practice"
+}

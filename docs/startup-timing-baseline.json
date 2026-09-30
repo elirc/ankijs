@@ -1,0 +1,346 @@
+{
+  "conditions": "Headless Chromium, 1440×1000, localhost uncompressed static server, no CPU/network throttle, one fresh browser context followed by three reloads. Service workers blocked to isolate app installation. Readiness is the visible Today heading; OS load and Playwright scheduling affect timings. These are diagnostic samples, not a latency guarantee.",
+  "freshMs": 28179,
+  "repeatMedianMs": 1312,
+  "samples": [
+    {
+      "kind": "fresh installation",
+      "readyMs": 28179,
+      "javascript": [
+        {
+          "path": "/assets/index-CosIrb86.js",
+          "transferBytes": 97105,
+          "encodedBytes": 96805
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 994,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 233200,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 96764,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 1953,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 1593,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/workshop-lr8Lfz2Z.js",
+          "transferBytes": 72657,
+          "encodedBytes": 72357
+        },
+        {
+          "path": "/assets/userStateRepo-5PI2eIWb.js",
+          "transferBytes": 55150,
+          "encodedBytes": 54850
+        },
+        {
+          "path": "/assets/curriculum-Bf8b1si4.js",
+          "transferBytes": 79751,
+          "encodedBytes": 79451
+        },
+        {
+          "path": "/assets/createLucideIcon-CekGFLbF.js",
+          "transferBytes": 1723,
+          "encodedBytes": 1423
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 702,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 635,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/studyRepo-DORXxd_V.js",
+          "transferBytes": 3885,
+          "encodedBytes": 3585
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 355,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 5953,
+          "encodedBytes": 5653
+        },
+        {
+          "path": "/assets/expanded-cards-DeDD_Z4H.js",
+          "transferBytes": 4032207,
+          "encodedBytes": 4031907
+        },
+        {
+          "path": "/assets/reviewed-01-RQ3g0JHC.js",
+          "transferBytes": 190436,
+          "encodedBytes": 190136
+        },
+        {
+          "path": "/assets/content-corrections-CXQgQKul.js",
+          "transferBytes": 5777405,
+          "encodedBytes": 5777105
+        }
+      ]
+    },
+    {
+      "kind": "repeat open",
+      "readyMs": 1750,
+      "javascript": [
+        {
+          "path": "/assets/index-CosIrb86.js",
+          "transferBytes": 0,
+          "encodedBytes": 96805
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 0,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 0,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 0,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 0,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 0,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/workshop-lr8Lfz2Z.js",
+          "transferBytes": 0,
+          "encodedBytes": 72357
+        },
+        {
+          "path": "/assets/userStateRepo-5PI2eIWb.js",
+          "transferBytes": 0,
+          "encodedBytes": 54850
+        },
+        {
+          "path": "/assets/curriculum-Bf8b1si4.js",
+          "transferBytes": 0,
+          "encodedBytes": 79451
+        },
+        {
+          "path": "/assets/createLucideIcon-CekGFLbF.js",
+          "transferBytes": 0,
+          "encodedBytes": 1423
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 0,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 0,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/studyRepo-DORXxd_V.js",
+          "transferBytes": 0,
+          "encodedBytes": 3585
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 0,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 0,
+          "encodedBytes": 5653
+        }
+      ]
+    },
+    {
+      "kind": "repeat open",
+      "readyMs": 1312,
+      "javascript": [
+        {
+          "path": "/assets/index-CosIrb86.js",
+          "transferBytes": 0,
+          "encodedBytes": 96805
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 0,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 0,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 0,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 0,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 0,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/workshop-lr8Lfz2Z.js",
+          "transferBytes": 0,
+          "encodedBytes": 72357
+        },
+        {
+          "path": "/assets/userStateRepo-5PI2eIWb.js",
+          "transferBytes": 0,
+          "encodedBytes": 54850
+        },
+        {
+          "path": "/assets/curriculum-Bf8b1si4.js",
+          "transferBytes": 0,
+          "encodedBytes": 79451
+        },
+        {
+          "path": "/assets/createLucideIcon-CekGFLbF.js",
+          "transferBytes": 0,
+          "encodedBytes": 1423
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 0,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 0,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/studyRepo-DORXxd_V.js",
+          "transferBytes": 0,
+          "encodedBytes": 3585
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 0,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 0,
+          "encodedBytes": 5653
+        }
+      ]
+    },
+    {
+      "kind": "repeat open",
+      "readyMs": 1308,
+      "javascript": [
+        {
+          "path": "/assets/index-CosIrb86.js",
+          "transferBytes": 0,
+          "encodedBytes": 96805
+        },
+        {
+          "path": "/assets/rolldown-runtime-QTnfLwEv.js",
+          "transferBytes": 0,
+          "encodedBytes": 694
+        },
+        {
+          "path": "/assets/react-BjALQlxx.js",
+          "transferBytes": 0,
+          "encodedBytes": 232900
+        },
+        {
+          "path": "/assets/dexie-Cz9_E2lT.js",
+          "transferBytes": 0,
+          "encodedBytes": 96464
+        },
+        {
+          "path": "/assets/dates-ByWTD2O-.js",
+          "transferBytes": 0,
+          "encodedBytes": 1653
+        },
+        {
+          "path": "/assets/outbox-CbKiSTOq.js",
+          "transferBytes": 0,
+          "encodedBytes": 1293
+        },
+        {
+          "path": "/assets/workshop-lr8Lfz2Z.js",
+          "transferBytes": 0,
+          "encodedBytes": 72357
+        },
+        {
+          "path": "/assets/userStateRepo-5PI2eIWb.js",
+          "transferBytes": 0,
+          "encodedBytes": 54850
+        },
+        {
+          "path": "/assets/curriculum-Bf8b1si4.js",
+          "transferBytes": 0,
+          "encodedBytes": 79451
+        },
+        {
+          "path": "/assets/createLucideIcon-CekGFLbF.js",
+          "transferBytes": 0,
+          "encodedBytes": 1423
+        },
+        {
+          "path": "/assets/cn-BKsnmNmw.js",
+          "transferBytes": 0,
+          "encodedBytes": 402
+        },
+        {
+          "path": "/assets/preferences-CW03zry2.js",
+          "transferBytes": 0,
+          "encodedBytes": 335
+        },
+        {
+          "path": "/assets/studyRepo-DORXxd_V.js",
+          "transferBytes": 0,
+          "encodedBytes": 3585
+        },
+        {
+          "path": "/assets/ids-nJcx05eu.js",
+          "transferBytes": 0,
+          "encodedBytes": 55
+        },
+        {
+          "path": "/assets/workbox-window.prod.es5-Bd17z0YL.js",
+          "transferBytes": 0,
+          "encodedBytes": 5653
+        }
+      ]
+    }
+  ]
+}

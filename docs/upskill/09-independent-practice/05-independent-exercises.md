@@ -1,0 +1,19 @@
+# 5. An independent exercise ladder
+
+Work in an isolated scratch area and preserve your first attempt. Each exercise has a measurable deliverable and a transfer question. Open the [review chapter](06-solutions-and-review.md) only after writing a prediction and collecting some evidence, even if the attempt fails.
+
+**E1: Catalog trace.** Pick `debug-stale-search`. Find its unit in [workshop-units.json](../../../src/data/workshop-units.json), its deck in [workshop-deck-catalog.json](../../../src/data/workshop-deck-catalog.json), and its mission construction in [workshop.ts](../../../src/data/workshop.ts). Deliver the exact deck ID, both card IDs, `lab-` mission ID, and fixture path. Transfer: explain why changing an ID is a migration decision rather than cosmetic renaming.
+
+**E2: Stale success and stale failure.** Implement an independent active-request gate with start, commit, and cancel operations. Schedule newer success followed by older success, then newer success followed by older failure. After cancellation, neither may update the view. Deliver an ordered callback log and a test that would fail if the equality check were removed. Transfer: move the identity check before an awaited parse and explain why that placement is insufficient.
+
+**E3: Two valid writers.** Follow `debug-stale-edit`. Two writes use the same expected revision. Prove exactly one succeeds and that the denied attempt leaves both saved content and its own local draft intact. Deliver a request/response timeline and a final record comparison. Transfer: explain why disabling the save button in one browser cannot establish the database invariant for another client.
+
+**E4: Idempotency is scoped identity.** Follow [integration-idempotency](../../../public/workshop/integration-idempotency.md). Test same actor/key/body, same actor/key/different body, and a different actor using the same key. State the expected treatment of an in-progress operation and the retention horizon. Deliver a matrix with committed-effect counts. Transfer: explain how expiration changes what a retrying client can assume. A cache lookup alone is not a concurrency-safe claim.
+
+**E5: Recovery without destroying the baseline.** Follow [ops-restore](../../../public/workshop/ops-restore.md). Restore generated data into an independent empty destination. Compare counts, identifiers, ownership relationships, representative content, and one authenticated journey. Record elapsed recovery duration separately from the newest recovered write. Transfer: explain why a valid checksum can coexist with missing owners or an unusable application.
+
+**E6: Review a green but irrelevant test.** Inspect [merge.test.ts](../../../src/db/sync/merge.test.ts). Suppose a contributor changes merge policy but reports only that the route-ID checker passed. Write a review identifying the mismatch between claim and evidence. Name the smallest relevant test command and a mutation that it should catch. Transfer: make the same argument about reference workshop tests versus an independently implemented capstone.
+
+**E7: Protect personal edits during retirement.** Read [retiredRetrieval.ts](../../../src/db/retiredRetrieval.ts) and its [tests](../../../src/db/retiredRetrieval.test.ts). Explain why ID membership alone cannot distinguish an untouched bundled card from a user's edited version. Design two fixtures sharing a retired identity but differing in content. Deliver expected classifications and the reason external promises need attention inside the transaction. Do not run a retirement experiment against your only study database.
+
+Complete two exercises without consulting reference solutions during implementation. For each, save a before-reveal prediction and a later corrected explanation. Return after a day and alter one input or schedule. The ladder is complete when the changed case still makes sense from the invariant, rather than because you memorized the supplied result.

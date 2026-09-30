@@ -1,0 +1,432 @@
+{
+  "trace-a-request": [
+    "trace",
+    "failure",
+    "explain"
+  ],
+  "ship-a-vertical-slice": [
+    "flow",
+    "recovery",
+    "review"
+  ],
+  "debug-a-regression": [
+    "repro",
+    "test",
+    "scope"
+  ],
+  "review-a-change": [
+    "evidence",
+    "priority",
+    "followup"
+  ],
+  "design-an-api": [
+    "contract",
+    "duplicate",
+    "mismatch"
+  ],
+  "migrate-without-loss": [
+    "preserve",
+    "upgrade",
+    "restore"
+  ],
+  "test-the-boundaries": [
+    "risks",
+    "atomic",
+    "journey"
+  ],
+  "secure-a-feature": [
+    "boundary",
+    "negative",
+    "logs"
+  ],
+  "measure-performance": [
+    "baseline",
+    "cause",
+    "comparison"
+  ],
+  "write-a-design-decision": [
+    "constraints",
+    "options",
+    "revisit"
+  ],
+  "rehearse-an-incident": [
+    "impact",
+    "recovery",
+    "prevention"
+  ],
+  "release-a-capstone": [
+    "journeys",
+    "restore",
+    "handoff"
+  ],
+  "repair-a-search-race": [
+    "reproduce",
+    "states",
+    "navigation"
+  ],
+  "measure-first-use": [
+    "baseline",
+    "result",
+    "contracts"
+  ],
+  "protect-two-editors": [
+    "atomic",
+    "draft",
+    "resolution"
+  ],
+  "review-learning-material": [
+    "audit",
+    "rewrite",
+    "verify"
+  ],
+  "accessible-dialog": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "url-backed-filters": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "resilient-file-upload": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "timezone-scheduling": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "money-without-drift": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "unicode-search": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "typed-boundary": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "streaming-csv-import": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "semantic-data-table": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "async-autocomplete": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "browser-storage-budget": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "configuration-boundary": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "optimistic-concurrency": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "keyset-pagination": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "query-plan-lab": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "transactional-outbox": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "lease-worker": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "cache-invalidation-lab": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "bounded-retries": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "webhook-receiver": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "object-authorization": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "structured-observability": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "graceful-shutdown": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "dependency-lifetime": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "expand-contract-release": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "restore-rehearsal": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "feature-flag-lifecycle": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "dependency-upgrade": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "performance-budget": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "incident-reconstruction": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "architecture-decision": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "contract-test-release": [
+    "contract",
+    "behavior",
+    "evidence"
+  ],
+  "lab-capstone-typescript": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-capstone-dotnet": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-debug-stale-search": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-debug-duplicate-save": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-debug-stale-edit": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-debug-date-boundary": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-debug-offline-update": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-debug-partial-import": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-review-owner-filter": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-review-retry-budget": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-review-secret-logging": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-review-false-positive-test": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-review-index-key": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-review-incompatible-migration": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-sql-lost-update": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-sql-unique-race": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-sql-deadlock": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-sql-keyset": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-sql-write-skew": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-sql-expand-contract": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-integration-signature": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-integration-dedup": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-integration-order": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-integration-idempotency": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-integration-rate-limit": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-integration-outbox": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ops-slow-query": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ops-bad-rollout": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ops-queue-backlog": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ops-restore": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ops-trace-failure": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ops-shutdown": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ai-review-diff": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ai-api-verification": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ai-challenge-tests": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ai-untrusted-text": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ai-scope-control": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ],
+  "lab-ai-evidence-report": [
+    "check-0",
+    "check-1",
+    "check-2"
+  ]
+}

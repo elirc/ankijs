@@ -62,3 +62,7 @@
 - **Write an honest implementation handoff** (`ai-evidence-report`): Separate verified results, assumptions and blocked checks.
 
 Downloadable sources live in `public/workshop`. `scripts/check-workshop.mjs` validates identities, required authored fields and assets. `scripts/package-workshop.py` rebuilds the offline ZIP, excluding dependency and build directories.
+
+## Guided routes and independent evidence
+
+Use [placement, routes, and capstone milestones](upskill/09-independent-practice/README.md) to choose among these units. The route manifest records the real deck, card, unit, and mission identities; the exercises distinguish supplied reference checks from your own implementation evidence.

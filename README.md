@@ -1,6 +1,6 @@
 # Recall — Engineering practice, in your pocket
 
-A local-first spaced-repetition web app with **3,179 practical web development flashcards across 90 decks** and 86 hands-on engineering missions. The card library includes 144 authored debugging scenarios and 712 guided lesson cards. No API key or account is required. The library focuses on forms, APIs, SQL, authentication, validation, testing, and shipping CRUD apps. LeetCode and DSA exercises are excluded.
+A local-first spaced-repetition web app with **3,231 practical web development flashcards across 92 decks** and 86 hands-on engineering missions. The card library includes 156 authored debugging scenarios and 752 guided lesson cards. No API key or account is required. The library focuses on forms, APIs, SQL, authentication, validation, testing, and shipping CRUD apps. LeetCode and DSA exercises are excluded.
 
 ## Start the app
 
@@ -32,17 +32,17 @@ The development server also prints your local network address for testing on the
 
 ## Included toolkit
 
-The library is **3,179 cards across 90 decks** (curriculum v17):
+The library is **3,231 cards across 92 decks** (curriculum v18 plus the guided workshop):
 
-- **1,188 original cards:** core SWE foundations, realistic engineering scenarios, 144 authored debugging scenarios, 160 beginner cards, 200 follow-on cards, 192 C#/.NET cards, and 160 Build real apps cards.
+- **1,240 original cards:** core SWE foundations, realistic engineering scenarios, 156 authored debugging scenarios, 160 beginner cards, 200 follow-on cards, 192 C#/.NET cards, 200 Build real apps cards, and 76 workshop cards.
 - **Start here:** ten numbered beginner decks covering your first program, control flow, collections, async and debugging, web pages, React, databases, Git, CRUD features, and reliable services.
 - **Keep going:** ten more guided decks covering TypeScript, Python, debugging, testing, accessible interfaces, HTTP APIs, SQL reasoning, security, delivery, and real CRUD app problems. Find them from the home page or [open the collection locally](http://localhost:4173/decks?track=Keep+going). Track filters persist in the URL for bookmarks.
-- **Build real apps:** eight decks (21–28) with 80 lessons and 48 scenarios on HTTP and REST, a Node and Express API, logins and sessions, everyday SQL writes, React forms and server data, testing with Vitest, browser DevTools, and review, merge, and deploy. Find it from the home page or [open the collection locally](http://localhost:4173/decks?track=Build+real+apps).
+- **Build real apps:** ten decks (21–30) with 100 lessons and 60 scenarios on HTTP and REST, a Node and Express API, logins and sessions, everyday SQL writes, React forms and server data, testing with Vitest, browser DevTools, review, merge, and deploy, data modeling and migrations, and performance and caching basics. Find it from the home page or [open the collection locally](http://localhost:4173/decks?track=Build+real+apps).
 - **1,991 adapted cards:** 1,211 explanation exercises and 780 code-completion exercises from the CC BY 4.0 licensed _30 seconds of code_ collection. Topics include JavaScript, Python, Git, CSS, HTML, and React.
 - **C# & .NET web development:** a [dedicated learning area](http://localhost:4173/dotnet) with 12 ordered decks and 96 lessons, built around .NET 10. Learn C#, object modeling, LINQ, async, ASP.NET Core endpoints, dependency injection, EF Core, security, MVC/Razor Pages/Blazor, testing, deployment, and a notes-app capstone. Its 2-, 5-, and 10-minute sessions contain only .NET cards, with due reviews first and new cards in deck order. Daily limits still apply across the whole library. Editing, undo, suspension, and offline reload preserve the session's subject.
 - Searchable topic decks, 30-at-a-time card browsing, and editable Markdown/code answers. Related new exercises are separated until another day.
 
-Revealing an answer opens an explanation reader. **Next explanation**, Previous, and the explanation picker let you try another teaching approach without recording a review. All 712 guided cards have five views: plain English, a worked example, an analogy, a common mistake, and a practice prompt with a separate **Check my answer** button. Rate the card based on what you remembered before revealing it.
+Revealing an answer opens an explanation reader. **Next explanation**, Previous, and the explanation picker let you try another teaching approach without recording a review. All 752 guided cards have five views: plain English, a worked example, an analogy, a common mistake, and a practice prompt with a separate **Check my answer** button. Rate the card based on what you remembered before revealing it.
 
 Existing installations receive the CRUD curriculum automatically on the next app load after updating. Version 6 removes retired bundled puzzle cards, adds the new practical lessons, and preserves personal content and progress on retained cards. Version 15 removes the generated source-derived library the same way; see [Version 15](#version-15--the-curated-library).
 
@@ -61,6 +61,10 @@ See [the full deck inventory](docs/CURRICULUM.md) and [content credits](public/c
 Keyboard: Space reveals, 1–4 rate, U undoes, E edits. Shortcuts ignore form inputs and key repeats.
 
 ## Hands-on engineering practice
+
+**Effect & agentic CRUD** is a separate section at `/effect-lab`, available from Home, the sidebar, and mobile More. It contains **23 guided projects and 1,002 learning activities**: 138 build milestones plus 864 focused practice drills, with 3,006 acceptance checks. Nine reinforcement labs add **162 worked examples and 324 recall questions with revealable answers** across JavaScript, TypeScript, Effect, relational data, HTTP/UI contracts, secure CRUD, and system design. Topic shortcuts separate Fundamentals, System design, and the original Project practice material. Filter build milestones versus drills, search full lesson text including worked examples and answers, and browse 24 activities per page. Drills remain grouped under their build milestones. Every activity has implementation steps, a concept explanation, a failure experiment, an agent prompt, review guidance, and an offline evidence journal. Existing identities and normal backups are preserved; project guides and personal evidence export as Markdown. These are assignments to implement in your development environment. See [the project guide](docs/EFFECT-PROJECTS.md) and [content audit](docs/effect-content-report.json).
+
+Loading now separates browse metadata, per-project guides, full-text search, and the evidence workspace. Startup avoids full curriculum/workshop bodies and avoids archived corrections on fresh installs. [Performance notes](docs/LOADING-PERFORMANCE.md) explain the measurements and reproducible checks.
 
 Open **Engineering practice** from the sidebar, Home, or Progress. The 86 missions cover feature delivery, reliability, and production ownership, with search and stage filters. New assignments include accessible dialogs, recoverable uploads, time-zone handling, conflicting edits, query plans, bounded retries, backup restoration, and measured loading improvements.
 
@@ -118,9 +122,9 @@ python scripts/build-curriculum.py
 
 The builder downloads only the declared pinned public source revision when its local cache is absent. It does not execute downloaded examples. Generated IDs depend on source identity, not card position. `src/data/content-report.json` records the content totals and source provenance. The `c0000000` and `e0000000` UUID prefixes and final variant digit identify related adapted exercises and guided cards; preserve these IDs when maintaining the curriculum. Curriculum v6 removes 434 bundled algorithm/puzzle cards and adds 38 guided CRUD cards. Retained card identities, deck membership, edits, and review schedules stay unchanged. Explicit retirement IDs also apply to older backups and cloud pulls; personal cards remain visible. The builder filters after assigning the original deck boundaries, so repeated builds cannot move retained cards between decks. `scripts/crud-content-policy.json` records the source exclusions.
 
-### Versions 16 and 17
+### Versions 16 to 18
 
-Version 16 rewrote about 2,200 existing cards and lessons for accuracy and clarity; installed apps receive the new text through the correction migration. Version 17 adds 232 cards: the eight Build real apps decks (208 cards) and 24 scenarios in the TypeScript, Git, Python, CSS, and HTML decks. The scenario pack is now about 168 KB. Existing installations get the new cards on the next app load; progress and review history are unchanged.
+Version 16 rewrote about 2,200 existing cards and lessons for accuracy and clarity; installed apps receive the new text through the correction migration. Version 17 adds 232 cards: the eight Build real apps decks (208 cards) and 24 scenarios in the TypeScript, Git, Python, CSS, and HTML decks. Version 18 adds 52 cards in two more Build real apps decks: 29 · Data modeling and migrations and 30 · Performance and caching basics (10 lessons and 6 scenarios each). The scenario pack is now about 186 KB. The core manifest now has 3,155 cards across 85 decks; the seven workshop decks (76 cards) are built at runtime on top of it. Existing installations get the new cards on the next app load; progress and review history are unchanged.
 
 ### Version 15 — the curated library
 
@@ -169,3 +173,7 @@ npm run test:e2e
 ```
 
 Migrate the server before updating connected clients. The new schema adds owner-scoped remote identities and user_state for journals, learner preferences and review revocations. Exports remain backward-compatible version-1 JSON with optional new fields. Older clients cannot interpret new revocation records and should be updated before cross-device undo is relied on.
+
+## Choose an independent learning route
+
+The [placement and evidence-based practice pack](docs/upskill/09-independent-practice/README.md) connects real deck and workshop IDs to guided routes, worked source traces, independent exercises, separate reviews, and a capstone rubric. It separates current learning navigation from historical curriculum records and does not change your study progress.

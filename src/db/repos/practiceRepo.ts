@@ -1,9 +1,28 @@
 import { db } from "../schema";
 import { saveUserState } from "./userStateRepo";
-import { engineeringMissions } from "../../data/engineering-missions";
+import engineeringCheckData from "../../data/engineering-completion-checks.json";
+import effectCheckData from "../../data/effect-completion-checks.json";
+import { pendingPracticeWrites as pendingWrites } from "./practiceWrites";
+export {
+  hasPendingPracticeWrites,
+  waitForPracticeWrites,
+} from "./practiceWrites";
+
+// Keep the long project guides in the lazy-loaded learning section.
+const effectChecks: Readonly<Record<string, readonly string[]>> =
+  effectCheckData;
+const engineeringChecks: Readonly<Record<string, readonly string[]>> =
+  engineeringCheckData;
+function completionCheckIds(id: string): readonly string[] | undefined {
+  return (
+    (Object.hasOwn(engineeringChecks, id)
+      ? engineeringChecks[id]
+      : undefined) ??
+    (Object.hasOwn(effectChecks, id) ? effectChecks[id] : undefined)
+  );
+}
 
 const prefix = "engineering_practice:";
-const pendingWrites = new Map<string, Promise<PracticeEntry>>();
 export interface PracticeEntry {
   mission_id: string;
   outcome: string;
@@ -27,15 +46,13 @@ export function emptyPracticeEntry(mission_id: string): PracticeDraft {
 }
 
 export function canCompleteMission(entry: PracticeDraft): boolean {
-  const mission = engineeringMissions.find(
-    (item) => item.id === entry.mission_id,
-  );
+  const checks = completionCheckIds(entry.mission_id);
   return Boolean(
-    mission &&
+    checks &&
     entry.outcome.trim() &&
     entry.verification.trim() &&
     entry.tradeoff.trim() &&
-    mission.checks.every((check) => entry.checked.includes(check.id)),
+    checks.every((id) => entry.checked.includes(id)),
   );
 }
 
@@ -67,9 +84,7 @@ export function validatePracticeEntries(
       !Number.isFinite(Date.parse(item.updated_at))
     )
       throw new Error("Invalid practice journal. No data was imported.");
-    const known = engineeringMissions.some(
-      (mission) => mission.id === item.mission_id,
-    );
+    const known = completionCheckIds(item.mission_id) !== undefined;
     if (
       item.completed &&
       (!item.outcome.trim() ||
@@ -89,14 +104,6 @@ export async function listPracticeEntries(): Promise<PracticeEntry[]> {
   const entries: unknown = rows.map((row) => JSON.parse(row.value));
   validatePracticeEntries(entries);
   return entries;
-}
-
-export function hasPendingPracticeWrites(): boolean {
-  return pendingWrites.size > 0;
-}
-
-export async function waitForPracticeWrites(): Promise<void> {
-  await Promise.all([...pendingWrites.values()]);
 }
 
 export function savePracticeEntry(

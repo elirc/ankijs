@@ -1,0 +1,11 @@
+[
+  { "id": "js-foundations", "track": "Fundamentals" },
+  { "id": "typescript-domain", "track": "Fundamentals" },
+  { "id": "effect-runtime", "track": "Fundamentals" },
+  { "id": "relational-foundations", "track": "Fundamentals" },
+  { "id": "http-interface", "track": "Fundamentals" },
+  { "id": "secure-crud", "track": "Fundamentals" },
+  { "id": "system-design-foundations", "track": "System design" },
+  { "id": "distributed-reliability", "track": "System design" },
+  { "id": "architecture-studio", "track": "System design" }
+]

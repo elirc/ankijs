@@ -3,7 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../../db/schema";
 import { searchCards, updateContent } from "../../db/repos/cardRepo";
-import { getDeckInfo } from "../../data/curriculum";
+import { getDeckInfo } from "../../data/curriculum-catalog";
 import {
   getLearningSettings,
   learningDefaults,

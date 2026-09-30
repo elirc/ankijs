@@ -1,0 +1,114 @@
+[
+  {
+    "id": "a0000000-0000-4000-8000-000000090001",
+    "name": "Capstones · Workshop",
+    "description": "Apply, verify and explain capstones.",
+    "track": "Workshop",
+    "icon": "bug",
+    "color": "mint",
+    "topics": [
+      "Capstones"
+    ],
+    "resource": {
+      "label": "Open guided workshop",
+      "url": "/workshop"
+    },
+    "cardCount": 4
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000090002",
+    "name": "Debugging · Workshop",
+    "description": "Apply, verify and explain debugging.",
+    "track": "Workshop",
+    "icon": "bug",
+    "color": "mint",
+    "topics": [
+      "Debugging"
+    ],
+    "resource": {
+      "label": "Open guided workshop",
+      "url": "/workshop"
+    },
+    "cardCount": 12
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000090003",
+    "name": "Code review · Workshop",
+    "description": "Apply, verify and explain code review.",
+    "track": "Workshop",
+    "icon": "bug",
+    "color": "mint",
+    "topics": [
+      "Code review"
+    ],
+    "resource": {
+      "label": "Open guided workshop",
+      "url": "/workshop"
+    },
+    "cardCount": 12
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000090004",
+    "name": "SQL concurrency · Workshop",
+    "description": "Apply, verify and explain sql concurrency.",
+    "track": "Workshop",
+    "icon": "bug",
+    "color": "mint",
+    "topics": [
+      "SQL concurrency"
+    ],
+    "resource": {
+      "label": "Open guided workshop",
+      "url": "/workshop"
+    },
+    "cardCount": 12
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000090005",
+    "name": "Integrations · Workshop",
+    "description": "Apply, verify and explain integrations.",
+    "track": "Workshop",
+    "icon": "bug",
+    "color": "mint",
+    "topics": [
+      "Integrations"
+    ],
+    "resource": {
+      "label": "Open guided workshop",
+      "url": "/workshop"
+    },
+    "cardCount": 12
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000090006",
+    "name": "Operations · Workshop",
+    "description": "Apply, verify and explain operations.",
+    "track": "Workshop",
+    "icon": "bug",
+    "color": "mint",
+    "topics": [
+      "Operations"
+    ],
+    "resource": {
+      "label": "Open guided workshop",
+      "url": "/workshop"
+    },
+    "cardCount": 12
+  },
+  {
+    "id": "a0000000-0000-4000-8000-000000090007",
+    "name": "AI-assisted engineering · Workshop",
+    "description": "Apply, verify and explain ai-assisted engineering.",
+    "track": "Workshop",
+    "icon": "bug",
+    "color": "mint",
+    "topics": [
+      "AI-assisted engineering"
+    ],
+    "resource": {
+      "label": "Open guided workshop",
+      "url": "/workshop"
+    },
+    "cardCount": 12
+  }
+]

@@ -1,0 +1,645 @@
+{
+  "project": {
+    "id": "relational-foundations",
+    "title": "Relational foundations lab",
+    "summary": "Build an equipment-loan database and learn data modeling, constraints, query semantics, concurrency, and safe schema evolution.",
+    "outcome": "An Effect-backed loan service whose invariants hold under direct SQL, concurrent requests, pagination, and migrations.",
+    "prerequisites": "TypeScript objects, basic CRUD routes, and a disposable PostgreSQL database. Use the repository's installed Effect conventions.",
+    "model": [
+      "Member M1 Ada and M2 Bo; equipment E1 Camera and E2 Tripod; loans connect members and equipment.",
+      "Loan: id, memberId, equipmentId, borrowedAt, returnedAt nullable, version; category names belong to category records.",
+      "Use UTC instants and stable generated identities. A current loan has returnedAt = NULL."
+    ],
+    "boundaries": "HTTP decoder → Effect loan operation → LoanRepository → PostgreSQL transaction. Expected failures cross the repository boundary explicitly; SQL and connection ownership stay in adapters.",
+    "resources": [
+      {
+        "label": "PostgreSQL constraints",
+        "url": "https://www.postgresql.org/docs/current/ddl-constraints.html"
+      },
+      {
+        "label": "PostgreSQL transaction isolation",
+        "url": "https://www.postgresql.org/docs/current/transaction-iso.html"
+      },
+      {
+        "label": "PostgreSQL indexes",
+        "url": "https://www.postgresql.org/docs/current/indexes.html"
+      },
+      {
+        "label": "PostgreSQL EXPLAIN",
+        "url": "https://www.postgresql.org/docs/current/using-explain.html"
+      }
+    ],
+    "kind": "Standalone app",
+    "track": "Fundamentals",
+    "milestones": [
+      {
+        "id": "effect-relational-foundations-model",
+        "title": "Model identities and relationships",
+        "concept": "Keys · functional dependencies · normalization",
+        "brief": "Replace a spreadsheet of equipment loans with related tables that preserve identity when editable names change.",
+        "explanation": "Begin with facts and their owners: a member has a display name, equipment has a category, and a loan records a relationship at a time. A primary key identifies a row; a foreign key represents a reference. Normalization prevents one fact from being updated in several places. It does not require splitting every attribute into a separate table. Distinguish a historical snapshot, such as an agreed fee, from an accidentally duplicated current name.",
+        "steps": [
+          "Seed rows L1/M1/Ada/E1/Camera/Optics and L2/M1/Ada/E2/Tripod/Supports; mark which attributes depend on each identity.",
+          "Create members, equipment, categories, and loans tables; write repository operations returning domain records rather than exposing joined SQL row shapes.",
+          "Rename Ada to A. Patel and render both loan details from joins; document which fields intentionally retain historical values."
+        ],
+        "checks": [
+          "One member update changes the borrower on both loans while loan identifiers remain L1 and L2.",
+          "No loan row needs a second member name column to support the current-name view.",
+          "A member with no loans can be created without inventing an equipment record."
+        ],
+        "experiment": "Keep a temporary denormalized fixture and update only one of Ada's names; compare the contradictory view with the normalized result.",
+        "review": "Explain memberId → displayName to a reviewer and ask an agent to identify one update anomaly your schema removes.",
+        "stretch": "Add an explicitly named borrowerNameAtCheckout snapshot and explain why its immutability changes the modeling decision.",
+        "stage": "Build independently",
+        "minutes": 75,
+        "workedExample": "L1 and L2 both reference M1, whose displayName is Ada. Updating members[M1] to A. Patel changes one row. Joining each loan on memberId now yields A. Patel twice. E1 still references C1, Optics, while E2 references C2, Supports. Neither the loan key nor category identity depends on editable labels, so renaming a person cannot disconnect their past loans.",
+        "retrieval": [
+          {
+            "question": "Why is an email address often a poor sole identity for a borrower?",
+            "answer": "It may change or be reused; a stable internal key lets contact details change without rewriting relationships."
+          },
+          {
+            "question": "When is duplicating a name in a loan defensible?",
+            "answer": "When the product needs the name as recorded at checkout, with a defined snapshot policy rather than a second current truth."
+          }
+        ]
+      },
+      {
+        "id": "effect-relational-foundations-constraints",
+        "title": "Make invariants survive every writer",
+        "concept": "NOT NULL · CHECK · UNIQUE · foreign keys",
+        "brief": "Enforce valid loan relationships and positive durations even when a maintenance script bypasses application validation.",
+        "explanation": "Validation gives callers useful explanations, but durable invariants belong at the database boundary too. A foreign key rejects nonexistent references, a uniqueness rule rejects duplicate identities or relationships, and a row check rejects invalid combinations. SQL NULL requires care: a check expression that evaluates to unknown does not substitute for NOT NULL. Translate recognized constraint violations into domain failures without exposing raw SQL details to the browser. An unexpected database error should retain a safe diagnostic cause rather than being mislabeled as invalid input.",
+        "steps": [
+          "Create foreign keys from loans to members and equipment, require durationDays, and constrain durationDays > 0.",
+          "Name the constraints and map duration violations to InvalidDuration and missing references to an explicit domain result.",
+          "Exercise invalid inputs through the Effect operation and direct SQL, then insert a valid one-day loan."
+        ],
+        "checks": [
+          "A nonexistent member cannot produce an orphan loan through either writer.",
+          "Zero, negative, and NULL durations are rejected for their respective reasons.",
+          "The valid insert succeeds after rejected attempts, without exposing database connection details."
+        ],
+        "experiment": "Temporarily remove NOT NULL while retaining CHECK(durationDays > 0); insert NULL to see why both constraints are required.",
+        "review": "Ask an agent to list assumptions enforced only in TypeScript, then justify which must remain true for imports and maintenance scripts.",
+        "stretch": "Require returnedAt not to precede borrowedAt and test equality, later instants, and an active loan with no return time.",
+        "stage": "Build independently",
+        "minutes": 75,
+        "workedExample": "For L9, durationDays = 0 makes the positive-duration expression false and is rejected. With NULL, that expression is unknown; CHECK alone permits that state. NOT NULL closes the gap. Setting durationDays = 1 and memberId = M404 still fails the foreign key. Finally durationDays = 1 and memberId = M1 succeeds, demonstrating separate safeguards rather than one catch-all rule.",
+        "retrieval": [
+          {
+            "question": "Why validate in the operation if the database rejects bad values?",
+            "answer": "The operation produces helpful field errors early; the database protects invariants against races and other writers."
+          },
+          {
+            "question": "Does a foreign key guarantee that the caller may access the referenced member?",
+            "answer": "No. Referential integrity proves existence and relationship shape, not the caller's authorization."
+          }
+        ]
+      },
+      {
+        "id": "effect-relational-foundations-queries",
+        "title": "Read joins, missing values, and totals",
+        "concept": "LEFT JOIN · NULL · aggregation",
+        "brief": "Build a member summary that includes borrowers with no loans and accurate active-loan counts.",
+        "explanation": "SQL results are multisets: joins may multiply rows, and aggregation operates on the resulting rows. A left join preserves a member without loans using NULL values for the missing loan side. COUNT(*) counts that placeholder row, while COUNT(loan.id) counts actual non-null identifiers. Filters on the nullable side can accidentally remove preserved members. Translate aggregate results into an explicit domain summary rather than asking the UI to infer missing semantics. Calculate expected fixture results by hand before trusting a generated query.",
+        "steps": [
+          "Seed M1 with one returned and one active loan, M2 with no loans, and M3 with one active loan.",
+          "Write a summary query with a left join and conditional active-loan count; decide where active predicates belong.",
+          "Expose summaries through the repository and compare SQL results with manually calculated totals."
+        ],
+        "checks": [
+          "All three members appear, including M2 with activeCount 0.",
+          "M1 reports totalCount 2 and activeCount 1; M3 reports 1 and 1.",
+          "The UI distinguishes no active loans from an unavailable summary query."
+        ],
+        "experiment": "Move an active-loan filter into WHERE and then use COUNT(*); inspect each change independently to identify dropped rows and false counts.",
+        "review": "Explain intermediate joined rows before the aggregate, and ask an agent to challenge the empty-member case.",
+        "stretch": "Add equipment tags to the report without inflating loan counts through another one-to-many join.",
+        "stage": "Make it reliable",
+        "minutes": 75,
+        "workedExample": "The left join creates two rows for M1, one NULL-loan row for M2, and one row for M3. COUNT(loan.id) yields 2, 0, and 1 because the missing identifier is not counted. Counting active non-null loan identifiers yields 1, 0, and 1. COUNT(*) would incorrectly yield one for M2. The output follows from the intermediate relation, not a memorized aggregate recipe.",
+        "retrieval": [
+          {
+            "question": "Why can COUNT(*) be wrong after a left join?",
+            "answer": "It counts the preserved parent row even when no child exists; count a non-null child identity when counting children."
+          },
+          {
+            "question": "What does NULL mean in unmatched loan columns?",
+            "answer": "There is no matching loan value in that joined row; it is not an invented loan with empty-string fields."
+          }
+        ]
+      },
+      {
+        "id": "effect-relational-foundations-transactions",
+        "title": "Make a transfer atomic under concurrency",
+        "concept": "Transactions · isolation · lost updates",
+        "brief": "Transfer a reservation between equipment records without leaving a half-applied result after failure.",
+        "explanation": "A transaction groups statements into one commit or rollback, but atomicity alone does not determine what concurrent transactions observe. Choose isolation or locking around the protected invariant. Keep statements on the same transaction-owned connection. In Effect, the repository adapter owns transaction acquisition and cleanup while the operation describes the business action. A timeout or interruption must not turn a failed workflow into a silently committed half-transfer. Avoid network notifications inside the transaction, where they would add latency and cannot be rolled back with SQL.",
+        "steps": [
+          "Seed reservation R1 on E1 and available E2; implement release-and-claim in one transaction.",
+          "Inject a failure between release and claim; verify state from a separate connection after rollback.",
+          "Run two transfers competing for E2 and enforce exclusive allocation using constraints and a documented locking or conditional-write strategy."
+        ],
+        "checks": [
+          "A successful transfer changes R1 once and leaves no extra reservation.",
+          "Injected failure preserves R1 on E1 and leaves E2 available.",
+          "Competing transfers cannot both commit E2 ownership; the loser receives a domain conflict."
+        ],
+        "experiment": "Run the statements on separate pooled connections to demonstrate why BEGIN on one connection does not protect another's write.",
+        "review": "Describe atomicity and isolation separately, then ask an agent to show connection lifetime and every rollback path.",
+        "stretch": "Record a durable audit row in the transaction and prove that it rolls back with the transfer.",
+        "stage": "Make it reliable",
+        "minutes": 75,
+        "workedExample": "Initially R1 points to E1 and E2 is free. Transaction A releases E1, then encounters a storage failure before claiming E2. ROLLBACK restores the assignment; a new connection reads R1 → E1. On a successful attempt, both changes become visible at commit. If B also claims E2, the chosen constraint or lock forces one winner instead of permitting two successful allocations.",
+        "retrieval": [
+          {
+            "question": "Does a transaction prevent every concurrent business-rule violation?",
+            "answer": "No. Isolation level, access patterns, locks, and constraints determine which concurrent outcomes remain possible."
+          },
+          {
+            "question": "Why must transaction statements share a connection?",
+            "answer": "The transaction belongs to that database session; another connection's writes are outside its commit and rollback boundary."
+          }
+        ]
+      },
+      {
+        "id": "effect-relational-foundations-performance",
+        "title": "Read a plan and paginate by a stable key",
+        "concept": "Indexes · query plans · keyset pagination",
+        "brief": "Make the newest-loans list predictable without assuming every index improves every query.",
+        "explanation": "An index trades storage and write work for access paths that can accelerate selected reads. Match its ordering and leading filters to an actual query, then inspect the plan with representative data. Small tables may correctly use sequential scans. Keyset pagination continues after the last ordered tuple rather than skipping a growing offset. Include a unique tiebreaker because timestamps are not unique, and state how concurrent inserts affect browsing. Validate query correctness independently of performance because a fast query with missing rows is still wrong.",
+        "steps": [
+          "Seed 20000 loans with intentional borrowedAt ties; query one equipment ordered by borrowedAt DESC, id DESC.",
+          "Compare plans before and after an index matching equipmentId and ordered columns, recording rows visited and sort behavior.",
+          "Implement a validated cursor containing the last borrowedAt and id, using the corresponding descending tuple comparison."
+        ],
+        "checks": [
+          "Equal-timestamp rows appear once each across page boundaries.",
+          "Plan evidence explains the chosen access path without demanding index use.",
+          "A newer insert while paging does not repeat an already-read row in continuation."
+        ],
+        "experiment": "Remove id from ordering and cursor, then split a timestamp tie across pages to expose missing or repeated records.",
+        "review": "Explain the index's read benefit and write cost; match each column to a predicate or ordering requirement.",
+        "stretch": "Bind the cursor to its equipment filter so E1 continuation cannot silently paginate E2.",
+        "stage": "Own the outcome",
+        "minutes": 75,
+        "workedExample": "Descending rows are (10:00,L9), (10:00,L8), and (09:59,L7). A page of two ends at (10:00,L8). The next predicate selects tuples less than that pair, yielding L7. Newly inserted (10:01,L10) belongs before the cursor and does not shift continuation. A timestamp-only cursor cannot distinguish L9 from L8 within their tie, so it cannot describe the exact page boundary.",
+        "retrieval": [
+          {
+            "question": "Why might the planner ignore an existing index?",
+            "answer": "Scanning a small table or most rows can cost less than traversing an index and fetching many table records."
+          },
+          {
+            "question": "What guarantee does the identifier add to timestamp ordering?",
+            "answer": "A unique total order, giving every row an unambiguous position at a page boundary."
+          }
+        ]
+      },
+      {
+        "id": "effect-relational-foundations-migrations",
+        "title": "Evolve a live schema in compatible steps",
+        "concept": "Expand · backfill · constrain · contract",
+        "brief": "Introduce a required loan purpose without breaking an older application during deployment.",
+        "explanation": "Schema changes interact with existing rows and concurrently running application versions. Adding a required column at once may fail old data or old writers. Expand-and-contract first permits both representations, then backfills history, updates writers and readers, and finally tightens the invariant once evidence supports it. Code rollback does not automatically roll back data. Keep migration progress observable and avoid destructive assumptions about production contents. Compatibility is a property of intermediate states, not only the final schema and newest code.",
+        "steps": [
+          "Start with three loans lacking purpose; add a nullable column and a compatible application read fallback.",
+          "Deploy purpose writing, backfill in bounded batches with a documented Legacy checkout value, and count remaining NULLs.",
+          "After old writers retire and missing rows reach zero, enforce the invariant; remove the fallback in a later change."
+        ],
+        "checks": [
+          "Old-schema fixtures upgrade without losing identifiers, times, or relationships.",
+          "The compatibility release reads both old and new rows throughout backfill.",
+          "Enforcement waits for evidence that all rows and active writers satisfy the contract."
+        ],
+        "experiment": "Keep an old writer running during backfill and observe a fresh NULL row; use it to test the deployment gate.",
+        "review": "Ask an agent to describe every intermediate schema/application combination and explain code rollback at your checkpoint.",
+        "stretch": "Add a migration ledger and resumable backfill cursor, then interrupt a batch.",
+        "stage": "Own the outcome",
+        "minutes": 75,
+        "workedExample": "L1-L3 initially lack purpose. Expansion adds NULL, and the compatible UI shows Legacy checkout. New L4 stores Field study. Backfill updates L1-L3 to Legacy checkout and the NULL count becomes zero. Once old writers stop, the required constraint can be enforced. Removing the fallback remains separate cleanup because deploying code and converging historical data are different events with different failure modes.",
+        "retrieval": [
+          {
+            "question": "Why is zero NULLs insufficient while old writers run?",
+            "answer": "Those writers can create incompatible rows immediately after the count."
+          },
+          {
+            "question": "Why separate expansion from cleanup?",
+            "answer": "The overlap allows multiple application versions and data migration to coexist before removing the old representation."
+          }
+        ]
+      }
+    ]
+  },
+  "drills": [
+    {
+      "id": "effect-relational-foundations-junction",
+      "title": "Represent many-to-many membership",
+      "concept": "Junction tables · composite uniqueness",
+      "brief": "Allow equipment to carry several tags without storing a comma-separated list in a text column.",
+      "explanation": "Cardinality describes how many records may participate in a relationship. Equipment and tags form a many-to-many relationship: one camera can be Portable and Fragile, and Portable can describe several items. A junction row represents one membership. This makes membership independently addressable and enforceable. A collection embedded in a string hides boundaries and complicates joins and constraints. Keep tag renaming separate from membership mutation, because changing a shared label should not require rewriting every equipment record.",
+      "steps": [
+        "Create tags T1 Portable and T2 Fragile, then equipment_tags with NOT NULL equipmentId and tagId foreign keys; a membership must name both records.",
+        "Seed E1/T1, E1/T2, and E2/T1; expose addTag and removeTag through an Effect repository dependency.",
+        "Use the pair as a composite primary key. Test duplicate E1/T1 and null membership keys, then remove E1/T1 and list both equipment records."
+      ],
+      "checks": [
+        "E1 initially returns two distinct tags and E2 returns only Portable.",
+        "Duplicate and null membership keys are rejected even through direct SQL; E1 cannot render Portable twice.",
+        "Removing E1/T1 leaves tag T1 and E2/T1 intact."
+      ],
+      "experiment": "Delete T2 under your chosen reference policy and inspect whether only its memberships disappear or deletion is rejected; make that decision explicit.",
+      "review": "Draw both one-to-many edges and explain why neither equipmentId nor tagId alone is unique in the junction.",
+      "stretch": "Attach a taggedAt timestamp to membership and explain why it belongs on the junction rather than on the shared tag.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "The junction contains (E1,T1), (E1,T2), and (E2,T1). Counting memberships by equipment gives E1 = 2 and E2 = 1. A second (E1,T1) violates the composite primary key, which also disallows a null component. Deleting only (E1,T1) gives E1 = Fragile and E2 = Portable; deleting the Portable tag itself would affect a different, shared entity. These are distinct CRUD operations with different consequences.",
+      "retrieval": [
+        {
+          "question": "What fact does a junction row assert?",
+          "answer": "That this equipment record belongs to this tag; the pair's key prevents duplicate assertions of the same relationship."
+        },
+        {
+          "question": "Why not make tagId unique in equipment_tags?",
+          "answer": "That would allow each tag on only one equipment record and accidentally change the relationship to one-to-many."
+        }
+      ],
+      "parentId": "effect-relational-foundations-model"
+    },
+    {
+      "id": "effect-relational-foundations-historical",
+      "title": "Separate current facts from history",
+      "concept": "Temporal modeling · snapshots",
+      "brief": "Keep checkout fees stable when an equipment item's current daily rate changes after checkout.",
+      "explanation": "A normalized current catalog and an immutable historical agreement answer different questions. Joining every old loan to today's rate would silently rewrite the apparent amount agreed at checkout. Copying the agreed rate into the loan is appropriate when that value describes the loan itself. Name fields to reveal intent and store money with an explicit unit and currency. Avoid binary floating-point arithmetic for amounts that must reconcile exactly. Document whether later corrections create adjustments or amend the original agreement.",
+      "steps": [
+        "Give E1 a current dailyRateCents of 1250 and create L1 with agreedDailyRateCents 1250, currency USD, and durationDays 2.",
+        "Change E1 to 1500, create L2, and calculate each loan's quoted total from its own agreed rate.",
+        "Implement snapshot assignment inside the loan creation transaction so the repository returns the exact persisted agreement."
+      ],
+      "checks": [
+        "L1 still quotes 2500 cents after the catalog rate changes.",
+        "L2 quotes 3000 cents for two days and both views label the currency.",
+        "Updating the catalog does not mutate any historical loan agreement."
+      ],
+      "experiment": "Replace the detail calculation with a join to current dailyRateCents and observe the old total changing; restore the snapshot-based calculation.",
+      "review": "Explain why agreedDailyRateCents depends on loanId while current dailyRateCents depends on equipmentId, despite equal initial values.",
+      "stretch": "Model an explicit adjustment record rather than permitting silent edits to an accepted historical agreement.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "At checkout, E1 costs 1250 cents per day. L1 stores 1250 and two days, producing 2500. Later E1 changes to 1500; L1 still multiplies 1250 by two. New L2 stores 1500 and produces 3000. A current catalog report shows 1500, while accepted loan agreements correctly include both rates. There is no conflict because the fields represent different facts.",
+      "retrieval": [
+        {
+          "question": "Does every repeated value violate normalization?",
+          "answer": "No. Equal values can describe different facts, such as a present catalog price and an agreement captured in a transaction."
+        },
+        {
+          "question": "What should a historical fee correction preserve?",
+          "answer": "An attributable adjustment or audit trail so the earlier agreement is not silently overwritten."
+        }
+      ],
+      "parentId": "effect-relational-foundations-model"
+    },
+    {
+      "id": "effect-relational-foundations-active-unique",
+      "title": "Prevent two current loans for one item",
+      "concept": "Conditional uniqueness · race-safe admission",
+      "brief": "Enforce at most one active loan per equipment item without blocking future historical loans.",
+      "explanation": "An application query asking whether equipment is available is useful for display but cannot reserve it against concurrent requests. The invariant concerns a subset of rows: loans with no return time. A PostgreSQL partial unique index can enforce uniqueness of equipmentId in that subset. This differs from uniqueness over all loans, which would forbid borrowing the same item ever again. Keep the database dialect choice visible in the adapter and translate the expected conflict where SQL failures become domain outcomes.",
+      "steps": [
+        "Seed returned loan L0 for E1 and define an active-loan unique index on equipmentId where returnedAt IS NULL.",
+        "Run two independently connected create-loan operations for E1 after both have displayed Available.",
+        "Map the losing unique violation to EquipmentUnavailable and refresh the losing client's availability view."
+      ],
+      "checks": [
+        "Exactly one active E1 loan commits while L0 remains in history.",
+        "The losing request receives a recoverable domain conflict rather than generic success or an internal SQL error.",
+        "Returning the winning loan permits a subsequent active loan for E1."
+      ],
+      "experiment": "Remove the unique index in a disposable database and synchronize both requests after the availability read; observe the duplicate active state.",
+      "review": "Explain why a preflight SELECT and a disabled UI button cannot serialize two different clients.",
+      "stretch": "Add a migration preflight that detects existing duplicate active loans before installing the index.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "L0 references E1 but has a return timestamp, so it is outside the indexed subset. A and B both attempt returnedAt = NULL for E1. A commits L1; B cannot insert another matching indexed key and becomes EquipmentUnavailable. Updating L1 with a return timestamp removes its active membership. A later L2 for E1 can commit while both historical rows remain.",
+      "retrieval": [
+        {
+          "question": "Why not make equipmentId unique across the entire loans table?",
+          "answer": "It would allow only one lifetime loan per item, including returned loans."
+        },
+        {
+          "question": "What should the losing concurrent request do?",
+          "answer": "Report an availability conflict and refresh state; it should not blindly retry the same unavailable booking forever."
+        }
+      ],
+      "parentId": "effect-relational-foundations-constraints"
+    },
+    {
+      "id": "effect-relational-foundations-delete-policy",
+      "title": "Choose deletion semantics deliberately",
+      "concept": "Referential actions · archival",
+      "brief": "Decide what happens to a borrower who still has loan history before wiring a Delete button.",
+      "explanation": "A delete changes a graph of references, not merely one visible row. Cascading deletion may be correct for disposable child records but disastrous for historical evidence. Restricting deletion preserves references while forcing a deliberate workflow. Archival often matches the product better: the record remains identifiable but cannot participate in new work. Treat the policy as a domain decision and verify it at both the operation and database boundary. Data retention and anonymization require their own explicit requirements rather than a generic scaffold default.",
+      "steps": [
+        "Create M1 with returned L1 and active L2; configure borrower references to reject physical deletion.",
+        "Add archivedAt to members and reject new loans for archived borrowers while displaying historical names.",
+        "Render Archive for this workflow and test direct repository deletion separately from the supported operation."
+      ],
+      "checks": [
+        "Archiving M1 leaves L1 and L2 readable with their borrower relation intact.",
+        "A new checkout for archived M1 is rejected with a specific explanation.",
+        "Direct physical deletion cannot silently erase or orphan the loan history."
+      ],
+      "experiment": "Try a disposable cascade variant and count affected rows; explain why successful SQL could still violate the product's intent.",
+      "review": "Have a reviewer trace consequences for active work, history, and personal data instead of approving a generic CRUD scaffold.",
+      "stretch": "Design a separate anonymization operation with explicitly retained fields and audit evidence.",
+      "stage": "Build independently",
+      "minutes": 40,
+      "workedExample": "M1 owns two loan references. Setting M1.archivedAt marks that member inactive but removes zero loans. L1 remains returned and L2 remains active. A third checkout receives BorrowerArchived. Attempting DELETE members WHERE id = M1 fails because references remain. Archival changes eligibility, while physical deletion remains a separate action with different data consequences. Historical views continue resolving M1 normally.",
+      "retrieval": [
+        {
+          "question": "Does ON DELETE CASCADE understand which history the business needs?",
+          "answer": "No. It executes the configured reference action; the schema designer chooses a policy consistent with the domain."
+        },
+        {
+          "question": "Why can an archived record appear in old work?",
+          "answer": "Archival restricts new use without destroying the identity and facts required to interpret existing relationships."
+        }
+      ],
+      "parentId": "effect-relational-foundations-constraints"
+    },
+    {
+      "id": "effect-relational-foundations-null-logic",
+      "title": "Make missing values explicit",
+      "concept": "Three-valued logic · optional fields",
+      "brief": "Implement active and returned loan filters without confusing NULL with an empty timestamp string.",
+      "explanation": "SQL uses true, false, and unknown when NULL participates in comparisons. WHERE keeps only true rows. Equality with NULL does not find missing values; IS NULL expresses that test. At the application boundary, model absence intentionally and serialize it consistently. A missing return time can mean currently borrowed, while a missing due time may mean no deadline; identical storage representation does not imply identical domain meaning. Keep the policy in the operation or query contract rather than scattering unexplained fallbacks through UI components.",
+      "steps": [
+        "Seed L1 returnedAt NULL and L2 returnedAt 2026-09-01T10:00:00Z; implement active and returned queries.",
+        "Decode nullable times into the project's optional-value convention and display Borrowed or Returned with a time.",
+        "Add nullable dueAt and render No deadline without reusing the active-loan predicate."
+      ],
+      "checks": [
+        "The active query returns only L1 using IS NULL.",
+        "The returned query returns L2, whose timestamp survives serialization and decoding.",
+        "No deadline and Still borrowed remain distinct labels with distinct meanings."
+      ],
+      "experiment": "Run returnedAt = NULL and returnedAt <> NULL against the fixture; record that neither selects the intended rows.",
+      "review": "Explain why unknown is not false even though WHERE discards both, then inspect agent-generated predicates.",
+      "stretch": "Add an overdue filter with an explicit policy for loans that have no deadline.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "For L1, returnedAt = NULL evaluates to unknown, not true. For L2, comparing its timestamp to NULL is also unknown. Consequently an equality-to-NULL query returns zero rows. IS NULL returns L1 and IS NOT NULL returns L2. If L1.dueAt is also NULL, the UI says Still borrowed and No deadline: two absent timestamps describe independent aspects of the loan rather than one universal empty state.",
+      "retrieval": [
+        {
+          "question": "Why does replacing = NULL with = '' not solve the problem?",
+          "answer": "An empty string is a concrete value, not SQL absence, and may not be a valid timestamp."
+        },
+        {
+          "question": "Should a missing deadline automatically count as overdue?",
+          "answer": "Only if the domain defines that policy; ordinary timestamp comparison with NULL cannot decide for you."
+        }
+      ],
+      "parentId": "effect-relational-foundations-queries"
+    },
+    {
+      "id": "effect-relational-foundations-join-fanout",
+      "title": "Stop aggregate fan-out",
+      "concept": "Join cardinality · pre-aggregation",
+      "brief": "Report loan and tag counts without multiplying them when both child relationships are joined.",
+      "explanation": "Two independent one-to-many relationships can produce a product of their cardinalities when joined through a parent. That is correct relational behavior but often wrong input for a naive count or sum. Pre-aggregate each child relation at the requested grain, then join the summaries. DISTINCT solves some counts but cannot safely repair every aggregate, especially when equal numeric values represent separate legitimate events. The repository's returned summary should state its grain so later callers cannot accidentally reaggregate an already aggregated value.",
+      "steps": [
+        "Seed E1 with two loans and three tags, including two loans each charging 100 cents.",
+        "Inspect the six rows from joining equipment to both loans and tags before adding aggregation.",
+        "Build separate equipment-level loan and tag summaries, join them to equipment, and return totalChargesCents as well as counts."
+      ],
+      "checks": [
+        "E1 reports loanCount 2, tagCount 3, and totalChargesCents 200.",
+        "Equipment without tags or loans still appears with defined zero counts.",
+        "Two distinct 100-cent charges are counted rather than collapsed by SUM(DISTINCT amount)."
+      ],
+      "experiment": "Run the naive aggregate and then SUM(DISTINCT amount); observe overcounting in the first and undercounting in the second.",
+      "review": "Explain the grain of each subquery and challenge an agent to prove every intermediate summary has at most one row per equipment.",
+      "stretch": "Add average duration and justify combining sums and counts rather than averaging unrelated precomputed averages.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "Two loans multiplied by three tags produce six rows for E1. COUNT(loan.id) becomes six and SUM(chargeCents) becomes 600 although only 200 was charged. SUM(DISTINCT chargeCents) gives 100 because both valid charges have the same amount. Aggregating loans first gives one E1 row with count two and sum 200; joining the tag summary of three cannot multiply that result.",
+      "retrieval": [
+        {
+          "question": "When does DISTINCT hide rather than fix an error?",
+          "answer": "When it discards legitimate equal-valued events instead of restoring the intended result grain."
+        },
+        {
+          "question": "What question should precede any report aggregate?",
+          "answer": "What one row represents before aggregation, and whether joins preserve or multiply that unit."
+        }
+      ],
+      "parentId": "effect-relational-foundations-queries"
+    },
+    {
+      "id": "effect-relational-foundations-optimistic",
+      "title": "Detect stale edits with a version",
+      "concept": "Optimistic concurrency · conditional UPDATE",
+      "brief": "Prevent two staff members from silently overwriting the same loan note after reading the same version.",
+      "explanation": "A read-modify-write sequence can lose an earlier edit when clients read the same starting value. A version predicate makes the write conditional on that state still being current. Increment the version atomically with the update and inspect affected rows. Zero affected rows requires interpretation: the record may have changed or disappeared. The UI should preserve the unsaved draft and offer reconciliation rather than pretending the last request was the only edit. A retry with a new version represents a new decision, not a transparent replay.",
+      "steps": [
+        "Seed L1 note = Inspect lens and version = 4; load it into editors A and B.",
+        "Implement UPDATE with id and expectedVersion predicates, setting the note and incrementing the version atomically.",
+        "Submit A's Checked lens and B's Replace cap, map the loser to conflict, and retain its draft."
+      ],
+      "checks": [
+        "Exactly one version-4 update succeeds and the stored version becomes 5.",
+        "The losing edit does not replace the winning note or increment the version.",
+        "The conflict view shows current server text and the losing draft without automatically merging."
+      ],
+      "experiment": "Remove the version predicate and submit both again; observe that success responses can conceal a lost update.",
+      "review": "Explain why rereading the version immediately before an unconditional UPDATE still races, then review the agent's SQL.",
+      "stretch": "Handle deletion between read and update without leaking a nonexistent current version.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "A and B both read version 4. A writes Checked lens where version = 4, affecting one row and storing version 5. B writes Replace cap with the version-4 predicate, affecting zero rows. L1 remains Checked lens at version 5. B's draft remains useful for deliberate reconciliation against version 5; it is not evidence that B's original update committed.",
+      "retrieval": [
+        {
+          "question": "Why increment the version in the same statement?",
+          "answer": "Data and its concurrency marker must advance atomically or another writer can observe an inconsistent pairing."
+        },
+        {
+          "question": "What does zero affected rows prove?",
+          "answer": "Only that the predicate did not match; authorized interpretation may distinguish stale state from a missing record."
+        }
+      ],
+      "parentId": "effect-relational-foundations-transactions"
+    },
+    {
+      "id": "effect-relational-foundations-isolation",
+      "title": "Observe a serialization failure",
+      "concept": "Write skew · full-transaction retry",
+      "brief": "Protect a two-person closing rota from both people leaving after reading the same availability.",
+      "explanation": "Some invariants span rows and survive ordinary row-level updates incorrectly. If one staff member must remain on duty, two transactions can each see the other on duty and update different rows, producing write skew. Serializable isolation can reject a transaction when the observed execution cannot be serialized. Retry all reads and decisions, not merely the final statement. External side effects must not repeat accidentally. A bounded retry policy should distinguish retryable serialization failure from a business decision that becomes invalid after rereading.",
+      "steps": [
+        "Seed Ada and Bo on duty; implement leaveDuty to read the roster before changing a person's row.",
+        "Use two connections and a barrier after reading to reproduce both callers observing two available people.",
+        "Use serializable transactions, classify serialization failures, and retry the complete transaction with a small bounded policy."
+      ],
+      "checks": [
+        "The committed roster always retains at least one on-duty person.",
+        "A retried operation rereads the roster and can return MustKeepCoverage.",
+        "Attempt counts and outcomes are observable without logging session credentials."
+      ],
+      "experiment": "Retry only the UPDATE using the stale allowed-to-leave decision; explain why the application rule is no longer recomputed.",
+      "review": "Compare write skew with two writers changing one row and identify where database failures become typed Effect errors.",
+      "stretch": "Move notification delivery after commit or into a durable outbox so retries cannot send duplicate messages.",
+      "stage": "Make it reliable",
+      "minutes": 40,
+      "workedExample": "A and B read Ada = on and Bo = on. A plans Ada = off; B plans Bo = off. Unprotected decisions can both finish and leave zero coverage. Under serializable execution, one transaction may be rejected. Retrying B from the beginning after A commits reads only Bo on duty, so B returns MustKeepCoverage and performs no update. The retry changes the decision because its inputs changed.",
+      "retrieval": [
+        {
+          "question": "Why is retrying only the failed statement insufficient?",
+          "answer": "Earlier reads and the business decision may be stale; the complete decision must be recomputed."
+        },
+        {
+          "question": "Should every database failure be retried?",
+          "answer": "No. Retry classified transient failures within a bound; invalid input and persistent business conflicts need different responses."
+        }
+      ],
+      "parentId": "effect-relational-foundations-transactions"
+    },
+    {
+      "id": "effect-relational-foundations-explain",
+      "title": "Interpret estimates without worshipping timings",
+      "concept": "EXPLAIN · selectivity · representative fixtures",
+      "brief": "Compare one lookup on a tiny fixture and a realistically skewed dataset before recommending an index.",
+      "explanation": "A plan explains an access strategy rather than providing a universal performance score. Estimated and actual rows reveal whether planner assumptions resemble the data. Timing varies with caching, load, and hardware. Inspect repeatable work such as scanned rows, filtering, and sorting. EXPLAIN ANALYZE executes the statement, so use it carefully with mutations and disposable data. Keep optimization evidence separate from correctness evidence. Record the parameter distribution because a fast rare-key lookup says little about the busiest equipment record.",
+      "steps": [
+        "Create 20 rows, then 20000 rows where E1 owns 18000 and E2 owns 20; keep the lookup query unchanged.",
+        "Inspect estimated and observed row counts for E1 and E2 using the same index and updated statistics.",
+        "Record why selectivity can justify different plans and retain the simpler query unless measured work supports a change."
+      ],
+      "checks": [
+        "The report names dataset size, distribution, parameters, and whether the statement executed.",
+        "Result sets remain identical with and without the index.",
+        "The conclusion distinguishes reduced work from one unusually fast timing sample."
+      ],
+      "experiment": "Measure only E2 and claim every lookup is fast; run E1 to expose the missing distribution assumption.",
+      "review": "Ask an agent which plan node consumes work and which proposed index changes it instead of accepting generic indexing advice.",
+      "stretch": "Measure the extra insert cost on a bounded batch and include it in the tradeoff.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "For E2, selecting 20 of 20000 rows is highly selective; an index can avoid examining most records. E1 matches 18000, so fetching nearly the whole table through the same index may cost more than scanning it. The schema has not changed between requests; only the parameter distribution has. A valid comparison records the parameter and row counts alongside timing and confirms equal results.",
+      "retrieval": [
+        {
+          "question": "What does EXPLAIN ANALYZE add to an estimated plan?",
+          "answer": "It executes the statement and reports observed work, allowing comparison between estimates and reality."
+        },
+        {
+          "question": "Why can uniformly distributed benchmark data mislead?",
+          "answer": "Real hot keys may match far more rows and create different access costs and plans."
+        }
+      ],
+      "parentId": "effect-relational-foundations-performance"
+    },
+    {
+      "id": "effect-relational-foundations-cursor-contract",
+      "title": "Treat cursors as validated query state",
+      "concept": "Pagination contracts · ordering invariants",
+      "brief": "Reject malformed or mismatched cursors instead of returning a subtly incorrect continuation.",
+      "explanation": "A cursor belongs to the public query contract. Encoding JSON as base64 makes transport convenient but does not validate it or make it trustworthy. Decode unknown input, validate fields, and bind continuation to relevant filters and sort direction. Keyset pagination does not create a frozen snapshot: records may be edited or removed between pages. Explain that policy instead of promising stable history that the query does not provide. Keep the decoder outside the repository so invalid transport data cannot become an arbitrary SQL predicate.",
+      "steps": [
+        "Define cursor version, equipmentId, borrowedAt, and id; emit it from the last returned row.",
+        "Validate types, timestamp, supported version, and filter agreement before invoking the continuation query.",
+        "Test truncated encoding, an E1 cursor used with E2, and deletion of the boundary row."
+      ],
+      "checks": [
+        "Malformed cursors produce a client error and execute no continuation query.",
+        "Equipment mismatch cannot switch or blend result sets.",
+        "Deleting the boundary row still allows continuation using its encoded tuple."
+      ],
+      "experiment": "Edit an unseen row's borrowedAt so it moves before the cursor; document why this session may never encounter it.",
+      "review": "Explain deterministic ordering versus snapshot consistency and ask an agent to state the endpoint's actual guarantee.",
+      "stretch": "Add an upper-bound timestamp for a steadier browsing window and analyze which updates it still cannot freeze.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Page one for E1 ends at (10:00,L8). The cursor includes E1 and that tuple. Using it with E2 is rejected before SQL. If L8 is deleted, the next query still compares against the stored tuple and returns (09:59,L7). The cursor records a boundary rather than a foreign key that must remain present. Edits to sorting fields can still move other records across the boundary.",
+      "retrieval": [
+        {
+          "question": "Is base64 cursor data trustworthy because it looks opaque?",
+          "answer": "No. Encoding is reversible and supplies neither input validation nor authorization."
+        },
+        {
+          "question": "Why can continuation survive deletion of the boundary row?",
+          "answer": "Its encoded ordered values define the comparison without fetching the original row."
+        }
+      ],
+      "parentId": "effect-relational-foundations-performance"
+    },
+    {
+      "id": "effect-relational-foundations-backfill",
+      "title": "Make a backfill resumable",
+      "concept": "Idempotence · batching · progress",
+      "brief": "Repair missing purposes without overwriting newer values or restarting all work after a crash.",
+      "explanation": "A backfill is a data transformation with operational failure modes. Process stable key ranges in bounded transactions and update only rows still needing repair. Repeating a batch must be safe after uncertain acknowledgment: it cannot overwrite a value a user supplied meanwhile. Track progress separately from assumed success and reconcile remaining work. Stable identifiers are safer traversal keys than editable display fields. Keep selection and conditional mutation close together, but retain the predicate even when a previous read found a missing value.",
+      "steps": [
+        "Seed L1-L6 with missing purpose except L3 = Research; process two identifiers per batch with WHERE purpose IS NULL.",
+        "Record the completed key after commit; interrupt after the L4 batch commits but before acknowledgment.",
+        "Resume from the previous checkpoint and verify remaining NULLs and preservation of user-entered values."
+      ],
+      "checks": [
+        "All rows finish with purpose while L3 remains Research.",
+        "Replaying a committed batch leaves correct values unchanged.",
+        "Each batch has a bounded transaction and evidence distinguishing attempted from committed work."
+      ],
+      "experiment": "Have a user set L5 to Repair between selection and update; verify the conditional update preserves it.",
+      "review": "Explain how checkpoint and row predicate jointly handle crashes; inspect an agent's proposal for hidden full-table transactions.",
+      "stretch": "Add a dry-run estimate and pause control without treating the estimate as evidence of execution.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "Batch one fills L1 and L2. Batch two visits L3 and L4, preserves Research, fills L4, and commits before a crash. Restarting from the older checkpoint revisits L3 and L4; the NULL predicate makes both updates no-ops. The last batch fills L5 and L6. Repeating work is safe because the transformation targets missing values instead of assigning every row unconditionally.",
+      "retrieval": [
+        {
+          "question": "Why checkpoint after commit?",
+          "answer": "A pre-commit checkpoint could skip rows whose transaction later rolls back."
+        },
+        {
+          "question": "Does idempotence mean every attempt does no work?",
+          "answer": "No. The first attempt can change data; subsequent equivalent attempts converge to the same intended state."
+        }
+      ],
+      "parentId": "effect-relational-foundations-migrations"
+    },
+    {
+      "id": "effect-relational-foundations-migration-proof",
+      "title": "Test upgrades against dirty history",
+      "concept": "Migration preconditions · recovery evidence",
+      "brief": "Prove an active-loan uniqueness rule against existing duplicate records before release.",
+      "explanation": "A migration that works on an empty database may fail on the history it must protect. Preconditions reveal incompatible rows before installing constraints. Resolving conflicts is a domain decision: arbitrarily deleting a record can destroy evidence or conceal an active obligation. Preserve a recovery point and rehearse with a representative fixture. Distinguish reversible schema operations from irreversible data cleanup. A successful migration command alone does not prove retained history is correct or that every application writer obeys the newly enforced rule.",
+      "steps": [
+        "Seed E1 with two active loans and E2 with one; preflight duplicates grouped by equipmentId.",
+        "Report identities and timestamps; resolve the fixture through an explicit recorded return decision rather than deleting history.",
+        "Apply the unique index, rerun on a clean copy, and verify rejection of later duplicates."
+      ],
+      "checks": [
+        "Preflight identifies E1 and both conflicting IDs before index creation.",
+        "Reconciliation preserves history and records why one loan closed.",
+        "The upgrade rejects duplicates while allowing new loans after return."
+      ],
+      "experiment": "Attempt migration without preflight and compare the raw failure with the actionable report; rehearse recovery using disposable data.",
+      "review": "Explain what the migration proves, what domain judgment supplied, and which data changes a down migration cannot undo.",
+      "stretch": "Keep a small anonymized upgrade fixture and validate both precondition failure and successful repair.",
+      "stage": "Own the outcome",
+      "minutes": 40,
+      "workedExample": "E1 has L1 and L2 with returnedAt NULL, so the report returns count two and both IDs. Investigation establishes L1 was returned earlier; recording that return leaves L2 active without erasing L1. The partial unique index builds successfully. A fresh L3 active insert for E1 fails until L2 returns, proving the migration establishes a durable invariant rather than cleaning only one snapshot.",
+      "retrieval": [
+        {
+          "question": "Why not keep whichever duplicate has the latest timestamp?",
+          "answer": "Recency does not prove which real-world obligation is valid; cleanup needs a defensible domain rule."
+        },
+        {
+          "question": "What does dropping the index reverse?",
+          "answer": "It removes future enforcement; it does not reconstruct data that cleanup deleted or changed."
+        }
+      ],
+      "parentId": "effect-relational-foundations-migrations"
+    }
+  ]
+}

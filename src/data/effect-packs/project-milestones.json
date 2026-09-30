@@ -1,0 +1,2051 @@
+{
+  "id": "project-milestones",
+  "title": "Milestones & evidence",
+  "kind": "Extend Recall",
+  "summary": "Give projects tasks, deadlines, completion rules, and linked evidence from your practice journal.",
+  "outcome": "A project detail page whose progress reflects verified milestone state and stays consistent after edits.",
+  "prerequisites": "Finish Project tracker. Read src/db/repos/practiceRepo.ts and its tests.",
+  "model": [
+    "Milestone: id, projectId, title, dueDate (optional YYYY-MM-DD), order, status, evidenceMissionId (optional).",
+    "One project has many milestones. Define what happens to children when a project is archived or removed.",
+    "Treat a deadline as a calendar date unless the product explicitly requires an instant and time zone."
+  ],
+  "boundaries": "Project detail → milestone service → project and milestone repositories. Keep changes that must succeed together inside one database transaction.",
+  "milestones": [
+    {
+      "id": "effect-milestones-crud",
+      "title": "Add related tasks and deadlines",
+      "concept": "Service composition · relationship validation",
+      "brief": "Create and reorder milestones inside a project, with a clear due-date policy.",
+      "explanation": "A projectId string is not proof that the parent exists. Validate the relationship at the write boundary and use database guarantees where available. Compose small services so the screen does not have to orchestrate parent lookup, validation, and child insertion itself.",
+      "steps": [
+        "Define create, rename, reorder, and remove behavior with examples for a missing or archived parent.",
+        "Implement the operations and a project detail screen with labeled controls. Reject impossible dates and document whether past deadlines are allowed.",
+        "Persist ordering explicitly. Test a fresh load with multiple projects so milestones cannot leak into another project's list."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each milestone appears only under its own project."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Missing parents and invalid dates are rejected before a child is saved."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reordering and deletion persist after reload."
+        }
+      ],
+      "experiment": "Attempt to create a milestone using a project ID that was just removed. Inspect the store for orphan records.",
+      "review": "Explain the parent-child invariant and where it is enforced. Use deterministic ordering when two rows share the same position.",
+      "stretch": "Add due-today and overdue filters and test them near midnight in two time zones.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-milestones-evidence",
+      "title": "Link completion to evidence",
+      "concept": "Schema refinements · domain invariants",
+      "brief": "Require an outcome, verification, and tradeoff before marking a milestone complete.",
+      "explanation": "Completion is a business transition, not just a checkbox. Validate evidence when the transition occurs. Link to stable journal IDs instead of copying text into multiple places, and define how missing or reopened evidence affects milestone status.",
+      "steps": [
+        "Choose and document whether reopening a linked journal entry reopens its milestone or leaves a historical completion snapshot.",
+        "Add a link to a practice entry and show its outcome, verification, and tradeoff. Gate completion at the service boundary.",
+        "Implement reopening and progress counts derived from stored milestones. Include empty projects and removed evidence in the cases."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Incomplete evidence cannot mark a milestone complete through UI or direct service calls."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A completed milestone can be reopened and its progress count updates."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Missing evidence is visible and does not crash the detail page."
+        }
+      ],
+      "experiment": "Complete one of three milestones, reopen its evidence, then reload. Compare the result with your documented rule.",
+      "review": "Avoid maintaining a separate completedCount that can drift from the underlying milestones. State what self-reviewed completion does and does not establish.",
+      "stretch": "Export a project work-sample report with milestone evidence and links to commits.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-milestones-atomic",
+      "title": "Make multi-record edits atomic",
+      "concept": "Effect composition · database transactions",
+      "brief": "Prevent half-completed project changes when a child write fails.",
+      "explanation": "Sequential Effect steps do not automatically form a database transaction. Atomicity comes from the storage transaction that encloses the related writes. Do not hold a transaction open while waiting for a network request or user interaction.",
+      "steps": [
+        "Choose a multi-row operation, such as moving milestones between projects or archiving a project and its active children. Write the invariant before coding.",
+        "Implement a repository operation that owns the transaction. Inject a failure after the first write and inspect every affected row.",
+        "Use the same failure case through the UI. Preserve selection and drafts so the user can retry after rollback."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All related writes commit together on success."
+        },
+        {
+          "id": "criterion-2",
+          "label": "An injected intermediate failure leaves every affected row unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry after rollback yields the same final state as one successful attempt."
+        }
+      ],
+      "experiment": "Fail the second of three writes. A test that only checks the returned error is insufficient: compare the before and after database snapshots.",
+      "review": "Show which transaction covers which rows. Distinguish a storage transaction from Effect error recovery.",
+      "stretch": "Introduce two competing edits and define which revision checks must occur inside the transaction.",
+      "stage": "Build independently",
+      "minutes": 90,
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-milestones-dependencies",
+      "title": "Model prerequisite relationships",
+      "concept": "Graph invariants · domain validation",
+      "brief": "Let a milestone depend on another milestone while preventing self-dependencies, cycles, and references across unrelated projects.",
+      "explanation": "A prerequisite graph is part of your data model. The UI may guide selection, but the service must enforce relationship rules for imports and direct calls too. A dependency added concurrently can invalidate a previous cycle check, so define the transaction or serialization boundary that protects the graph.",
+      "steps": [
+        "Choose whether completion is blocked by unmet prerequisites or merely displays a warning. Define removal and reopening behavior before writing controls.",
+        "Implement add/remove dependency commands, cycle detection, and a readable blocked-state explanation. Validate both endpoints belong to the allowed project scope.",
+        "Exercise A depends on B, B depends on C, then C depends on A. Test the same cases through import and concurrent commands."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Self-links, missing endpoints, and forbidden cross-project links are rejected."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A cycle cannot be committed through any write path."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The interface explains which prerequisite is incomplete and links to it."
+        }
+      ],
+      "experiment": "Have two clients add opposite edges at the same time. Verify that the chosen storage boundary prevents a cycle even if both initial reads were valid.",
+      "review": "Explain graph correctness separately from the display ordering. A visually sorted list is not evidence that cycle creation is impossible.",
+      "stretch": "Show the earliest actionable milestone without hiding tasks that a learner may intentionally study out of order.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-milestones-summary",
+      "title": "Build trustworthy project summaries",
+      "concept": "Derived data · aggregate queries",
+      "brief": "Display completed, overdue, and blocked milestone counts without letting a cached summary contradict the underlying records.",
+      "explanation": "An aggregate has a precise definition. Decide whether archived milestones, missing deadlines, and reopened evidence participate in each count. Derived values can be computed from source records or maintained as projections; projections require update and repair rules. Use one interpretation across the dashboard, project page, and exports.",
+      "steps": [
+        "Write a six-record fixture covering completed, reopened, overdue, undated, archived, and blocked milestones. Calculate expected counts by hand.",
+        "Implement the aggregate at a repository or query boundary and consume it from the UI. Avoid one query for every row in a large project list.",
+        "Update a deadline and reopen evidence while the dashboard is open. Verify live counts, reload behavior, and an empty project's denominator."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Counts agree with the hand-calculated fixture."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Edits and reopening update every displayed summary consistently."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Query count remains bounded as the project list grows."
+        }
+      ],
+      "experiment": "Move the test clock past midnight while the page stays open. Verify overdue status updates under your documented calendar and time-zone policy.",
+      "review": "Report the number of database reads as well as the final numbers. Cache invalidation belongs to the feature contract when you choose to cache aggregates.",
+      "stretch": "Create a reconciliation command that rebuilds a deliberately corrupted projection from authoritative records.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-milestones-retrieval",
+      "title": "Turn project mistakes into review material",
+      "concept": "Learning workflow · data relationships",
+      "brief": "Link a concrete debugging lesson to a flashcard and a milestone without confusing recall ratings with engineering completion.",
+      "explanation": "A flashcard tests recall; a project journal records performed work. Keeping those meanings separate prevents a successful quiz from falsely completing a build task. Link stable identifiers, preserve source evidence, and let the learner revise an explanation after a second attempt rather than treating the first answer as permanent truth.",
+      "steps": [
+        "Choose one actual project failure and write a narrow recall question about its cause. Include a worked example and a counterexample in the answer.",
+        "Add a link from milestone evidence to the card while retaining the journal's outcome and verification. Define what happens if the card is deleted.",
+        "Review the card, then repeat a small implementation variation without the agent. Record the difference between remembered explanation and observed coding behavior."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Review ratings never silently change milestone completion."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A missing linked card has a recoverable display state."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The work sample includes a reproducible implementation variation."
+        }
+      ],
+      "experiment": "Answer the flashcard correctly, then deliberately omit the transaction from the implementation. Explain why the passing review cannot validate the broken feature.",
+      "review": "Keep evidence specific: a test result, commit, and observed behavior are stronger than a confidence score. Ask the agent for a new case after you explain the first one.",
+      "stretch": "Export a portfolio entry containing the initial mistake, corrected rule, regression test, and follow-up learning question.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-reject-an-orphan-task",
+      "parentId": "effect-milestones-crud",
+      "title": "Reject an orphan task",
+      "concept": "Relational integrity",
+      "brief": "Create task T-9 against project P-4 after that project disappears.",
+      "explanation": "A task may reference only a project that exists at the write boundary.",
+      "steps": [
+        "Create a repeatable fixture: Create task T-9 against project P-4 after that project disappears. Record the starting rows and relevant UI state before making the change.",
+        "Validate the parent relationship inside the repository transaction.",
+        "Delete P-4 between form load and submission. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No orphan task appears in the task table."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The UI retains the title and explains the missing parent."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Restore a different project using a different ID and retry. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Restore a different project using a different ID and retry.",
+      "review": "Review the agent's proposed diff: Does the command rely solely on a previously loaded dropdown?",
+      "stretch": "Offer moving the retained draft to an explicitly selected existing project.",
+      "minutes": 30,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-interpret-date-only-deadlines",
+      "parentId": "effect-milestones-crud",
+      "title": "Interpret date-only deadlines",
+      "concept": "Time modeling",
+      "brief": "Set a task deadline to 2030-03-10 while viewing the app in two time zones.",
+      "explanation": "A calendar deadline is not an instant until the product assigns a timezone policy.",
+      "steps": [
+        "Create a repeatable fixture: Set a task deadline to 2030-03-10 while viewing the app in two time zones. Record the starting rows and relevant UI state before making the change.",
+        "Store the date-only representation and compare calendar dates deliberately.",
+        "Render the same record in Los Angeles and Tokyo. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both users see the intended calendar date."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Parsing never shifts the deadline to the preceding day."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Cross midnight using a controlled clock and recompute overdue status. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Cross midnight using a controlled clock and recompute overdue status.",
+      "review": "Review the agent's proposed diff: Did the agent introduce UTC conversion for a date-only field?",
+      "stretch": "Add project-local deadline zones with explicit migration rules.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-keep-task-order-stable",
+      "parentId": "effect-milestones-crud",
+      "title": "Keep task order stable",
+      "concept": "Ordering",
+      "brief": "Seed three tasks with identical sort ranks and move one between its neighbors.",
+      "explanation": "A task order needs a deterministic tie rule and a safe rebalancing strategy.",
+      "steps": [
+        "Create a repeatable fixture: Seed three tasks with identical sort ranks and move one between its neighbors. Record the starting rows and relevant UI state before making the change.",
+        "Define rank allocation and an ID tiebreaker before implementing movement.",
+        "Move first-to-last, last-to-first, and between equal ranks. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reload preserves the requested order with unique visible positions."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The moved task never duplicates or disappears during rerender."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Interrupt between rank calculation and transactional update. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Interrupt between rank calculation and transactional update.",
+      "review": "Review the agent's proposed diff: Can concurrent moves produce order-dependent data loss?",
+      "stretch": "Add revision-aware reorder commands with a conflict preview.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-archive-a-parent-with-children",
+      "parentId": "effect-milestones-crud",
+      "title": "Archive a parent with children",
+      "concept": "Lifecycle policy",
+      "brief": "Archive a project containing two open tasks and one completed task.",
+      "explanation": "Child visibility and editability must follow an explicit parent-archive policy.",
+      "steps": [
+        "Create a repeatable fixture: Archive a project containing two open tasks and one completed task. Record the starting rows and relevant UI state before making the change.",
+        "Apply parent status checks at task-write boundaries.",
+        "Open an old task editor after archiving its parent. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The task operation returns the documented archived-parent result."
+        },
+        {
+          "id": "criterion-2",
+          "label": "An old editor cannot silently reactivate the project."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Restore the parent and revisit all three tasks. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Restore the parent and revisit all three tasks.",
+      "review": "Review the agent's proposed diff: Does archiving preserve task history rather than delete it accidentally?",
+      "stretch": "Add a read-only archived project view with deliberate restore controls.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-move-tasks-across-projects",
+      "parentId": "effect-milestones-crud",
+      "title": "Move tasks across projects",
+      "concept": "Relationship updates",
+      "brief": "Move task T-3 with evidence and dependencies from Alpha to Beta.",
+      "explanation": "Moving a task must validate every relationship that assumes a shared project.",
+      "steps": [
+        "Create a repeatable fixture: Move task T-3 with evidence and dependencies from Alpha to Beta. Record the starting rows and relevant UI state before making the change.",
+        "Specify which evidence moves and which dependency edges block the command.",
+        "Attempt the move with a cross-project dependency present. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "A valid move preserves task identity and allowed history."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A blocked move changes neither parent link nor dependency edges."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Remove the blocking edge and retry the same request. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Remove the blocking edge and retry the same request.",
+      "review": "Review the agent's proposed diff: Are derived counts updated for both source and destination?",
+      "stretch": "Provide a move preview listing every affected relationship.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-distinguish-clear-from-omit",
+      "parentId": "effect-milestones-crud",
+      "title": "Distinguish clear from omit",
+      "concept": "Patch semantics",
+      "brief": "Edit a task whose deadline exists while sending a patch that omits the deadline key.",
+      "explanation": "Omission preserves a field; explicit clearing removes it only when allowed.",
+      "steps": [
+        "Create a repeatable fixture: Edit a task whose deadline exists while sending a patch that omits the deadline key. Record the starting rows and relevant UI state before making the change.",
+        "Decode optional patch presence separately from nullable field values.",
+        "Send omitted, null, empty-string, and valid-date variants. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Omission preserves the deadline and explicit clear removes it."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Malformed empty-string dates never become accidental clears."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Submit the same patch through the API without the form. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Submit the same patch through the API without the form.",
+      "review": "Review the agent's proposed diff: Does a default value erase information about user intent?",
+      "stretch": "Document patch examples in the service contract.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-restore-a-deleted-task-draft",
+      "parentId": "effect-milestones-crud",
+      "title": "Restore a deleted task draft",
+      "concept": "Recovery UX",
+      "brief": "Delete a task in one tab while another contains a long unsaved description.",
+      "explanation": "A missing entity response should preserve authored text without recreating identity automatically.",
+      "steps": [
+        "Create a repeatable fixture: Delete a task in one tab while another contains a long unsaved description. Record the starting rows and relevant UI state before making the change.",
+        "Show a copyable draft and explicit create-new action.",
+        "Save the stale editor and inspect database rows. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The original missing ID stays absent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The draft remains available after the missing-task response."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Create a new task from the draft and reload. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Create a new task from the draft and reload.",
+      "review": "Review the agent's proposed diff: Is create-new visibly distinct from retrying the stale update?",
+      "stretch": "Offer a comparison when the task was archived instead of deleted.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-enforce-title-limits-centrally",
+      "parentId": "effect-milestones-crud",
+      "title": "Enforce title limits centrally",
+      "concept": "Schema reuse",
+      "brief": "Enter a whitespace-only title through a direct task command and a pasted long title through React.",
+      "explanation": "All task entry paths need one normalization and length contract.",
+      "steps": [
+        "Create a repeatable fixture: Enter a whitespace-only title through a direct task command and a pasted long title through React. Record the starting rows and relevant UI state before making the change.",
+        "Reuse the operation decoder for create and rename.",
+        "Test boundary lengths after trimming, including line breaks. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Valid normalized titles persist identically through both paths."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Invalid titles cause zero repository mutations."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Make the UI validation intentionally permissive during the test. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Make the UI validation intentionally permissive during the test.",
+      "review": "Review the agent's proposed diff: Does repository code receive already validated domain values?",
+      "stretch": "Add multiline-description limits independently from title limits.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-keep-list-counts-truthful",
+      "parentId": "effect-milestones-crud",
+      "title": "Keep list counts truthful",
+      "concept": "Derived state",
+      "brief": "Create a task while a filtered project list refresh is still pending.",
+      "explanation": "A stale list response must not overwrite a newer accepted task count.",
+      "steps": [
+        "Create a repeatable fixture: Create a task while a filtered project list refresh is still pending. Record the starting rows and relevant UI state before making the change.",
+        "Associate reads with request identity or derive counts from one reactive source.",
+        "Resolve the older list response after the create completes. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The displayed count includes the accepted new task."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The empty state never reappears from the obsolete read."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Fail the refresh after the successful create. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Fail the refresh after the successful create.",
+      "review": "Review the agent's proposed diff: Can mutation confirmation and list loading coexist without contradiction?",
+      "stretch": "Add a refresh timestamp for counts sourced from remote aggregation.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-require-evidence-before-completion",
+      "parentId": "effect-milestones-evidence",
+      "title": "Require evidence before completion",
+      "concept": "Domain transitions",
+      "brief": "Attempt to complete task T-12 with no linked evidence record.",
+      "explanation": "Completion is a domain transition whose preconditions must survive direct API calls.",
+      "steps": [
+        "Create a repeatable fixture: Attempt to complete task T-12 with no linked evidence record. Record the starting rows and relevant UI state before making the change.",
+        "Validate evidence presence within the completion operation.",
+        "Bypass the disabled button and execute the command directly. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "A task with valid evidence completes once."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A task without evidence stays open with an actionable error."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Delete evidence immediately before completion commits. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Delete evidence immediately before completion commits.",
+      "review": "Review the agent's proposed diff: Are evidence checks and state mutation protected by one consistency boundary?",
+      "stretch": "Support an explicitly audited waiver instead of weakening the default rule.",
+      "minutes": 30,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-validate-evidence-links-safely",
+      "parentId": "effect-milestones-evidence",
+      "title": "Validate evidence links safely",
+      "concept": "Input boundaries",
+      "brief": "Attach https evidence, a javascript URL, and an empty reference to one task.",
+      "explanation": "A useful evidence reference needs an allowed representation and safe navigation behavior.",
+      "steps": [
+        "Create a repeatable fixture: Attach https evidence, a javascript URL, and an empty reference to one task. Record the starting rows and relevant UI state before making the change.",
+        "Decode allowed URL schemes and preserve plain-text notes separately.",
+        "Open accepted links and inspect the rendered anchor attributes. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Allowed references remain readable after reload."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Executable and malformed URLs never become active links."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Paste a URL containing credentials and inspect preview output. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Paste a URL containing credentials and inspect preview output.",
+      "review": "Review the agent's proposed diff: Does validation happen before any preview fetch or rendering?",
+      "stretch": "Support repository-relative file references with an explicit resolver.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-keep-evidence-ownership-intact",
+      "parentId": "effect-milestones-evidence",
+      "title": "Keep evidence ownership intact",
+      "concept": "Authorization",
+      "brief": "Link evidence E-2 owned by project Beta to a task in project Alpha.",
+      "explanation": "Knowing an evidence ID does not grant permission to attach or reveal it.",
+      "steps": [
+        "Create a repeatable fixture: Link evidence E-2 owned by project Beta to a task in project Alpha. Record the starting rows and relevant UI state before making the change.",
+        "Check task and evidence visibility in the same authenticated operation.",
+        "Attempt cross-project links as a viewer and an editor. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Authorized same-project evidence can be linked."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unauthorized attempts reveal no private evidence title or content."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Revoke access after the picker loads but before submit. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Revoke access after the picker loads but before submit.",
+      "review": "Review the agent's proposed diff: Does the backend trust picker filtering instead of authorizing the reference?",
+      "stretch": "Add shared evidence with explicit access inheritance rules.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-reopen-when-proof-changes",
+      "parentId": "effect-milestones-evidence",
+      "title": "Reopen when proof changes",
+      "concept": "Lifecycle invariants",
+      "brief": "Complete a task using evidence E-5, then remove that evidence.",
+      "explanation": "The system must define whether completion remains historical or is invalidated by lost proof.",
+      "steps": [
+        "Create a repeatable fixture: Complete a task using evidence E-5, then remove that evidence. Record the starting rows and relevant UI state before making the change.",
+        "Choose and implement a removal policy with an audit event.",
+        "Remove the only evidence and inspect task status and history. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The result follows the published completion-evidence policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Evidence deletion cannot silently leave contradictory current-state claims."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Replace evidence while the task is completed. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Replace evidence while the task is completed.",
+      "review": "Review the agent's proposed diff: Does history distinguish original completion evidence from current attachments?",
+      "stretch": "Version evidence so historical completion can reference an immutable snapshot.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-prevent-duplicate-evidence-links",
+      "parentId": "effect-milestones-evidence",
+      "title": "Prevent duplicate evidence links",
+      "concept": "Idempotent relationships",
+      "brief": "Attach the same screenshot to a task twice through a slow form.",
+      "explanation": "One logical attachment should produce one relationship under repeated delivery.",
+      "steps": [
+        "Create a repeatable fixture: Attach the same screenshot to a task twice through a slow form. Record the starting rows and relevant UI state before making the change.",
+        "Use a uniqueness rule for task ID and evidence identity.",
+        "Race repeated attach commands and inspect relationship rows. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly one link exists with one visible attachment."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Duplicate delivery never inflates evidence counts."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Return a timeout after the first link commits and retry. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Return a timeout after the first link commits and retry.",
+      "review": "Review the agent's proposed diff: Does the operation return the existing relation as a successful repeat?",
+      "stretch": "Add explicit support for distinct annotated versions of the same source.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-separate-observation-from-claim",
+      "parentId": "effect-milestones-evidence",
+      "title": "Separate observation from claim",
+      "concept": "Evidence quality",
+      "brief": "An agent writes a completion note saying tests passed without any recorded execution.",
+      "explanation": "Evidence should identify what was actually observed and what remains an unverified claim.",
+      "steps": [
+        "Create a repeatable fixture: An agent writes a completion note saying tests passed without any recorded execution. Record the starting rows and relevant UI state before making the change.",
+        "Add fields for command, result, environment, and artifact reference.",
+        "Complete a fixture using only a claim, then with a captured failing test. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The UI distinguishes observed failure from unsupported success language."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A failed test cannot be automatically labeled passing by note text."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Ask the agent to revise the implementation after the recorded failure. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Ask the agent to revise the implementation after the recorded failure.",
+      "review": "Review the agent's proposed diff: Can a reviewer trace completion to concrete output rather than confidence wording?",
+      "stretch": "Add a checklist requiring evidence for the task's specific acceptance criteria.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-retain-evidence-across-reopen",
+      "parentId": "effect-milestones-evidence",
+      "title": "Retain evidence across reopen",
+      "concept": "Journal continuity",
+      "brief": "Complete, reopen, and complete the same task with a second test run.",
+      "explanation": "Reopening changes workflow state while preserving prior evidence and decisions.",
+      "steps": [
+        "Create a repeatable fixture: Complete, reopen, and complete the same task with a second test run. Record the starting rows and relevant UI state before making the change.",
+        "Append transition events and associate evidence with each completion attempt.",
+        "Exercise two completion cycles and inspect chronological history. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both runs and both completion events remain available."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Reopening does not erase the first attempt's diagnosis."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Fail the second completion after its evidence was saved. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Fail the second completion after its evidence was saved.",
+      "review": "Review the agent's proposed diff: Does the model distinguish draft evidence from accepted completion evidence?",
+      "stretch": "Show a comparison of evidence between consecutive completion attempts.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-make-uploads-independent-of-completion",
+      "parentId": "effect-milestones-evidence",
+      "title": "Make uploads independent of completion",
+      "concept": "Operation sequencing",
+      "brief": "Upload proof successfully, then fail the task-completion write.",
+      "explanation": "A completed upload and a completed task are separate durable facts.",
+      "steps": [
+        "Create a repeatable fixture: Upload proof successfully, then fail the task-completion write. Record the starting rows and relevant UI state before making the change.",
+        "Track attachment readiness and task transition status independently.",
+        "Inject failure only after attachment persistence succeeds. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The evidence remains linked and the task stays open."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Retrying completion does not upload a duplicate file."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reload between the failed transition and its retry. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reload between the failed transition and its retry.",
+      "review": "Review the agent's proposed diff: Does the UI explain which part succeeded and which part needs retry?",
+      "stretch": "Add cleanup for abandoned uploads without deleting evidence linked to active drafts.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-export-meaningful-completion-evidence",
+      "parentId": "effect-milestones-evidence",
+      "title": "Export meaningful completion evidence",
+      "concept": "Portable records",
+      "brief": "Export a completed task with a local note, remote link, and failed experiment.",
+      "explanation": "An evidence export should preserve provenance and limitations outside the application.",
+      "steps": [
+        "Create a repeatable fixture: Export a completed task with a local note, remote link, and failed experiment. Record the starting rows and relevant UI state before making the change.",
+        "Include task identity, timestamps, criteria, observations, and link availability notes.",
+        "Read the exported Markdown in a plain-text viewer. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All three evidence types retain their meaning and association."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The export never replaces a failed observation with a generic completed label."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Remove remote access and reread the exported record. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Remove remote access and reread the exported record.",
+      "review": "Review the agent's proposed diff: Does the artifact distinguish embedded content from external references?",
+      "stretch": "Add a manifest for optional bundled artifacts with content hashes.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-complete-task-and-update-summary",
+      "parentId": "effect-milestones-atomic",
+      "title": "Complete task and update summary",
+      "concept": "Transactions",
+      "brief": "Complete one of three open tasks while the project stores a cached completion count.",
+      "explanation": "The task state and its materialized count must commit together or be derived consistently.",
+      "steps": [
+        "Create a repeatable fixture: Complete one of three open tasks while the project stores a cached completion count. Record the starting rows and relevant UI state before making the change.",
+        "Update both records inside a transaction or remove redundant stored state.",
+        "Inject failure after task update but before count update. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "After failure, both records reflect the same precommand state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No screen reports a completed task with the old cached total."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Retry after removing the failure and inspect the delta. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Retry after removing the failure and inspect the delta.",
+      "review": "Review the agent's proposed diff: Is the count increment conditional on an actual state transition?",
+      "stretch": "Rebuild cached counts from source tasks and compare results.",
+      "minutes": 30,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-delete-a-task-with-edges",
+      "parentId": "effect-milestones-atomic",
+      "title": "Delete a task with edges",
+      "concept": "Cascades",
+      "brief": "Delete a task referenced by two prerequisite edges and one evidence link.",
+      "explanation": "Deletion needs a declared cascade-or-restrict policy for every related table.",
+      "steps": [
+        "Create a repeatable fixture: Delete a task referenced by two prerequisite edges and one evidence link. Record the starting rows and relevant UI state before making the change.",
+        "Enumerate dependent records and implement one atomic deletion command.",
+        "Fail the command after deleting one relationship. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Either all permitted deletions commit or none do."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No dangling dependency or evidence relation survives unintentionally."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Retry while another operation adds a new dependency. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Retry while another operation adds a new dependency.",
+      "review": "Review the agent's proposed diff: Are relationship constraints enforced at storage rather than only prechecked?",
+      "stretch": "Add a dry-run deletion preview generated from the same dependency rules.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-move-a-task-with-summary-counters",
+      "parentId": "effect-milestones-atomic",
+      "title": "Move a task with summary counters",
+      "concept": "Multi-entity writes",
+      "brief": "Move a completed task from Alpha to Beta while both projects cache totals.",
+      "explanation": "Source decrement, destination increment, and parent reassignment form one logical mutation.",
+      "steps": [
+        "Create a repeatable fixture: Move a completed task from Alpha to Beta while both projects cache totals. Record the starting rows and relevant UI state before making the change.",
+        "Perform all affected writes inside the repository's transaction scope.",
+        "Fail the destination counter update and inspect both projects. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The task and both counters retain their original consistent state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A retry never decrements Alpha twice."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Deliver the same move command twice after a successful commit. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Deliver the same move command twice after a successful commit.",
+      "review": "Review the agent's proposed diff: Does idempotency cover the entire move rather than each write separately?",
+      "stretch": "Include a move receipt that records source and destination revisions.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-keep-network-work-outside-transactions",
+      "parentId": "effect-milestones-atomic",
+      "title": "Keep network work outside transactions",
+      "concept": "Transaction lifetime",
+      "brief": "A completion command fetches a remote proof URL before writing local task state.",
+      "explanation": "A database transaction should not be held open while waiting on unrelated network latency.",
+      "steps": [
+        "Create a repeatable fixture: A completion command fetches a remote proof URL before writing local task state. Record the starting rows and relevant UI state before making the change.",
+        "Resolve external verification first, then revalidate required state in a short transaction.",
+        "Delay the remote response and issue another local task write. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The unrelated local write is not blocked for the network delay."
+        },
+        {
+          "id": "criterion-2",
+          "label": "External verification cannot skip final revision validation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change the task while the remote proof request is pending. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change the task while the remote proof request is pending.",
+      "review": "Review the agent's proposed diff: Did the agent put an awaited HTTP request inside the database transaction?",
+      "stretch": "Use expiring verification receipts that can be checked during the local commit.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-avoid-caught-transaction-failures",
+      "parentId": "effect-milestones-atomic",
+      "title": "Avoid caught transaction failures",
+      "concept": "Error propagation",
+      "brief": "The second write in a completion transaction fails and a helper catches its error.",
+      "explanation": "A swallowed failure can turn an intended rollback into a partial commit.",
+      "steps": [
+        "Create a repeatable fixture: The second write in a completion transaction fails and a helper catches its error. Record the starting rows and relevant UI state before making the change.",
+        "Let transaction-critical failures propagate until the transaction boundary resolves.",
+        "Inject the failure and inspect task, evidence, and summary tables. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The operation reports failure and every provisional change rolls back."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A convenience catch never returns a fake success inside the transaction."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add logging and repeat to ensure logging does not consume the error. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add logging and repeat to ensure logging does not consume the error.",
+      "review": "Review the agent's proposed diff: Does each catch explicitly preserve the rollback semantics?",
+      "stretch": "Represent optional postcommit diagnostics separately from mandatory writes.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-validate-batch-reassignment-atomically",
+      "parentId": "effect-milestones-atomic",
+      "title": "Validate batch reassignment atomically",
+      "concept": "Bulk relationships",
+      "brief": "Reassign six tasks to a milestone when one task belongs to another project.",
+      "explanation": "A batch relationship change should validate every target before committing any target.",
+      "steps": [
+        "Create a repeatable fixture: Reassign six tasks to a milestone when one task belongs to another project. Record the starting rows and relevant UI state before making the change.",
+        "Resolve and validate the entire selected set within the chosen transaction policy.",
+        "Include the foreign-project task as the last item. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "An atomic policy leaves all six tasks unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Input order never determines which invalid batch partially succeeds."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Remove one selected task during validation in another connection. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Remove one selected task during validation in another connection.",
+      "review": "Review the agent's proposed diff: Are read checks protected from concurrent invalidation?",
+      "stretch": "Provide per-task preview reasons before submitting the atomic batch.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-distinguish-rollback-from-compensation",
+      "parentId": "effect-milestones-atomic",
+      "title": "Distinguish rollback from compensation",
+      "concept": "Distributed boundaries",
+      "brief": "A task completion also posts to an external issue tracker after local commit.",
+      "explanation": "A local transaction cannot roll back an already accepted external side effect.",
+      "steps": [
+        "Create a repeatable fixture: A task completion also posts to an external issue tracker after local commit. Record the starting rows and relevant UI state before making the change.",
+        "Record an outbox event transactionally with local completion.",
+        "Make the external request succeed while its response is lost. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Local completion and pending delivery remain auditable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A remote timeout never triggers an unsafe local history rewrite."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Retry delivery with a stable external operation identity. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Retry delivery with a stable external operation identity.",
+      "review": "Review the agent's proposed diff: Does the design describe eventual delivery rather than fictional global atomicity?",
+      "stretch": "Add a reconciliation command for unresolved external outcomes.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-test-transaction-scope-wiring",
+      "parentId": "effect-milestones-atomic",
+      "title": "Test transaction scope wiring",
+      "concept": "Adapter integration",
+      "brief": "The fake repository passes atomic tests but the Dexie adapter opens separate transactions per method.",
+      "explanation": "Atomic application behavior depends on the live adapter sharing one actual transaction.",
+      "steps": [
+        "Create a repeatable fixture: The fake repository passes atomic tests but the Dexie adapter opens separate transactions per method. Record the starting rows and relevant UI state before making the change.",
+        "Add an adapter-level failure injection between the participating writes.",
+        "Inspect persisted rows using a fresh connection after rejection. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Live storage rolls back the same records as the contract requires."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A green in-memory test alone is not accepted as transaction evidence."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Execute the operation twice with failure at each write position. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Execute the operation twice with failure at each write position.",
+      "review": "Review the agent's proposed diff: Can the reviewer identify the single transaction owner in the call graph?",
+      "stretch": "Add an integration matrix for each multi-record operation.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-serialize-completion-with-deletion",
+      "parentId": "effect-milestones-atomic",
+      "title": "Serialize completion with deletion",
+      "concept": "Race conditions",
+      "brief": "Complete task T-8 while another command deletes its parent project.",
+      "explanation": "Concurrent commands must resolve to a valid state permitted by one serial ordering.",
+      "steps": [
+        "Create a repeatable fixture: Complete task T-8 while another command deletes its parent project. Record the starting rows and relevant UI state before making the change.",
+        "Enforce parent existence and deletion policy within transactional writes.",
+        "Coordinate both commands with a test barrier before mutation. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The final state matches completion-before-delete or delete-before-completion policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No completed orphan task exists after both commands settle."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Reverse the order in which each transaction acquires its write boundary. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Reverse the order in which each transaction acquires its write boundary.",
+      "review": "Review the agent's proposed diff: Does the test assert final invariants instead of requiring a particular winner?",
+      "stretch": "Run repeated controlled interleavings across two independent connections.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-reject-a-direct-self-edge",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Reject a direct self-edge",
+      "concept": "Graph invariants",
+      "brief": "Attempt to make task T-1 depend on itself through a direct command.",
+      "explanation": "A task cannot be its own prerequisite regardless of picker behavior.",
+      "steps": [
+        "Create a repeatable fixture: Attempt to make task T-1 depend on itself through a direct command. Record the starting rows and relevant UI state before making the change.",
+        "Validate distinct endpoint IDs before graph lookup and persistence.",
+        "Submit self-dependency through UI and repository-facing operation tests. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "No self-edge is stored."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The typed error identifies the invalid relationship without a generic crash."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Repeat the request with a stale task revision. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Repeat the request with a stale task revision.",
+      "review": "Review the agent's proposed diff: Is the rule enforced even when the UI never offers the task itself?",
+      "stretch": "Add a schema-level constraint where the storage engine supports it.",
+      "minutes": 30,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-detect-an-indirect-cycle",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Detect an indirect cycle",
+      "concept": "Graph traversal",
+      "brief": "Seed A depends on B and B depends on C, then add C depends on A.",
+      "explanation": "A dependency graph must remain acyclic across paths longer than one edge.",
+      "steps": [
+        "Create a repeatable fixture: Seed A depends on B and B depends on C, then add C depends on A. Record the starting rows and relevant UI state before making the change.",
+        "Check reachability from the proposed prerequisite before inserting the edge.",
+        "Test three-node and long-chain cycles with a deterministic fixture. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The cycle-creating edge is rejected with existing edges unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "An unrelated acyclic edge still succeeds."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Insert the same cycle proposal after reordering stored edges. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Insert the same cycle proposal after reordering stored edges.",
+      "review": "Review the agent's proposed diff: Does traversal track visited nodes and terminate safely on corrupt old data?",
+      "stretch": "Return a short cycle path to explain the blocked change.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-race-two-harmless-looking-edges",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Race two harmless-looking edges",
+      "concept": "Concurrent graph edits",
+      "brief": "Two editors concurrently add A depends on B and B depends on A.",
+      "explanation": "Individually valid prechecks can jointly violate acyclicity without concurrency control.",
+      "steps": [
+        "Create a repeatable fixture: Two editors concurrently add A depends on B and B depends on A. Record the starting rows and relevant UI state before making the change.",
+        "Serialize graph mutations or validate against a locked revision boundary.",
+        "Pause both commands after their initial graph reads, then release them. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "At most one conflicting edge commits."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The final graph never contains the two-edge cycle."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Retry the losing operation after reloading the graph. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Retry the losing operation after reloading the graph.",
+      "review": "Review the agent's proposed diff: Does the agent mistake client-side cycle detection for a durable guarantee?",
+      "stretch": "Introduce project-level graph revisions to reject stale structural edits.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-block-premature-completion",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Block premature completion",
+      "concept": "Prerequisite state",
+      "brief": "Task Deploy depends on Test, which remains open when Deploy is submitted for completion.",
+      "explanation": "Completion must check the current prerequisite state at the mutation boundary.",
+      "steps": [
+        "Create a repeatable fixture: Task Deploy depends on Test, which remains open when Deploy is submitted for completion. Record the starting rows and relevant UI state before making the change.",
+        "Resolve unfinished prerequisites within the completion consistency boundary.",
+        "Complete Deploy from a stale screen after Test is reopened. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Deploy stays open with Test identified as blocking."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A cached green prerequisite badge cannot authorize completion."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Complete Test and retry Deploy with fresh state. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Complete Test and retry Deploy with fresh state.",
+      "review": "Review the agent's proposed diff: Are archived or deleted prerequisites handled by an explicit policy?",
+      "stretch": "Add a preview listing the minimal blocking prerequisite set.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-handle-prerequisite-deletion",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Handle prerequisite deletion",
+      "concept": "Graph lifecycle",
+      "brief": "Delete a prerequisite task that blocks three downstream tasks.",
+      "explanation": "Removing a node requires a deliberate policy for its outgoing dependency meaning.",
+      "steps": [
+        "Create a repeatable fixture: Delete a prerequisite task that blocks three downstream tasks. Record the starting rows and relevant UI state before making the change.",
+        "Choose restrict, detach, or archived-history behavior and expose it in confirmation.",
+        "Delete the node and inspect downstream eligibility and history. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The downstream tasks follow the declared deletion policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "They never silently become complete because a reference vanished."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Fail midway through edge cleanup. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Fail midway through edge cleanup.",
+      "review": "Review the agent's proposed diff: Does the deletion transaction include every affected edge?",
+      "stretch": "Provide an impact preview with downstream task counts before confirmation.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-explain-blocked-work-accessibly",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Explain blocked work accessibly",
+      "concept": "Graph UI",
+      "brief": "Display a task blocked by two prerequisites, one with a very long title.",
+      "explanation": "Blocked status should name actionable causes without requiring a visual graph.",
+      "steps": [
+        "Create a repeatable fixture: Display a task blocked by two prerequisites, one with a very long title. Record the starting rows and relevant UI state before making the change.",
+        "Render a text list of blocking tasks with keyboard-reachable links.",
+        "Navigate the list at narrow width and with large text. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each blocker has a readable name and destination."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Color and line position are not the only explanation of dependency."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Delete one blocker while the detail view stays open. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Delete one blocker while the detail view stays open.",
+      "review": "Review the agent's proposed diff: Does the screen update the reason without moving focus unexpectedly?",
+      "stretch": "Add an accessible nested outline for the dependency path.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-keep-cross-project-rules-explicit",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Keep cross-project rules explicit",
+      "concept": "Graph boundaries",
+      "brief": "Try to connect a task in Alpha to a prerequisite in Beta.",
+      "explanation": "Dependency scope determines authorization, summaries, and deletion behavior.",
+      "steps": [
+        "Create a repeatable fixture: Try to connect a task in Alpha to a prerequisite in Beta. Record the starting rows and relevant UI state before making the change.",
+        "Enforce same-project scope or define cross-project access checks before storing edges.",
+        "Submit the cross-project relation directly after changing picker state. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Accepted edges satisfy the published scope rule."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unauthorized target titles never leak in validation errors."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Move the prerequisite to another project after creating an allowed edge. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Move the prerequisite to another project after creating an allowed edge.",
+      "review": "Review the agent's proposed diff: Do task moves revalidate existing graph boundaries?",
+      "stretch": "Support cross-project milestones through a dedicated reference type with clear visibility.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-bound-graph-traversal-work",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Bound graph traversal work",
+      "concept": "Algorithmic limits",
+      "brief": "Load a chain of five thousand tasks plus a disconnected component.",
+      "explanation": "Cycle detection should visit relevant nodes without repeated exponential exploration.",
+      "steps": [
+        "Create a repeatable fixture: Load a chain of five thousand tasks plus a disconnected component. Record the starting rows and relevant UI state before making the change.",
+        "Build an adjacency index and track visited nodes during traversal.",
+        "Measure visited-node counts for a long chain and a branching diamond. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Traversal terminates with the correct reachability result."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Shared subgraphs are not revisited once per incoming path."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Insert a corrupt cycle in a read-only fixture to test termination. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Insert a corrupt cycle in a read-only fixture to test termination.",
+      "review": "Review the agent's proposed diff: Does the implementation protect stack depth on long chains?",
+      "stretch": "Move expensive graph analysis to a worker while keeping commit validation authoritative.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-reopen-prerequisite-policy",
+      "parentId": "effect-milestones-dependencies",
+      "title": "Reopen prerequisite policy",
+      "concept": "Workflow semantics",
+      "brief": "Reopen Test after its dependent Deploy task was previously completed.",
+      "explanation": "Historical completion and current readiness need a deliberate relationship when prerequisites change.",
+      "steps": [
+        "Create a repeatable fixture: Reopen Test after its dependent Deploy task was previously completed. Record the starting rows and relevant UI state before making the change.",
+        "Specify whether to flag, reopen, or retain downstream completion with an audit event.",
+        "Reopen Test and inspect Deploy's status and evidence history. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The declared downstream policy is visible and repeatable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Prior completion evidence is never erased automatically."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Recomplete Test and observe whether flags resolve. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Recomplete Test and observe whether flags resolve.",
+      "review": "Review the agent's proposed diff: Does the model distinguish historical truth from current dependency satisfaction?",
+      "stretch": "Add a dependency-change review queue for affected completed tasks.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-choose-the-completion-denominator",
+      "parentId": "effect-milestones-summary",
+      "title": "Choose the completion denominator",
+      "concept": "Product metrics",
+      "brief": "A project contains three open, two complete, and five archived tasks.",
+      "explanation": "A progress percentage is meaningful only with an explicit inclusion rule.",
+      "steps": [
+        "Create a repeatable fixture: A project contains three open, two complete, and five archived tasks. Record the starting rows and relevant UI state before making the change.",
+        "Define archived-task treatment and compute numerator and denominator from that rule.",
+        "Compare summary cards with the ten-row fixture. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The displayed percentage matches the documented eligible task set."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Hidden archived tasks do not unpredictably change the denominator."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Archive one completed task and recompute. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Archive one completed task and recompute.",
+      "review": "Review the agent's proposed diff: Does the UI explain what its percentage measures?",
+      "stretch": "Display separate active-work progress and historical completion totals.",
+      "minutes": 30,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-handle-zero-task-progress",
+      "parentId": "effect-milestones-summary",
+      "title": "Handle zero-task progress",
+      "concept": "Empty aggregates",
+      "brief": "Create a project with no tasks and open its progress summary.",
+      "explanation": "An empty workload must not produce NaN, infinity, or a misleading completed claim.",
+      "steps": [
+        "Create a repeatable fixture: Create a project with no tasks and open its progress summary. Record the starting rows and relevant UI state before making the change.",
+        "Represent no-work state separately from a numeric percentage.",
+        "Render zero tasks, one open task, and one completed task. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The empty state invites defining work without arithmetic artifacts."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Zero divided by zero never reaches chart labels or accessibility text."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Delete the last task while the summary is visible. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Delete the last task while the summary is visible.",
+      "review": "Review the agent's proposed diff: Did the agent choose a product meaning before selecting a fallback number?",
+      "stretch": "Add a summary explanation that distinguishes no work from all work complete.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-calculate-overdue-by-project-date",
+      "parentId": "effect-milestones-summary",
+      "title": "Calculate overdue by project date",
+      "concept": "Time boundaries",
+      "brief": "A task due yesterday and a task due today belong to a project in a specified timezone.",
+      "explanation": "Overdue classification should follow the deadline's calendar semantics consistently.",
+      "steps": [
+        "Create a repeatable fixture: A task due yesterday and a task due today belong to a project in a specified timezone. Record the starting rows and relevant UI state before making the change.",
+        "Compute the project's current date from an injected clock and explicit zone.",
+        "Test one minute before and after the project-local midnight. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only the intended tasks switch overdue state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Viewer timezone changes do not redefine the project's deadline."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Advance through a daylight-saving transition. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Advance through a daylight-saving transition.",
+      "review": "Review the agent's proposed diff: Are date-only values compared without accidental instant conversion?",
+      "stretch": "Show the timezone beside deadlines when collaborators view from different regions.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-avoid-count-multiplication-in-joins",
+      "parentId": "effect-milestones-summary",
+      "title": "Avoid count multiplication in joins",
+      "concept": "SQL aggregation",
+      "brief": "A completed task has three evidence rows and two dependency edges.",
+      "explanation": "Joining one-to-many relationships can multiply task rows and inflate totals.",
+      "steps": [
+        "Create a repeatable fixture: A completed task has three evidence rows and two dependency edges. Record the starting rows and relevant UI state before making the change.",
+        "Aggregate task counts independently or use a justified distinct strategy.",
+        "Compare summaries with and without the joined evidence and dependency data. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The project still counts one completed task."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Adding evidence never increases the number of tasks."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Add duplicate relationship attempts and rerun the query. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Add duplicate relationship attempts and rerun the query.",
+      "review": "Review the agent's proposed diff: Can the reviewer explain the cardinality of each join?",
+      "stretch": "Use query plans to compare alternative correct aggregate shapes.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-retain-last-good-summary-on-refresh",
+      "parentId": "effect-milestones-summary",
+      "title": "Retain last good summary on refresh",
+      "concept": "Remote state",
+      "brief": "Display a confirmed summary while the next refresh times out.",
+      "explanation": "A refresh failure should not erase known data or label stale data as freshly verified.",
+      "steps": [
+        "Create a repeatable fixture: Display a confirmed summary while the next refresh times out. Record the starting rows and relevant UI state before making the change.",
+        "Track data freshness separately from loading and error states.",
+        "Fail a refresh after an initial successful response. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The last confirmed values remain with a visible stale indicator."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Failure never replaces counts with zeros."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Recover the connection and complete a new refresh. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Recover the connection and complete a new refresh.",
+      "review": "Review the agent's proposed diff: Are empty, stale, and unavailable states modeled distinctly?",
+      "stretch": "Add a manual retry control that preserves the summary's layout.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-make-aggregate-updates-race-safe",
+      "parentId": "effect-milestones-summary",
+      "title": "Make aggregate updates race-safe",
+      "concept": "Materialized views",
+      "brief": "Two tasks complete concurrently in a project whose cached done count is four.",
+      "explanation": "Read-modify-write counters can lose increments when commands overlap.",
+      "steps": [
+        "Create a repeatable fixture: Two tasks complete concurrently in a project whose cached done count is four. Record the starting rows and relevant UI state before making the change.",
+        "Use an atomic increment or recompute under the appropriate transaction boundary.",
+        "Synchronize both completions before counter mutation. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The final count is six and both tasks are completed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A retried completion does not increment the total again."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Replay one accepted command after a lost response. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Replay one accepted command after a lost response.",
+      "review": "Review the agent's proposed diff: Is count mutation conditional on changing open to complete?",
+      "stretch": "Add a periodic invariant check comparing cached totals with source rows.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-drill-from-summary-to-exact-rows",
+      "parentId": "effect-milestones-summary",
+      "title": "Drill from summary to exact rows",
+      "concept": "Navigation consistency",
+      "brief": "Click the overdue count on a project card containing seven overdue tasks.",
+      "explanation": "A summary link should reproduce the same predicate used to calculate its count.",
+      "steps": [
+        "Create a repeatable fixture: Click the overdue count on a project card containing seven overdue tasks. Record the starting rows and relevant UI state before making the change.",
+        "Share filter semantics between aggregation and the destination list.",
+        "Open the link and compare the returned task IDs with the aggregate fixture. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exactly the seven counted tasks appear."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Archived or completed exclusions do not differ between screens."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Cross midnight between rendering the summary and opening the list. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Cross midnight between rendering the summary and opening the list.",
+      "review": "Review the agent's proposed diff: Does the destination explain a count change caused by newer data?",
+      "stretch": "Include a snapshot timestamp when exact historical drill-down is required.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-explain-weighted-progress",
+      "parentId": "effect-milestones-summary",
+      "title": "Explain weighted progress",
+      "concept": "Metric design",
+      "brief": "Assign weights one, two, and eight to three tasks and complete only the largest.",
+      "explanation": "Weighted progress needs transparent semantics and validation distinct from item counts.",
+      "steps": [
+        "Create a repeatable fixture: Assign weights one, two, and eight to three tasks and complete only the largest. Record the starting rows and relevant UI state before making the change.",
+        "Define allowed positive weights and show both weighted and task-count progress.",
+        "Calculate the fixture by hand and compare every label. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Weighted progress is eight of eleven while task completion is one of three."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Zero, negative, and malformed weights are rejected."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change a completed task's weight and inspect history. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change a completed task's weight and inspect history.",
+      "review": "Review the agent's proposed diff: Does the summary disclose why its percentage differs from the task count?",
+      "stretch": "Version weight changes when progress is used in external reporting.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-detect-inconsistent-cached-summaries",
+      "parentId": "effect-milestones-summary",
+      "title": "Detect inconsistent cached summaries",
+      "concept": "Reconciliation",
+      "brief": "Corrupt a project's cached total to ninety-nine while only four tasks exist.",
+      "explanation": "A repair operation must derive truth from authoritative rows and remain auditable.",
+      "steps": [
+        "Create a repeatable fixture: Corrupt a project's cached total to ninety-nine while only four tasks exist. Record the starting rows and relevant UI state before making the change.",
+        "Add a read-only comparison followed by an explicit repair command.",
+        "Run comparison, repair, and a second comparison. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The repaired total matches the four actual tasks."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The diagnostic never changes task states to fit the bad cache."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Mutate a task while repair computes its snapshot. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Mutate a task while repair computes its snapshot.",
+      "review": "Review the agent's proposed diff: Does repair verify the source revision before replacing the cache?",
+      "stretch": "Schedule bounded background audits with counts of detected and repaired drift.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-turn-a-failure-into-a-focused-card",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Turn a failure into a focused card",
+      "concept": "Learning design",
+      "brief": "A task failed because an update used a stale revision and overwrote another tab.",
+      "explanation": "A review card should test the transferable decision behind the failure.",
+      "steps": [
+        "Create a repeatable fixture: A task failed because an update used a stale revision and overwrote another tab. Record the starting rows and relevant UI state before making the change.",
+        "Write a prompt asking where the expected revision must be checked.",
+        "Answer without looking at the incident note and compare with the fix. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The answer names the authoritative mutation boundary and conflict behavior."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The card does not merely ask for the incident's arbitrary project name."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Repeat the scenario with different entity names. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Repeat the scenario with different entity names.",
+      "review": "Review the agent's proposed diff: Does the card test reasoning rather than memorization of a patch?",
+      "stretch": "Add a counterexample where last-write-wins is a deliberate acceptable policy.",
+      "minutes": 30,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-link-learning-without-copying-secrets",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Link learning without copying secrets",
+      "concept": "Data minimization",
+      "brief": "An incident note includes a customer's email and an access token in a pasted log.",
+      "explanation": "A study artifact should preserve the debugging lesson without unnecessary private data.",
+      "steps": [
+        "Create a repeatable fixture: An incident note includes a customer's email and an access token in a pasted log. Record the starting rows and relevant UI state before making the change.",
+        "Redact sensitive values and retain structural details needed to understand the bug.",
+        "Inspect the generated card, export, and search index. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The causal sequence remains understandable after redaction."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No token or customer identifier appears in study material."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Run the card generator on a second log with a different token format. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Run the card generator on a second log with a different token format.",
+      "review": "Review the agent's proposed diff: Did the agent treat raw logs as safe reusable teaching text?",
+      "stretch": "Add a preview showing exactly which incident fields will be included.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-deduplicate-repeated-lessons",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Deduplicate repeated lessons",
+      "concept": "Content identity",
+      "brief": "Three tasks fail due to the same missing transaction boundary.",
+      "explanation": "Repeated incidents may strengthen one concept without creating indistinguishable cards.",
+      "steps": [
+        "Create a repeatable fixture: Three tasks fail due to the same missing transaction boundary. Record the starting rows and relevant UI state before making the change.",
+        "Define concept identity and let new incidents attach supporting examples.",
+        "Generate cards from all three incidents and review the result. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One canonical lesson can reference the three distinct examples."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Exact duplicate prompts do not crowd the review queue."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Edit one incident so its cause becomes genuinely different. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Edit one incident so its cause becomes genuinely different.",
+      "review": "Review the agent's proposed diff: Does deduplication preserve materially different failure mechanisms?",
+      "stretch": "Offer a merge review that compares prompts and evidence before consolidating cards.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-preserve-source-provenance",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Preserve source provenance",
+      "concept": "Traceability",
+      "brief": "Create a card from a task's failed experiment and later rename that task.",
+      "explanation": "A derived learning item needs a stable source reference independent of display text.",
+      "steps": [
+        "Create a repeatable fixture: Create a card from a task's failed experiment and later rename that task. Record the starting rows and relevant UI state before making the change.",
+        "Store task ID and evidence ID alongside a readable source label.",
+        "Rename the source and navigate back from the card. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The link reaches the same incident and its current title."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Source identity never depends on the old title string."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Archive the source project and reopen the card. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Archive the source project and reopen the card.",
+      "review": "Review the agent's proposed diff: Does the app distinguish unavailable sources from broken card content?",
+      "stretch": "Bundle a minimal source snapshot for portable study exports.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-write-falsifiable-debugging-prompts",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Write falsifiable debugging prompts",
+      "concept": "Reasoning practice",
+      "brief": "An agent fixed a retry bug by changing several unrelated timeout values.",
+      "explanation": "A useful prompt asks for an observable prediction that could disprove the diagnosis.",
+      "steps": [
+        "Create a repeatable fixture: An agent fixed a retry bug by changing several unrelated timeout values. Record the starting rows and relevant UI state before making the change.",
+        "Create a card requiring the next experiment and its expected counterexample.",
+        "Answer using the original failure fixture and then run the proposed check. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The response includes a specific observation and failure interpretation."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A vague instruction to add logging does not satisfy the rubric."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Change the fixture so the original hypothesis becomes false. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Change the fixture so the original hypothesis becomes false.",
+      "review": "Review the agent's proposed diff: Can the reviewer tell whether the learner understands causality?",
+      "stretch": "Add paired cards for competing hypotheses and the experiment separating them.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-separate-solution-from-retrieval-cue",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Separate solution from retrieval cue",
+      "concept": "Study UX",
+      "brief": "A card front contains the exact code fragment that reveals its answer.",
+      "explanation": "Retrieval practice requires withholding the solution while preserving enough context to reason.",
+      "steps": [
+        "Create a repeatable fixture: A card front contains the exact code fragment that reveals its answer. Record the starting rows and relevant UI state before making the change.",
+        "Move implementation details into the answer and keep the invariant on the front.",
+        "Study the card with the answer hidden and explain a solution aloud. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The prompt is answerable from its scenario and asks a concrete decision."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The front does not leak the decisive method name or final condition."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Have a second learner interpret the prompt without the original task. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Have a second learner interpret the prompt without the original task.",
+      "review": "Review the agent's proposed diff: Does removing the answer also remove essential context?",
+      "stretch": "Offer graduated hints that reveal one constraint at a time.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-update-a-lesson-after-correction",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Update a lesson after correction",
+      "concept": "Versioned knowledge",
+      "brief": "A study card recommends a pattern that a later incident shows is unsafe.",
+      "explanation": "Learning content needs revision history and a way to retire misleading guidance.",
+      "steps": [
+        "Create a repeatable fixture: A study card recommends a pattern that a later incident shows is unsafe. Record the starting rows and relevant UI state before making the change.",
+        "Revise the answer, record the reason, and preserve the prior version for audit.",
+        "Open the old source link and the revised card. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Current study uses the corrected explanation."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Previously learned wording is not silently presented as still authoritative."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Import an older backup containing the obsolete card version. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Import an older backup containing the obsolete card version.",
+      "review": "Review the agent's proposed diff: Does merge policy prevent old content from overwriting the correction?",
+      "stretch": "Flag learners who reviewed the obsolete version for a focused correction review.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-create-contrastive-implementation-reviews",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Create contrastive implementation reviews",
+      "concept": "Agentic review",
+      "brief": "Two agent patches fix a task count, one by atomic update and one by delayed refresh.",
+      "explanation": "Comparing plausible patches should expose the invariant each actually guarantees.",
+      "steps": [
+        "Create a repeatable fixture: Two agent patches fix a task count, one by atomic update and one by delayed refresh. Record the starting rows and relevant UI state before making the change.",
+        "Write a card presenting both approaches with the concurrent completion fixture.",
+        "Predict final counts under a controlled two-writer interleaving. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The answer identifies which patch prevents lost updates and why."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Visual freshness is not confused with durable correctness."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Run the delayed-refresh patch against the race fixture. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Run the delayed-refresh patch against the race fixture.",
+      "review": "Review the agent's proposed diff: Is the exercise comparing concrete behavior rather than stylistic preference?",
+      "stretch": "Add a third valid design that derives counts instead of caching them.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-project-milestones-measure-transfer-with-a-new-task",
+      "parentId": "effect-milestones-retrieval",
+      "title": "Measure transfer with a new task",
+      "concept": "Assessment",
+      "brief": "After reviewing a stale-edit lesson, implement revision checking for evidence updates.",
+      "explanation": "A memorized example becomes skill only when the learner can transfer its invariant.",
+      "steps": [
+        "Create a repeatable fixture: After reviewing a stale-edit lesson, implement revision checking for evidence updates. Record the starting rows and relevant UI state before making the change.",
+        "Create a small new task with changed entities and no copied solution snippet.",
+        "Implement the operation and run an unseen conflicting-write fixture. Exercise the real operation boundary as well as the rendered result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The new boundary rejects stale evidence edits while preserving drafts."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Passing the old project's test alone does not count as transfer."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Recovery evidence: Introduce a delete-between-read-and-save case in the new task. Record the resulting state and prove that a fresh valid action still works."
+        }
+      ],
+      "experiment": "Introduce a delete-between-read-and-save case in the new task.",
+      "review": "Review the agent's proposed diff: Does the learner explain both shared principles and domain-specific differences?",
+      "stretch": "Schedule a later transfer exercise using an HTTP API instead of local storage.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ],
+  "track": "Project practice"
+}

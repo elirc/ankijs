@@ -1,6 +1,6 @@
 import { db, type Card, type Deck, type ReviewLog } from "../schema";
 import { localDateStamp } from "../../lib/dates";
-import { getDeckInfo } from "../../data/curriculum";
+import { getDeckInfo } from "../../data/curriculum-catalog";
 
 import { getStudyPreferences, introductionCounts } from "./studyRepo";
 import {

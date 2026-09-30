@@ -5,7 +5,7 @@ import { Clock3, Plus, Search } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DeckCard } from "../../components/DeckCard";
 import { getDashboard } from "../../db/repos/dashboardRepo";
-import { getDeckInfo } from "../../data/curriculum";
+import { getDeckInfo } from "../../data/curriculum-catalog";
 import { CreateDeckDialog } from "./CreateDeckDialog";
 import { useNow } from "../../lib/useNow";
 

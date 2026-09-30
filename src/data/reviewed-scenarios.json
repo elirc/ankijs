@@ -1126,5 +1126,99 @@
         "check": "Keep the list in the repo (for example `docs/smoke-check.md`) and paste the results into the PR or release note. Compare what is deployed with what was merged: the commit label or changed screen should match `git log --oneline -1 origin/main`. Run the list after every deploy, including rollbacks."
       }
     ]
+  },
+  {
+    "deck": 7009,
+    "lessons": [
+      {
+        "key": "scn-model-soft-delete-email",
+        "question": "A users table has UNIQUE (email) and deletes accounts by setting deleted_at. Someone who deleted their account signs up again with the same email and gets 'Email already taken'. What should the schema use instead?",
+        "answer": "Replace the plain constraint with a partial unique index that covers only live rows: `CREATE UNIQUE INDEX users_email_active ON users (email) WHERE deleted_at IS NULL;`, then drop the old UNIQUE constraint (in PostgreSQL, `ALTER TABLE users DROP CONSTRAINT` with the name `\\d users` lists, usually `users_email_key`). Two active accounts still cannot share an email, but any number of soft-deleted rows can keep theirs. PostgreSQL 17 and SQLite both support partial indexes.",
+        "explanation": "A UNIQUE constraint compares every row, and a soft-deleted row is still a row, so it holds on to the email forever. A partial index includes only rows matching its WHERE clause, so uniqueness is enforced among `deleted_at IS NULL` rows only. This is one of soft delete's hidden costs: every rule and every query must now say which rows count as live.",
+        "check": "In sqlite3, create the table with the partial index, insert ana@x.com, set its deleted_at, and insert ana@x.com again: it succeeds. A third, live ana@x.com fails with \"UNIQUE constraint failed: users.email\". Also check that the signup code's \"email exists?\" lookup adds `AND deleted_at IS NULL`, or it will still say taken."
+      },
+      {
+        "key": "scn-model-status-values",
+        "question": "A free-text tasks.status column now holds 'done', 'Done', 'DONE ' and 'completed', and the Done filter misses most of them. How do you stop new variants when the existing rows are already messy?",
+        "answer": "Clean first, then constrain, in one migration: `UPDATE tasks SET status = 'done' WHERE lower(trim(status)) IN ('done', 'completed');` then, in PostgreSQL, `ALTER TABLE tasks ADD CONSTRAINT tasks_status_valid CHECK (status IN ('open', 'done'));`. From then on the database rejects any other spelling, whichever code writes it.",
+        "explanation": "In PostgreSQL, adding a CHECK to an existing table scans the current rows and fails if any row breaks it, which is why the cleanup comes first. API validation covered only one code path; imports, scripts and old app versions wrote the variants. A CHECK list makes the allowed values part of the schema. If the list changes often or needs labels, use a `task_statuses` table and a foreign key instead.",
+        "check": "Before the migration, run `SELECT status, count(*) FROM tasks GROUP BY status;` and confirm only 'open' and 'done' remain. Afterwards, in a test database, run `UPDATE tasks SET status = 'Done' WHERE id = 1;` and expect a check-constraint error. SQLite has no ALTER TABLE ... ADD CONSTRAINT, so there the CHECK must be declared in CREATE TABLE (rebuild the table)."
+      },
+      {
+        "key": "scn-model-json-line-items",
+        "question": "An orders table keeps its line items in a JSON column like [{\"sku\":\"A1\",\"qty\":2}]. Finance wants units sold per SKU last month, and a bug saved a qty of -3 unnoticed. What schema would serve this better?",
+        "answer": "Move line items into a child table: `order_items (order_id REFERENCES orders (id), sku, qty integer NOT NULL CHECK (qty > 0), unit_price_cents ...)` with an index on `order_id`. The report becomes a plain `GROUP BY sku` over order_items joined to orders, and a negative qty is rejected on insert. Keep JSON for data you always read and write whole and never filter or constrain, such as a raw webhook payload.",
+        "explanation": "Inside one JSON value an item cannot have a foreign key, and giving each item a type, NOT NULL or CHECK rule takes awkward JSON expressions instead of plain column definitions, so bad items get in silently, and every report must first expand the array into rows (PostgreSQL has `jsonb_array_elements` for that). Rows in a child table are what SQL is built to filter, join, sum, index and constrain.",
+        "check": "Rehearse the backfill in a test database. In SQLite, `json_each(orders.items)` expands each array into rows you can INSERT into order_items; the -3 item makes that INSERT fail on the CHECK, so fix or exclude it first. Compare `SELECT sku, sum(qty) FROM order_items GROUP BY sku` with the JSON totals before dropping the old column."
+      },
+      {
+        "key": "scn-model-orphan-fk",
+        "question": "tasks.project_id was created as a plain integer with no foreign key. A PostgreSQL migration adding REFERENCES projects (id) now fails, because some tasks point at projects that were deleted. What do you do?",
+        "answer": "Find the orphans, decide what they mean, then add the constraint. `SELECT t.id, t.project_id FROM tasks t LEFT JOIN projects p ON p.id = t.project_id WHERE p.id IS NULL AND t.project_id IS NOT NULL;` lists them. Delete them, move them to an \"Unsorted\" project, or set project_id to NULL if the column allows it. Then run `ALTER TABLE tasks ADD CONSTRAINT tasks_project_fk FOREIGN KEY (project_id) REFERENCES projects (id);` and index project_id.",
+        "explanation": "Adding a foreign key makes PostgreSQL scan the existing rows and fail if any row has no matching parent, so the data must be valid first. The orphans exist because nothing ever checked the link, so deleting a project left its tasks behind. Once the constraint exists, the database blocks new orphans. On a big table, `NOT VALID` plus a later `VALIDATE CONSTRAINT` defers the scan, but the orphans still have to be fixed.",
+        "check": "Run the LEFT JOIN query and expect zero rows before the migration. Afterwards, in a test database, insert a task with project_id 999999 and try deleting a project that still has tasks; both should fail with a foreign-key violation."
+      },
+      {
+        "key": "scn-model-text-dates",
+        "question": "A tasks table stores due dates as text like '3/14/2026'. Sorting by due_at puts '10/1/2026' before '3/14/2026', and a 'due this week' filter returns the wrong rows. What should the column be?",
+        "answer": "A real date type: `due_on date` in PostgreSQL, or `timestamptz` if the time of day matters. Add the new column, fill it by converting the old text with a format pattern (PostgreSQL: `to_date(due_at, 'MM/DD/YYYY')`), confirm every old value got a date, then move the code over. In SQLite, which has no date type, store ISO 8601 text such as '2026-03-14', which sorts correctly as text.",
+        "explanation": "Text compares character by character, so the '1' of '10/1' sorts before the '3' of '3/14', and range filters compare strings, not days. A date column orders and compares by the calendar, only holds real dates, and supports date arithmetic. ISO 8601 text orders correctly because the largest unit comes first and every part has a fixed width.",
+        "check": "In sqlite3, `SELECT d FROM t ORDER BY d` over '3/14/2026' and '10/1/2026' returns '10/1/2026' first; the same dates written '2026-03-14' and '2026-10-01' come back in calendar order. After the PostgreSQL backfill, `SELECT count(*) FROM tasks WHERE due_at IS NOT NULL AND due_on IS NULL` should return 0."
+      },
+      {
+        "key": "scn-model-seed-rerun",
+        "question": "A dev setup script inserts the roles 'admin' and 'member'. A teammate ran `npm run seed` twice, and the role dropdown now lists every role twice. How should the seed and the roles table change?",
+        "answer": "Make the table reject duplicates and the seed skip existing rows. Delete the duplicates, add `UNIQUE (name)` to roles, and write the seed as `INSERT INTO roles (name) VALUES ('admin'), ('member') ON CONFLICT (name) DO NOTHING;`. Running it once or ten times now leaves the same two rows. The statement works in PostgreSQL and in SQLite 3.24 or later.",
+        "explanation": "A seed loads the reference data the app needs to work, and it is re-run on new laptops, CI databases and after resets, so it must be idempotent: the same result however often it runs. A plain INSERT adds rows every time. Keep fake demo users and sample notes in a separate dev-only script; a production seed holds only real reference data such as roles and statuses.",
+        "check": "Run the seed twice against a fresh database, then `SELECT name, count(*) FROM roles GROUP BY name` should show each role with a count of 1. A CI step that seeds twice in a row catches a non-idempotent seed before a teammate does."
+      }
+    ]
+  },
+  {
+    "deck": 7010,
+    "lessons": [
+      {
+        "key": "scn-perf-row-fetches",
+        "question": "A task list renders 50 `<TaskRow>`s, and each row's `useEffect` fetches `/api/users/${task.ownerId}` to show the owner's name. The Network panel shows 50 user requests, many for the same user. What should change?",
+        "answer": "Stop fetching per row. Have the list endpoint return what the rows display, for example join users in the tasks query and include `ownerName`, or fetch the owners once in the parent (`GET /api/users?ids=3,8,12`) and pass each row its owner. The page then makes one or two requests instead of 51, and `TaskRow` just renders props.",
+        "explanation": "This is the N+1 problem moved into the browser: one request for the list, then one per row, each with its own HTTP overhead and each starting only when its component mounts. With 20 distinct owners among 50 tasks, a React 19 test counted 50 requests for 20 distinct URLs, so 30 fetched someone already fetched. In development, StrictMode runs each effect twice, doubling the count again.",
+        "check": "Reload with the Network panel filtered to `/api/users`: before the fix there is one request per row, after it none or one. A `Server-Timing` query count on `GET /api/tasks` should stay the same when the page size grows from 20 to 50."
+      },
+      {
+        "key": "scn-perf-load-more-duplicates",
+        "question": "A newest-first feed appends each \"Load more\" page with `setTasks(prev => [...prev, ...page])`. After someone adds a task, the next page repeats a task already shown, and React warns about duplicate keys. Why?",
+        "answer": "The new task pushed every row down one place, so the next page, fetched by position (such as OFFSET 20), starts with the row that ended the previous page. Merge by id when appending: skip items whose id is already in the list. Also disable \"Load more\" while a page is loading, so a double tap can't append the same page twice.",
+        "explanation": "The server decides page boundaries when each request runs, not when the first page was shown, and blind appending assumes nothing changed in between. In a test with pages of 3, adding task 11 after page one gave `10 9 8 8 7 6`; merging by id gave `10 9 8 7 6`, and React logged \"Encountered two children with the same key\" for the first list. Merging removes repeats; asking for rows after the last id shown also stops rows being skipped after deletes.",
+        "check": "In a test, load page one, insert a task, load the next page, and assert the ids are unique: `new Set(ids).size === ids.length`. In the browser, the duplicate-key warning should be gone from the Console, and double-tapping \"Load more\" should send a single request in the Network panel."
+      },
+      {
+        "key": "scn-perf-exact-count",
+        "question": "An orders list shows \"Page 1 of 4,210\". `Server-Timing` on `GET /api/orders` reports `count;dur=1150` next to `rows;dur=4`, and users only ever click Next. What should the endpoint do instead?",
+        "answer": "Drop the exact total from the list request. Fetch `LIMIT 21` for a page of 20 and return `hasMore`, and show Next or \"Load more\" instead of \"Page 1 of 4,210\". If the UI really needs a size, show an approximate figure (for a whole table, PostgreSQL's estimate in `pg_class.reltuples`) or load the exact count in a separate, cached request that doesn't hold up the page.",
+        "explanation": "An exact `COUNT(*)` has to visit every matching row. The PostgreSQL wiki explains that under MVCC it must check each row's visibility, so the cost grows with the table, while fetching 21 rows stops early. In SQLite, on 2 million orders with an index on `(status, id)`, counting the 1,333,333 paid orders took over half a second in two separate runs, while the 21-row page took under 2 ms.",
+        "check": "Compare `Server-Timing` before and after: the count entry is gone, and the handler's time should stay flat as orders are added. Test the edge case: with exactly 40 matching orders, page 2 returns 20 rows and `hasMore: false`."
+      },
+      {
+        "key": "scn-perf-composite-order",
+        "question": "`tasks` has an index on `(owner_id, due_date)`. A new admin page lists all overdue tasks with `WHERE due_date < ? ORDER BY due_date LIMIT 50` and is slow. Why doesn't the index help, and what do you add?",
+        "answer": "The index is sorted by `owner_id` first and by `due_date` only within each owner, so a query with no `owner_id` condition can't jump to \"due before X\": those dates are scattered through the whole index. Add an index that leads with the filtered column: `CREATE INDEX tasks_due ON tasks (due_date)`. Keep the old one, because owner-scoped queries still use it.",
+        "explanation": "A multicolumn B-tree narrows its search with equality on the leading columns plus a range on the next one. The PostgreSQL 17 docs say that without a condition on the first column the entire index would have to be scanned, so the planner usually reads the table instead. PostgreSQL 18 added B-tree skip scan, which helps in some such cases. SQLite can skip-scan after `ANALYZE` when `owner_id` has few distinct values, but it still sorts afterwards; an index led by `due_date` avoids both.",
+        "check": "In SQLite (before any `ANALYZE`), `EXPLAIN QUERY PLAN` for the query showed `SCAN tasks` and `USE TEMP B-TREE FOR ORDER BY`; after adding `tasks_due` it showed `SEARCH tasks USING INDEX tasks_due (due_date<?)` with no temp sort. In PostgreSQL, run `EXPLAIN` and look for an index scan on `tasks_due` instead of a Seq Scan followed by a Sort."
+      },
+      {
+        "key": "scn-perf-hero-image",
+        "question": "A product page's hero is a 4000×3000 JPEG of 3.1 MB, shown 400 CSS pixels wide on phones. On mobile data it appears last, and the text below jumps down when it loads. What do you change?",
+        "answer": "Serve sizes that match the display: export a few widths (say 480, 800 and 1600 px) and list them in `srcset` with `w` descriptors plus a `sizes` attribute, so a phone downloads a small file. Use a modern format such as WebP or AVIF where you can. Add `width=\"1600\" height=\"1200\"` (the image's ratio) or CSS `aspect-ratio` so the browser reserves the space before the image arrives.",
+        "explanation": "With `srcset` and `sizes`, the browser works out how wide the slot is and loads the listed file that fits it, taking screen density into account (MDN, Responsive images), so a 400-px slot doesn't pull a 4000-px file. Modern browsers derive an image's aspect ratio from its `width` and `height` attributes before it loads (web.dev, Optimize CLS), so the text keeps its place.",
+        "check": "In DevTools device mode with a phone size, filter the Network panel to Img: the hero request should be one of the smaller files, far below 3.1 MB. Record in the Performance panel while loading and check that no layout shift is reported when the image appears."
+      },
+      {
+        "key": "scn-perf-whole-library",
+        "question": "`vite build` shows the main chunk grew by about 70 kB after a teammate added `import _ from 'lodash'` just to call `_.debounce`. How do you get the helper without the whole library?",
+        "answer": "Import only the function: `import debounce from 'lodash/debounce'` (a one-function file), or switch to `lodash-es` and write `import { debounce } from 'lodash-es'`, which the bundler can tree-shake. For one small helper, writing your own 8-line debounce is also fine. Rebuild and compare the chunk size.",
+        "explanation": "The `lodash` entry point is one big CommonJS file, so the bundler can't drop the parts you don't use; even `import { debounce } from 'lodash'` pulled in the whole library. In one test build with Rolldown 1.1 (the bundler inside Vite 8) and lodash 4, minified, the default and named imports both came to about 70 kB (25 kB gzipped), `lodash/debounce` to 3.2 kB and `lodash-es` to 2.2 kB. Exact sizes vary by version and bundler.",
+        "check": "Run `vite build` before and after the change and compare the size and gzip size printed for the main `index-<hash>.js` chunk. Then check that search still waits for the user to stop typing, so the smaller import behaves the same."
+      }
+    ]
   }
 ]

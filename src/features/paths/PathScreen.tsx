@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { curriculum, type Track } from "../../data/curriculum";
+import { curriculum, type Track } from "../../data/curriculum-catalog";
 import { getDashboard } from "../../db/repos/dashboardRepo";
 import { saveLearningSettings, studyLink } from "../../db/repos/learningRepo";
 import { loadStudy } from "../../db/repos/studyRepo";

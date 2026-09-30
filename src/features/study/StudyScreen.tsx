@@ -33,7 +33,7 @@ import { rate } from "../../srs/scheduler";
 import { RelatedPractice } from "../../components/RelatedPractice";
 import { RatingBar } from "./RatingBar";
 import { DOTNET_TRACK } from "../../data/dotnet-path";
-import { curriculum, getDeckInfo, type Track } from "../../data/curriculum";
+import { curriculum, getDeckInfo, type Track } from "../../data/curriculum-catalog";
 
 type StudyData = Awaited<ReturnType<typeof loadStudy>>;
 // Any track in the curriculum can be studied as a focused session.

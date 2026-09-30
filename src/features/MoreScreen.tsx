@@ -6,6 +6,7 @@ export function MoreScreen() {
       <nav className="more-grid" aria-label="More tools">
         {[
           ["/workshop", "Guided workshop"],
+          ["/effect-lab", "Effect & agentic CRUD"],
           ["/practice", "Engineering practice"],
           ["/paths", "Learning paths"],
           ["/library", "Find cards"],

@@ -1,0 +1,2051 @@
+{
+  "id": "customer-crm",
+  "title": "Customer CRM",
+  "kind": "Standalone app",
+  "summary": "Manage companies, contacts, deals, duplicate records, and reliable customer activity history.",
+  "outcome": "A searchable CRM with relationship-aware CRUD, duplicate resolution, owner-scoped access, and tested data portability.",
+  "prerequisites": "Project tracker, related milestones, and verified-session CRUD. Create a separate React, Effect API, and PostgreSQL repository.",
+  "model": [
+    "Company: id, ownerId, name, domain, archivedAt. Contact: id, companyId, name, email, revision.",
+    "Deal: id, companyId, contactId, stage, valueMinorUnits, currency, revision. Activity: actor, subject, action, time.",
+    "Store optional values deliberately. An unknown email is different from a known empty string; money requires an explicit currency and precision policy."
+  ],
+  "boundaries": "React editors → company/contact/deal services → owner-scoped repositories. Relationship changes and their history share a transaction.",
+  "milestones": [
+    {
+      "id": "effect-crm-directory",
+      "title": "Create a company and contact directory",
+      "concept": "Schema · related CRUD",
+      "brief": "Ship labeled company and contact editors with optional fields, archived states, and clear relationship validation.",
+      "explanation": "A form model is not automatically a persistence model. Normalize display input at a known boundary, preserve meaningful user text, and validate relationships inside the service. Decide whether email and domain are identifiers, hints, or merely attributes; treating every shared domain as one company can accidentally merge unrelated customers.",
+      "steps": [
+        "Define company and contact creation examples, including unknown email, a missing company, and an archived parent. Write the field normalization rules.",
+        "Implement owner-scoped list/detail/create/update/archive operations and forms. Keep a contact's identity stable when its company changes.",
+        "Test direct API calls, failed writes retaining drafts, reload persistence, and contacts whose parent is archived."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Company/contact CRUD persists and enforces declared relationships."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Optional values keep their documented meaning across form and API."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Another owner cannot read or modify the directory."
+        }
+      ],
+      "experiment": "Create two companies sharing a domain and a contact without an email. Verify your schema does not invent uniqueness rules the product never specified.",
+      "review": "Ask the agent to trace one submitted field through normalization, decoding, repository, and response. Review database constraints alongside UI messages.",
+      "stretch": "Add a contact move operation with an activity entry that preserves the original relationship in history.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-crm-pipeline",
+      "title": "Model deal stages and amounts",
+      "concept": "Domain transitions · precise values",
+      "brief": "Add deals with a controlled stage workflow and money values that survive round trips without floating-point surprises.",
+      "explanation": "A pipeline stage is a business state, not an arbitrary label. Specify allowed transitions and the effect of closing or reopening a deal. Represent amounts using a declared integer-minor-unit or decimal policy and keep currency explicit. Do not aggregate amounts from different currencies as though they were interchangeable.",
+      "steps": [
+        "Write a stage transition table and amount fixtures such as zero, a fractional input, and two currencies. Define required fields for closing a deal.",
+        "Implement transition commands and amount decoding at the service boundary. Keep rejected transitions from writing activity events.",
+        "Build a pipeline list with accessible move controls and a conflict response for stale revisions. Verify formatting independently of stored arithmetic."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only allowed deal transitions commit."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Amounts and currencies round-trip according to the precision policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Stale moves preserve the user's intended action for review."
+        }
+      ],
+      "experiment": "Submit a close action from two tabs with different amounts and the same revision. Inspect the winning record and ensure the losing draft remains visible.",
+      "review": "Check that display formatting is not reused as a database value. Require the agent to explain why its numeric representation matches the supported currencies.",
+      "stretch": "Add stage duration metrics using recorded transition times rather than the current record's updatedAt field.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-crm-deduplicate",
+      "title": "Merge duplicate contacts deliberately",
+      "concept": "Merge policy · transactional reassignment",
+      "brief": "Preview and confirm a duplicate-contact merge while preserving linked deals and a record of the decision.",
+      "explanation": "A suspected duplicate is a suggestion, not proof. Define field conflict resolution, the surviving identity, and reassignment of relationships before committing a merge. Search-based similarity should never silently combine people. A merge transaction must protect the source revisions so its preview cannot overwrite intervening edits.",
+      "steps": [
+        "Create duplicate candidates with conflicting names, emails, and linked deals. Design a field-by-field preview and a stable surviving ID.",
+        "Reassign allowed relationships and archive the source record in one transaction, recording who approved the merge. Revalidate revisions at confirmation.",
+        "Test a moved deal, a source edited after preview, an inaccessible candidate, and a failure after the first relationship update."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Merge decisions are explicit and linked records retain valid ownership."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A failed merge leaves both contacts and relationships unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Stale previews are rejected or refreshed before applying changes."
+        }
+      ],
+      "experiment": "Preview a merge, attach a new deal to the source, then confirm. Verify the transaction either includes the new relationship safely or requests a new preview.",
+      "review": "Explain which information is retained, replaced, or archived. A count of merged rows alone cannot establish that customer context was preserved.",
+      "stretch": "Design a reversible merge receipt and identify changes that make automatic undo unsafe.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-crm-search",
+      "title": "Search and paginate a growing directory",
+      "concept": "Query design · stable cursors",
+      "brief": "Find contacts across companies without leaking other owners' data or issuing a query for every result row.",
+      "explanation": "Search semantics need examples: prefix versus substring, case folding, accents, and empty input. Apply authorization before returning totals or suggestions. Stable pagination requires a deterministic ordering and tie-breaker; a cursor is part of the API contract and must be validated like any other unknown input.",
+      "steps": [
+        "Define realistic search fixtures with repeated names, accents, archived records, and two owners. Specify sort order and page-size limits.",
+        "Implement a bounded query with company display data and a stable cursor. Inspect the query plan on representative synthetic records.",
+        "Test filter changes between requests, malformed cursors, equal sort values, and insertions while paging. Record database query count."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Search behavior matches the documented text rules."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Results, counts, and suggestions stay inside the caller's scope."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Pagination and query count remain predictable as data grows."
+        }
+      ],
+      "experiment": "Give an outsider a name fragment that appears only in another owner's records. Verify that result counts and autocomplete do not confirm the hidden contact's existence.",
+      "review": "Measure before proposing an index. Include the filter predicates and sort direction in the reasoning so the chosen index actually serves the query.",
+      "stretch": "Add saved searches with validated filter schemas and a migration policy for renamed fields.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-crm-activities",
+      "title": "Build an activity feed with provenance",
+      "concept": "Append-only events · actor context",
+      "brief": "Show meaningful contact and deal changes in one readable timeline with reliable actor and event ordering.",
+      "explanation": "An activity feed can be generated from accepted domain events or inferred from current rows. Inference loses history, so record the facts needed to explain important changes at commit time. Keep the event's display text separate from its structured fields so wording can improve without rewriting historical meaning.",
+      "steps": [
+        "Choose events for contact moves, deal transitions, merges, and archival. Define actor identity, subject references, and visibility rules.",
+        "Commit events with their corresponding mutations and render a paginated feed. Handle actors or subjects that later become unavailable.",
+        "Test failed commands, repeated requests, identical timestamps, and an archived company. Verify ordering with an explicit secondary key."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only committed changes appear as successful activity."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Each event identifies the verified actor and affected subject."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Deleted or archived references do not break the timeline."
+        }
+      ],
+      "experiment": "Retry a command after its response is lost. Confirm the same business action does not create two misleading activity events.",
+      "review": "Separate a useful activity feed from compliance claims. Document what events are intentionally omitted and which roles may read historical details.",
+      "stretch": "Add a filtered company timeline without duplicating the same event into multiple stores.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-crm-portability",
+      "title": "Export, archive, and restore customer data",
+      "concept": "Data lifecycle · recovery contracts",
+      "brief": "Finish the CRM with a scoped export and a tested restore that preserves relationships and activity meaning.",
+      "explanation": "Data portability is a workflow with access control, a format contract, and a recovery procedure. Define which archived rows and activity references are included. Deletion, archival, and redaction are distinct product choices; choose a policy with stakeholders instead of assuming one button can satisfy every retention requirement.",
+      "steps": [
+        "Create a small export containing related companies, contacts, deals, currencies, and activities. Document identifiers and unsupported format versions.",
+        "Authorize and bound the export, then restore into an independent empty database. Verify relationships before making imported data visible.",
+        "Rehearse an archival or redaction request under a stated sample policy and inspect search, exports, caches, and timeline rendering afterward."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Exports contain only authorized records and required relationships."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A restored CRM supports the same create/search/deal workflow."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Lifecycle actions behave consistently across lists, feeds, and exports."
+        }
+      ],
+      "experiment": "Remove one referenced contact from a valid export fixture. Verify restoration rejects or explicitly resolves the orphan instead of silently dropping the deal.",
+      "review": "Record exact restored counts and a complete user journey. Explain remaining retention decisions without presenting a demo policy as legal advice.",
+      "stretch": "Add a versioned export contract test to CI and prove it detects a missing relationship field.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-email-optional",
+      "parentId": "effect-crm-directory",
+      "title": "Preserve absent email",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Add Ada and Bo without addresses.",
+      "explanation": "Missing email cannot identify a contact. Ada and Bo need separate stable IDs even when their optional address columns both contain no value. This CRM allows shared mailboxes: a matching known address is a review candidate, not a uniqueness violation or proof of identical people. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Normalize empty email into absence and flag matching known addresses for duplicate review without automatically rejecting or merging contacts.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both contacts save."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Neither receives fabricated email."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Matching known addresses are flagged for review while distinct contacts remain permitted."
+        }
+      ],
+      "experiment": "Race whitespace and null submissions. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Document internationalized address normalization. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-company-archive",
+      "parentId": "effect-crm-directory",
+      "title": "Explain archived company selection",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Select Cedar before another user archives it.",
+      "explanation": "New contacts cannot join an archived company. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Recheck company eligibility when saving. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Save reports archived parent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Draft name survives."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No dangling relationship appears."
+        }
+      ],
+      "experiment": "Archive between dropdown selection and submit. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Offer an authorized restore route. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-unicode-name",
+      "parentId": "effect-crm-directory",
+      "title": "Keep names as entered",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Create two José contacts with different identifiers.",
+      "explanation": "Display names need not be unique or ASCII. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Separate display-name validation from contact identity. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both people remain distinct."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Accents survive reload."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Search preserves original display."
+        }
+      ],
+      "experiment": "Paste a combining-accent form then edit. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Compare locale-aware matching rules. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-contact-move",
+      "parentId": "effect-crm-directory",
+      "title": "Move contacts across companies",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Move Lee from Cedar to Birch.",
+      "explanation": "A contact transfer must preserve activity attribution. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Implement a revision-aware company reassignment command. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Lee belongs to Birch."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Earlier activity retains historical company."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Stale reassignment conflicts."
+        }
+      ],
+      "experiment": "Race reassignment with company deletion. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Add a transfer preview. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-field-error-focus",
+      "parentId": "effect-crm-directory",
+      "title": "Focus the failed contact field",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Submit invalid phone and email using keyboard only.",
+      "explanation": "Validation must leave keyboard users able to recover. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Associate errors and focus the first invalid field. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Error names identify fields."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Corrected input clears its error."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry retains other values."
+        }
+      ],
+      "experiment": "Reject storage after validation passes. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Test translated error wrapping. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-phone-extension",
+      "parentId": "effect-crm-directory",
+      "title": "Represent phone extensions explicitly",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Save +1 202 555 0148 extension 203.",
+      "explanation": "Telephone display formatting cannot erase extension data. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Model normalized number and extension separately. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Extension survives editing."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Display stays readable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Invalid extension has a field error."
+        }
+      ],
+      "experiment": "Import an extension containing letters. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Add several labeled phone numbers. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-delete-references",
+      "parentId": "effect-crm-directory",
+      "title": "Handle referenced contact deletion",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Delete contact C7 referenced by two open deals.",
+      "explanation": "Deletion must follow a declared deal-reference policy. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Return a typed dependency conflict with permitted recovery. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Deals remain readable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Contact survives rejection."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Conflict lists authorized dependencies."
+        }
+      ],
+      "experiment": "Hide one dependent deal from the requester. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Implement reassignment before deletion. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-tenant-company",
+      "parentId": "effect-crm-directory",
+      "title": "Reject foreign company identifiers",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Post workspace A contact with workspace B company ID.",
+      "explanation": "Contact ownership cannot be inferred from a supplied parent. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Resolve parent within verified workspace scope. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Request cannot mutate B."
+        },
+        {
+          "id": "criterion-2",
+          "label": "A has no orphan contact."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Response reveals no company name."
+        }
+      ],
+      "experiment": "Use a valid foreign ID from a stale cache. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Add repository isolation assertions. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-form-double-submit",
+      "parentId": "effect-crm-directory",
+      "title": "Deduplicate contact creation attempts",
+      "concept": "Contact commands · identity boundaries",
+      "brief": "Double-click Save for contact Mina under slow storage.",
+      "explanation": "One user intent must not create two people. Directory commands combine field interpretation with relationship rules. Decode user input before constructing a command, and enforce identity and ownership in storage so another client cannot bypass the form.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Carry a stable creation command identity across retries. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One contact row exists."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Both responses identify it."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Changed payload cannot reuse identity."
+        }
+      ],
+      "experiment": "Lose the first successful response. Record persisted state and a recovery action.",
+      "review": "Inspect the agent diff for assumptions hidden in input coercion. Explain which rule belongs to decoding, authorization, or persistence.",
+      "stretch": "Preserve draft identity across reload. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-minor-units",
+      "parentId": "effect-crm-pipeline",
+      "title": "Calculate decimal deal amounts",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Enter three USD line items of 0.10.",
+      "explanation": "Binary floating-point must not change stored deal value. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Decode decimal strings into bounded minor units. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Total equals 30 cents."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Reload shows 0.30."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Excess precision is rejected."
+        }
+      ],
+      "experiment": "Submit 0.001 through the API. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Support currencies with different minor units. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-currency-mismatch",
+      "parentId": "effect-crm-pipeline",
+      "title": "Keep currency totals separate",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Create USD 100 and EUR 100 deals.",
+      "explanation": "Unlike currencies cannot share an unlabeled aggregate. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Group pipeline totals by currency. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Totals show separate currencies."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No ambiguous 200 appears."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Filters retain currency labels."
+        }
+      ],
+      "experiment": "Change one deal currency during aggregation. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Introduce dated conversion quotes. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-stage-required",
+      "parentId": "effect-crm-pipeline",
+      "title": "Require evidence before closing",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Move empty-contract deal D4 into Won.",
+      "explanation": "Won deals require the agreed closing fields. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Validate transition-specific requirements in the service. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Transition is rejected."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Earlier stage remains."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Contract field receives guidance."
+        }
+      ],
+      "experiment": "Bypass the kanban form with direct request. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Version closing policy rules. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-drag-conflict",
+      "parentId": "effect-crm-pipeline",
+      "title": "Recover a stale kanban move",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Two tabs move revision 8 to Won and Lost.",
+      "explanation": "A stale board cannot overwrite a newer stage. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Compare revisions and render the authoritative result. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One transition commits."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Losing tab explains conflict."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Dragged card is not duplicated."
+        }
+      ],
+      "experiment": "Delay successful response behind conflicting response. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Offer explicit user retry. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-probability-bounds",
+      "parentId": "effect-crm-pipeline",
+      "title": "Validate weighted pipeline inputs",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Set probability to -1 then 101 percent.",
+      "explanation": "Probability is bounded independently of display percentage. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Decode percentage and calculate deterministic weighted totals. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Out-of-range values fail."
+        },
+        {
+          "id": "criterion-2",
+          "label": "50 percent of 120 equals 60."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Original amount stays unchanged."
+        }
+      ],
+      "experiment": "Submit numeric strings with trailing junk. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Document rounding across large portfolios. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-terminal-reopen",
+      "parentId": "effect-crm-pipeline",
+      "title": "Record reopened won deals",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Reopen deal D9 after a mistaken win.",
+      "explanation": "Reopening must preserve evidence of the original close. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use a reasoned transition with historical close data. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Current stage becomes open."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Prior win remains auditable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Empty reason is rejected."
+        }
+      ],
+      "experiment": "Retry after transition commit. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Add a reopen permission. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-owner-deactivation",
+      "parentId": "effect-crm-pipeline",
+      "title": "Reassign inactive deal owners",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Deactivate owner U3 with four open deals.",
+      "explanation": "Active deals cannot silently disappear with deactivated owners. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Expose unassigned work and an authorized reassignment command. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All four deals remain visible."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Former owner cannot edit."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Assignment history identifies actors."
+        }
+      ],
+      "experiment": "Deactivate during an owner picker session. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Build bulk reassignment preview. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-negative-refund",
+      "parentId": "effect-crm-pipeline",
+      "title": "Separate refunds from deal amount",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Request a partial refund on won deal D12.",
+      "explanation": "A correction must not corrupt the booked deal value. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Represent adjustments separately from original amount. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Booked value remains intact."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Net value includes refund."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Excess refund is rejected."
+        }
+      ],
+      "experiment": "Race two refunds exceeding the deal value. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Add adjustment reversal evidence. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-board-keyboard",
+      "parentId": "effect-crm-pipeline",
+      "title": "Move cards without dragging",
+      "concept": "Deal transitions · money modeling",
+      "brief": "Move deal D2 using a keyboard action menu.",
+      "explanation": "Stage changes must be available without pointer gestures. A pipeline is a set of business transitions rather than freely editable status text. Separate amount representation, transition policy, and transaction boundaries so reporting remains trustworthy under concurrent changes.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Provide labeled destination choices and status feedback. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Keyboard completes the move."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Focus stays predictable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Rejection announces the current stage."
+        }
+      ],
+      "experiment": "Remove destination permission while menu is open. Record persisted state and a recovery action.",
+      "review": "Ask the agent to demonstrate the database invariant with actual rows. A successful drag animation is insufficient evidence of a committed business transition.",
+      "stretch": "Test touch and zoomed layouts. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-email-collision",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Distinguish shared mailbox contacts",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Compare Pat and Sam using team@example.test.",
+      "explanation": "A shared address does not prove two people are identical. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Mark mailbox matches as candidates requiring review. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both identities remain until approval."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Names appear in preview."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No automatic merge occurs."
+        }
+      ],
+      "experiment": "Import a third mailbox-sharing person. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Add confidence reasons without auto-merging. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-winner-fields",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Choose surviving field values",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Compare Cedar contacts with different job titles.",
+      "explanation": "A merge must not silently discard conflicting contact fields. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Collect explicit choices for each conflicting field. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Selected title survives."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unchosen value has provenance."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Missing choices block commit."
+        }
+      ],
+      "experiment": "Change a title after preview. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Add a side-by-side accessible diff. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-deal-links",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Move deal relationships exactly once",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Both candidate contacts reference deal D5.",
+      "explanation": "Merged identities must not duplicate deal participation. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Deduplicate join rows during transactional merge. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "D5 has one surviving link."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Other deals remain linked."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Source identities resolve consistently."
+        }
+      ],
+      "experiment": "Fail after moving half the references. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Add multi-role relationship handling. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-cross-workspace-merge",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Prevent cross-workspace consolidation",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Supply one candidate from another workspace.",
+      "explanation": "A merge cannot bridge tenant ownership. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Scope candidate reads and merge writes together. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Foreign candidate is rejected."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No references cross workspaces."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Error omits private fields."
+        }
+      ],
+      "experiment": "Forge winner and loser IDs in the request. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Audit tenant predicates in generated SQL. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-preview-revision",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Expire outdated merge previews",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Edit loser L2 after merge preview opens.",
+      "explanation": "Approval applies only to the records actually reviewed. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Bind confirmation to both revisions. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Stale confirmation fails."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New fields are not lost."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Updated preview explains the difference."
+        }
+      ],
+      "experiment": "Race a phone edit with confirmation. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Add explicit preview expiration. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-merge-redirect",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Resolve saved links after a merge",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Bookmark loser C8 then merge into C3.",
+      "explanation": "Historical links should resolve without recreating deleted identity. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Store a bounded canonical-identity redirect. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old link opens C3."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Redirect retains merge context."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Redirect cycles are impossible."
+        }
+      ],
+      "experiment": "Merge C3 into another record afterward. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Compress long redirect chains safely. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-merge-concurrency",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Serialize overlapping contact merges",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Race C2 into C1 against C2 into C4.",
+      "explanation": "One contact cannot disappear into two winners concurrently. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Protect merge participants in a consistent lock order. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One canonical outcome exists."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Losing command reports conflict."
+        },
+        {
+          "id": "criterion-3",
+          "label": "References remain valid."
+        }
+      ],
+      "experiment": "Reverse lock acquisition in a test branch. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Measure deadlock recovery behavior. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-merge-undo",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Define a realistic merge reversal",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Merge contacts then add a new deal link.",
+      "explanation": "Undo cannot invent provenance that was never stored. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Record an inverse plan with post-merge conflict checks. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Safe reversal restores prior links."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New link requires a decision."
+        },
+        {
+          "id": "criterion-3",
+          "label": "History remains intact."
+        }
+      ],
+      "experiment": "Edit the winner before undo. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Limit reversible operations by retention. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-merge-agent-review",
+      "parentId": "effect-crm-deduplicate",
+      "title": "Catch a destructive generated merge",
+      "concept": "Merge planning · relationship integrity",
+      "brief": "Review a patch deleting losers before moving notes.",
+      "explanation": "An agent change must preserve relationships beyond the visible page. A merge is a reviewed transformation of identities and references. Preview conflicts before committing, protect the chosen revisions, and retain enough provenance to explain why records were combined.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Create a fixture covering hidden note and tag tables. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Regression exposes note loss."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Corrected transaction preserves tags."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Diff explains deletion order."
+        }
+      ],
+      "experiment": "Force note-move failure before delete. Record persisted state and a recovery action.",
+      "review": "Review every foreign key affected by the merge. Ask which relationships are moved, combined, retained as history, or deliberately rejected.",
+      "stretch": "Write a merge dependency checklist. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-cursor-ties",
+      "parentId": "effect-crm-search",
+      "title": "Page contacts with equal names",
+      "concept": "Search queries · stable pagination",
+      "brief": "Create twelve contacts named Alex across three pages.",
+      "explanation": "Pagination requires a stable tie-breaker. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Order by normalized name and stable identifier. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every contact appears once."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repeated paging is stable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Back navigation preserves filters."
+        }
+      ],
+      "experiment": "Insert another Alex between page requests. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Document snapshot versus live-list semantics. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-search-race",
+      "parentId": "effect-crm-search",
+      "title": "Discard superseded search responses",
+      "concept": "Search queries · stable pagination",
+      "brief": "Type Cedar then Birch while Cedar is delayed.",
+      "explanation": "An older query must not replace newer results. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Associate responses with their query generation. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Birch remains visible."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Loading state matches Birch."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Cedar response is discarded."
+        }
+      ],
+      "experiment": "Resolve responses in reverse order. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Cancel abandoned Effect work. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-accent-policy",
+      "parentId": "effect-crm-search",
+      "title": "Make matching policy explicit",
+      "concept": "Search queries · stable pagination",
+      "brief": "Search José using Jose and José fixtures.",
+      "explanation": "Search normalization must be consistent with its advertised behavior. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Choose and test accent-sensitive or folded matching. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Results match documented policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Original names display unchanged."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Empty query remains predictable."
+        }
+      ],
+      "experiment": "Mix composed and decomposed accents. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Measure index support for normalization. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-filter-cursor",
+      "parentId": "effect-crm-search",
+      "title": "Reject cursors from different filters",
+      "concept": "Search queries · stable pagination",
+      "brief": "Reuse an active-company cursor for archived contacts.",
+      "explanation": "A cursor is meaningful only within its query shape. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Bind cursor to filter and sort parameters. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Mismatched cursor is rejected."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fresh search starts correctly."
+        },
+        {
+          "id": "criterion-3",
+          "label": "No contacts are skipped silently."
+        }
+      ],
+      "experiment": "Tamper with encoded filter metadata. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Version cursor formats explicitly. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-scope-counts",
+      "parentId": "effect-crm-search",
+      "title": "Keep result counts authorized",
+      "concept": "Search queries · stable pagination",
+      "brief": "Search as salesperson with restricted account access.",
+      "explanation": "Aggregates must use the same access predicate as rows. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Compute count under verified visibility rules. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Count excludes hidden contacts."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Pages contain permitted rows."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Facets expose no hidden company."
+        }
+      ],
+      "experiment": "Change team membership during pagination. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Define count consistency guarantees. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-debounce-accessibility",
+      "parentId": "effect-crm-search",
+      "title": "Announce useful search status",
+      "concept": "Search queries · stable pagination",
+      "brief": "Search a 5000-contact directory using screen reader.",
+      "explanation": "Typing feedback should inform without flooding announcements. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Debounce query work and announce settled result state. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Labels identify search."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Final count is announced."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Each keystroke avoids repeated chatter."
+        }
+      ],
+      "experiment": "Return an error for the final query. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Provide an explicit retry control. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-index-measurement",
+      "parentId": "effect-crm-search",
+      "title": "Prove a directory index helps",
+      "concept": "Search queries · stable pagination",
+      "brief": "Seed 50000 contacts with common and rare prefixes.",
+      "explanation": "Performance claims need representative query measurements. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Compare plans and latency before adding an index. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Selective query uses intended access path."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Broad query stays correct."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Write cost is recorded."
+        }
+      ],
+      "experiment": "Test a wildcard that defeats the index. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Evaluate keyset versus offset paging. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-url-search-state",
+      "parentId": "effect-crm-search",
+      "title": "Restore a shared directory view",
+      "concept": "Search queries · stable pagination",
+      "brief": "Open a link with owner stage and name filters.",
+      "explanation": "A URL should reconstruct permitted search state. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Decode query parameters into validated filter state. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reload keeps filters."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Invalid parameters get safe defaults."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Shared link retains no secret data."
+        }
+      ],
+      "experiment": "Paste an unknown owner value. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Add browser back-navigation coverage. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-deleted-selection",
+      "parentId": "effect-crm-search",
+      "title": "Handle selection removed by refresh",
+      "concept": "Search queries · stable pagination",
+      "brief": "Select C6 then delete it from another session.",
+      "explanation": "Selection cannot imply that a deleted record still exists. Search results are a view over changing authorized data. Treat ordering, filters, cursor interpretation, and cancellation as part of the API contract; matching text alone does not establish correctness.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Reconcile selected IDs against refreshed authorized data. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Missing row is identified."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Bulk action skips nothing silently."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Remaining selection stays usable."
+        }
+      ],
+      "experiment": "Delete during a bulk-action preview. Record persisted state and a recovery action.",
+      "review": "Read the query plan and request trace together. Explain whether the improvement reduces database work, transferred rows, rendering, or merely hides delay.",
+      "stretch": "Require explicit confirmation of changed scope. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-note-edit-history",
+      "parentId": "effect-crm-activities",
+      "title": "Track edits to customer notes",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Ada writes a note and Bo corrects it.",
+      "explanation": "Editing a note must not impersonate its original author. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Store note revisions with actual editing actor. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Original author remains."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Bo appears as editor."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Earlier text is recoverable under policy."
+        }
+      ],
+      "experiment": "Submit from a stale note revision. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Add reasoned redaction without erasing metadata. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-activity-order",
+      "parentId": "effect-crm-activities",
+      "title": "Order simultaneous activities",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Create call note email and stage change at one instant.",
+      "explanation": "Equal timestamps cannot make a timeline shuffle. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use a deterministic event sequence tie-breaker. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Reload order is stable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Pagination has no duplicates."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Same-time events remain distinguishable."
+        }
+      ],
+      "experiment": "Append another same-time event between pages. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Expose source time and recorded time separately. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-deleted-actor",
+      "parentId": "effect-crm-activities",
+      "title": "Render departed colleague attribution",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Deactivate user U9 after recording three calls.",
+      "explanation": "A deleted profile cannot break historical evidence. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Render retained actor identifier with fallback label. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "All calls remain readable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No broken profile crash occurs."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Identity is not reassigned."
+        }
+      ],
+      "experiment": "Remove optional display-name data. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Define anonymization rules separately. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-private-note",
+      "parentId": "effect-crm-activities",
+      "title": "Protect restricted activity bodies",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Mark one note private to account managers.",
+      "explanation": "Timeline permission must cover the underlying activity. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Apply visibility before pagination and body serialization. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Unauthorized body is absent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Counts follow policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Direct note URL also denies access."
+        }
+      ],
+      "experiment": "Change access after timeline loads. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Expire cached private previews. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-outbox-activity",
+      "parentId": "effect-crm-activities",
+      "title": "Keep domain change and activity aligned",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Change D8 from Qualified to Won.",
+      "explanation": "Successful stage changes need corresponding evidence. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Commit structured activity with deal mutation. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Won state has one event."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Failed mutation adds none."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry adds no duplicate event."
+        }
+      ],
+      "experiment": "Crash after mutation before transaction commit. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Rebuild the timeline from durable events. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-rich-text-note",
+      "parentId": "effect-crm-activities",
+      "title": "Render untrusted customer notes safely",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Save a note containing script-like HTML and links.",
+      "explanation": "Customer text cannot become executable page markup. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use the existing safe rendering boundary. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Text renders harmlessly."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Link policy is enforced."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Editing preserves literal content."
+        }
+      ],
+      "experiment": "Paste malformed nested markup. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Add allowed formatting with parser tests. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-import-provenance",
+      "parentId": "effect-crm-activities",
+      "title": "Label imported historical activities",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Import a call dated last month today.",
+      "explanation": "Import time and original activity time mean different things. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Store source identity and both timestamps. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Call sorts under chosen policy."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Import provenance is visible."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reimport remains idempotent."
+        }
+      ],
+      "experiment": "Provide a future source timestamp. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Add source-file row references. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-attachment-removal",
+      "parentId": "effect-crm-activities",
+      "title": "Keep note meaning after attachment deletion",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Delete the recording linked from a call note.",
+      "explanation": "Removed media cannot silently leave misleading evidence. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Show a durable unavailable-attachment state. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Note remains readable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Broken link has an explanation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unauthorized storage URL is absent."
+        }
+      ],
+      "experiment": "Expire download permission while timeline stays open. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Add retention notices to activity detail. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-agent-timeline-debug",
+      "parentId": "effect-crm-activities",
+      "title": "Debug missing timeline events",
+      "concept": "Activity provenance · append-only evidence",
+      "brief": "Hide one event through a faulty frontend filter.",
+      "explanation": "A display bug must be separated from failed persistence. Activity entries connect actions to actors and domain revisions. Separate editable user notes from system evidence, and design pagination and rendering to remain reliable when profiles or permissions change.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Trace event write query response and render stages. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Stored event is located."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Regression targets the bad predicate."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Fix avoids duplicate backfill."
+        }
+      ],
+      "experiment": "Repeat with a genuinely missing event. Record persisted state and a recovery action.",
+      "review": "Compare the timeline with authoritative transaction records. Explain any entries that are projections and how they could be rebuilt without fabricating events.",
+      "stretch": "Write a diagnostic decision tree. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-csv-formula",
+      "parentId": "effect-crm-portability",
+      "title": "Export spreadsheet-safe contact text",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Export company names beginning with equals and plus.",
+      "explanation": "Customer text must not become a spreadsheet command. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Apply documented CSV escaping and spreadsheet handling. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Columns remain aligned."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Dangerous prefixes follow policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Original source data is unchanged."
+        }
+      ],
+      "experiment": "Include quotes commas and newlines. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Provide lossless JSON beside CSV. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-export-scope",
+      "parentId": "effect-crm-portability",
+      "title": "Export only authorized customers",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Salesperson exports a mixed-ownership directory.",
+      "explanation": "Export access cannot exceed interactive visibility. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Reuse scoped query rules inside the export service. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only allowed contacts appear."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Related deals share scope."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Manifest records selected filters."
+        }
+      ],
+      "experiment": "Revoke access while export job is pending. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Revalidate access before download. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-archive-bulk",
+      "parentId": "effect-crm-portability",
+      "title": "Archive a reviewed selection",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Preview archiving twelve dormant companies.",
+      "explanation": "Bulk scope must not grow between preview and commit. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Bind operation to explicit IDs and revisions. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Only twelve are considered."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Changed rows report conflicts."
+        },
+        {
+          "id": "criterion-3",
+          "label": "History records each accepted archive."
+        }
+      ],
+      "experiment": "Activate one company after preview. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Add resumable per-row results. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-restore-links",
+      "parentId": "effect-crm-portability",
+      "title": "Restore relationship graphs safely",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Import backup with remapped internal identifiers.",
+      "explanation": "Restored contacts must point to the restored companies. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Validate references and maintain an ID mapping. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every parent resolves."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Deals link correctly."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unknown references block mutation."
+        }
+      ],
+      "experiment": "Remove one company from backup. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Produce a preflight relationship report. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-schema-upgrade",
+      "parentId": "effect-crm-portability",
+      "title": "Read an older CRM backup",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Restore version-one contacts lacking owner metadata.",
+      "explanation": "Format migration must retain the old data meaning. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Decode old format and apply explicit migration defaults. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Contacts stay readable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Missing owner stays identifiable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unsupported future versions fail clearly."
+        }
+      ],
+      "experiment": "Corrupt the declared schema version. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Add migration fixtures across two releases. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-export-cancel",
+      "parentId": "effect-crm-portability",
+      "title": "Cancel a large export honestly",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Cancel a 50000-contact export halfway through.",
+      "explanation": "Cancellation cannot pretend already-created artifacts never existed. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Stop future work and expire incomplete artifacts. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Job becomes cancelled."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Partial file is not downloadable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Temporary objects are reclaimed."
+        }
+      ],
+      "experiment": "Restart the worker after cancellation. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Add bounded cleanup retries. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-retention-hold",
+      "parentId": "effect-crm-portability",
+      "title": "Respect a customer retention hold",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Put company C4 on hold before cleanup runs.",
+      "explanation": "Scheduled deletion must honor current hold state. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Recheck hold and retention revision at deletion. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Held company survives."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unheld eligible records delete."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Decision evidence records the rule."
+        }
+      ],
+      "experiment": "Race hold creation against cleanup. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Design release-from-hold approval. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-roundtrip-audit",
+      "parentId": "effect-crm-portability",
+      "title": "Compare a full CRM round trip",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Export and restore companies contacts deals and notes.",
+      "explanation": "Portability requires semantic equivalence beyond row counts. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Compare normalized fields and relationship sets. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Amounts remain exact."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Note provenance survives."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Archived status is preserved."
+        }
+      ],
+      "experiment": "Shuffle export record order. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Add deterministic checksums per entity type. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-customer-crm-recovery-runbook",
+      "parentId": "effect-crm-portability",
+      "title": "Rehearse failed restore recovery",
+      "concept": "Customer lifecycle · portable backups",
+      "brief": "Interrupt restore after companies but before contacts.",
+      "explanation": "A failed restore must leave a known restart point. Portability crosses serialization, permissions, and retention boundaries. A useful export must describe relationships and versions, while restore must validate before mutation and preserve an honest account of partial failures.",
+      "steps": [
+        "Trace the screen, Effect service, and storage boundary using the fixture.",
+        "Use transactional import or explicit resumable checkpoints. Model expected failures explicitly at the service boundary.",
+        "Verify the acceptance checks, reload, and compare visible state with committed records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Existing records stay intact."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Retry avoids duplicates."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Report names unresolved items."
+        }
+      ],
+      "experiment": "Restart with a changed backup file. Record persisted state and a recovery action.",
+      "review": "Have the agent restore into an isolated database and compare meaningful relationships. A downloadable file alone does not demonstrate that customer data is portable.",
+      "stretch": "Bind checkpoints to backup digest. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ],
+  "track": "Project practice"
+}

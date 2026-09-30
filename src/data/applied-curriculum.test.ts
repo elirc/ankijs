@@ -6,25 +6,27 @@ import report from "./content-report.json";
 import { parseAnswerPages } from "../teaching/answers";
 
 describe("Build real apps curriculum", () => {
-  it("ships eight ordered decks of ten lessons, each with a concept and a practice card", async () => {
-    expect(lessons).toHaveLength(80);
+  it("ships ten ordered decks of ten lessons, each with a concept and a practice card", async () => {
+    expect(lessons).toHaveLength(100);
     expect(lessons.length).toBe(report.appliedLessons);
-    expect(new Set(lessons.map((lesson) => lesson.key)).size).toBe(80);
+    expect(new Set(lessons.map((lesson) => lesson.key)).size).toBe(100);
     const decks = curriculum.filter((deck) => deck.track === "Build real apps");
-    expect(decks).toHaveLength(8);
+    expect(decks).toHaveLength(10);
     expect(decks.map((deck) => deck.id)).toEqual(
       appliedDecks.map((deck) => deck.id),
     );
     decks.forEach((deck, index) => {
       expect(deck.name.startsWith(`${21 + index} · `)).toBe(true);
-      expect(deck.id).toBe(`a0000000-0000-4000-8000-00000000700${index + 1}`);
+      expect(deck.id).toBe(
+        `a0000000-0000-4000-8000-${String(7001 + index).padStart(12, "0")}`,
+      );
     });
     const packs = await loadStarterCards();
     const cards = decks.flatMap((deck) =>
       packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)),
     );
     expect(cards).toHaveLength(report.appliedCards);
-    expect(cards).toHaveLength(160);
+    expect(cards).toHaveLength(200);
     for (const deck of decks) {
       expect(
         packs.get(deck.id)!.filter((card) => !/^a[1234]000000-/.test(card.id)),

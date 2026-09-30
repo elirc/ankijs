@@ -1,0 +1,1244 @@
+[
+  {
+    "id": "effect-drill-shared-projects-authorize-the-addressed-project",
+    "parentId": "effect-sharing-auth",
+    "title": "Authorize the addressed project",
+    "concept": "Object access",
+    "brief": "User Alice owns project A and submits an update URL containing Bob's project B.",
+    "explanation": "Authentication establishes identity but does not authorize access to an arbitrary entity ID.",
+    "steps": [
+      "Create a repeatable fixture: User Alice owns project A and submits an update URL containing Bob's project B. Record the starting rows and relevant UI state before making the change.",
+      "Load or mutate the project through an ownership-aware operation.",
+      "Send the request directly without using the filtered UI. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Alice can update A through the normal route.",
+      "B remains unchanged and its private fields are not disclosed.",
+      "Recovery evidence: Change only the route ID while retaining Alice's valid session. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change only the route ID while retaining Alice's valid session.",
+    "review": "Review the agent's proposed diff: Does every operation use the authenticated identity rather than a body-supplied owner?",
+    "stretch": "Add the same authorization matrix for reads, archives, restores, and exports.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-ignore-forged-ownership-fields",
+    "parentId": "effect-sharing-auth",
+    "title": "Ignore forged ownership fields",
+    "concept": "Input authority",
+    "brief": "An authenticated create request includes ownerId set to another user's ID.",
+    "explanation": "Ownership derives from trusted session context rather than client-authored fields.",
+    "steps": [
+      "Create a repeatable fixture: An authenticated create request includes ownerId set to another user's ID. Record the starting rows and relevant UI state before making the change.",
+      "Remove owner identity from the writable input contract.",
+      "Submit valid project data with conflicting owner fields. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The saved owner is the authenticated user.",
+      "No request can create or transfer ownership by adding an extra property.",
+      "Recovery evidence: Repeat through an older API client that sends whole entity objects. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Repeat through an older API client that sends whole entity objects.",
+    "review": "Review the agent's proposed diff: Does schema stripping hide an attempted privileged write without clear policy?",
+    "stretch": "Add explicit rejection for reserved fields and safe audit categorization.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-expire-sessions-during-editing",
+    "parentId": "effect-sharing-auth",
+    "title": "Expire sessions during editing",
+    "concept": "Authentication lifecycle",
+    "brief": "Open a project editor, expire the session, then submit a long drafted goal.",
+    "explanation": "An expired session blocks mutation while preserving recoverable local work.",
+    "steps": [
+      "Create a repeatable fixture: Open a project editor, expire the session, then submit a long drafted goal. Record the starting rows and relevant UI state before making the change.",
+      "Map authentication failure separately from validation and storage failures.",
+      "Save after expiry, sign in again, and retry deliberately. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "No unauthenticated write reaches storage.",
+      "The draft survives the expired-session response.",
+      "Recovery evidence: Change the project remotely before the user signs in again. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change the project remotely before the user signs in again.",
+    "review": "Review the agent's proposed diff: Does reauthentication also require fresh revision validation?",
+    "stretch": "Show a comparison before retrying a draft after a long authentication gap.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-authorize-nested-resources",
+    "parentId": "effect-sharing-auth",
+    "title": "Authorize nested resources",
+    "concept": "Relationship access",
+    "brief": "Alice requests comment C-7 through project A although C-7 belongs to project B.",
+    "explanation": "A nested route must verify the relationship between every addressed resource.",
+    "steps": [
+      "Create a repeatable fixture: Alice requests comment C-7 through project A although C-7 belongs to project B. Record the starting rows and relevant UI state before making the change.",
+      "Constrain comment lookup by both comment ID and authorized project ID.",
+      "Try valid, mismatched, and nonexistent project-comment pairs. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Valid authorized pairs return the intended comment.",
+      "A mismatched pair never exposes another project's comment.",
+      "Recovery evidence: Reuse the comment ID with a forged request-body project ID. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Reuse the comment ID with a forged request-body project ID.",
+    "review": "Review the agent's proposed diff: Does the query enforce the relationship instead of trusting route structure?",
+    "stretch": "Apply the same rule to attachments, evidence, and membership endpoints.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-prevent-client-chosen-roles",
+    "parentId": "effect-sharing-auth",
+    "title": "Prevent client-chosen roles",
+    "concept": "Privilege boundaries",
+    "brief": "A viewer submits a project-edit request with role set to owner in its JSON body.",
+    "explanation": "Role decisions must come from current authoritative membership records.",
+    "steps": [
+      "Create a repeatable fixture: A viewer submits a project-edit request with role set to owner in its JSON body. Record the starting rows and relevant UI state before making the change.",
+      "Decode writable project fields separately from authorization context.",
+      "Send the forged role with a valid viewer session. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Permitted viewer reads continue working.",
+      "The write is denied and the stored membership stays unchanged.",
+      "Recovery evidence: Modify a local browser cache to display an editor button. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Modify a local browser cache to display an editor button.",
+    "review": "Review the agent's proposed diff: Does the service independently authorize the command after UI gating?",
+    "stretch": "Add contract tests for every reserved authorization field.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-choose-nondisclosing-missing-responses",
+    "parentId": "effect-sharing-auth",
+    "title": "Choose nondisclosing missing responses",
+    "concept": "Error design",
+    "brief": "An outsider probes one real private project ID and one nonexistent ID.",
+    "explanation": "Access failures should not reveal private existence unless the product intentionally permits it.",
+    "steps": [
+      "Create a repeatable fixture: An outsider probes one real private project ID and one nonexistent ID. Record the starting rows and relevant UI state before making the change.",
+      "Define a consistent external response policy while retaining safe internal diagnostics.",
+      "Compare status, body shape, and visible messages for both probes. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The caller receives the documented nondisclosing result.",
+      "Private names and owner details never enter error payloads.",
+      "Recovery evidence: Trigger a storage failure during the authorization lookup. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Trigger a storage failure during the authorization lookup.",
+    "review": "Review the agent's proposed diff: Does error mapping preserve operational failures without exposing entity content?",
+    "stretch": "Review timing and enumeration limits as separate concerns from response wording.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-apply-authorization-to-exports",
+    "parentId": "effect-sharing-auth",
+    "title": "Apply authorization to exports",
+    "concept": "Data egress",
+    "brief": "A viewer can open a summary but requests a full project export containing private notes.",
+    "explanation": "Export is an independent data-access operation with its own allowed field scope.",
+    "steps": [
+      "Create a repeatable fixture: A viewer can open a summary but requests a full project export containing private notes. Record the starting rows and relevant UI state before making the change.",
+      "Authorize the export and select fields according to the requesting role.",
+      "Compare exports produced by owner, editor, viewer, and outsider. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each artifact contains only the fields allowed for its role.",
+      "Hidden notes cannot leak through a download route.",
+      "Recovery evidence: Revoke access while the export job is preparing its snapshot. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Revoke access while the export job is preparing its snapshot.",
+    "review": "Review the agent's proposed diff: Does artifact download recheck access when completion occurs later?",
+    "stretch": "Use expiring download grants tied to the authorized artifact and principal.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-recheck-access-at-mutation-time",
+    "parentId": "effect-sharing-auth",
+    "title": "Recheck access at mutation time",
+    "concept": "Time-of-check races",
+    "brief": "An editor loads a project, then loses membership before submitting an update.",
+    "explanation": "Previously granted UI access does not authorize later mutation indefinitely.",
+    "steps": [
+      "Create a repeatable fixture: An editor loads a project, then loses membership before submitting an update. Record the starting rows and relevant UI state before making the change.",
+      "Check current membership inside the write operation's consistency boundary.",
+      "Pause submission, revoke membership, then continue the command. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The command follows the current access policy.",
+      "A stale open tab cannot retain editing privileges through cached role data.",
+      "Recovery evidence: Restore membership and retry with a refreshed project revision. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Restore membership and retry with a refreshed project revision.",
+    "review": "Review the agent's proposed diff: Are role and entity revision assumptions revalidated together?",
+    "stretch": "Document how long-running jobs respond to permission changes.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-separate-authorization-from-validation",
+    "parentId": "effect-sharing-auth",
+    "title": "Separate authorization from validation",
+    "concept": "Operation ordering",
+    "brief": "An outsider submits malformed input to a private project's update endpoint.",
+    "explanation": "Validation errors should not disclose private record details before access is established.",
+    "steps": [
+      "Create a repeatable fixture: An outsider submits malformed input to a private project's update endpoint. Record the starting rows and relevant UI state before making the change.",
+      "Define which envelope checks precede authorization and which domain checks follow it.",
+      "Compare malformed requests from an owner and outsider. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Authorized users receive useful field-level errors.",
+      "Outsiders learn no stored values through validation comparisons.",
+      "Recovery evidence: Cause a uniqueness check to reference another private project name. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Cause a uniqueness check to reference another private project name.",
+    "review": "Review the agent's proposed diff: Does a convenient shared validator query protected data too early?",
+    "stretch": "Add a test asserting repository call order for unauthorized requests.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-protect-the-last-owner",
+    "parentId": "effect-sharing-members",
+    "title": "Protect the last owner",
+    "concept": "Membership invariants",
+    "brief": "A project has one owner who attempts to remove their own membership.",
+    "explanation": "Every active shared project needs the ownership structure promised by its product rules.",
+    "steps": [
+      "Create a repeatable fixture: A project has one owner who attempts to remove their own membership. Record the starting rows and relevant UI state before making the change.",
+      "Validate remaining owners atomically before role reduction or removal.",
+      "Attempt removal, demotion, and transfer with one owner. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "A valid transfer leaves an authorized owner afterward.",
+      "The project never becomes ownerless through self-removal.",
+      "Recovery evidence: Race two owners each removing their own ownership. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Race two owners each removing their own ownership.",
+    "review": "Review the agent's proposed diff: Does the invariant survive concurrent membership changes?",
+    "stretch": "Provide an explicit project-closure flow for intentional ownership termination.",
+    "minutes": 30,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-prevent-role-escalation-by-editors",
+    "parentId": "effect-sharing-members",
+    "title": "Prevent role escalation by editors",
+    "concept": "Role capabilities",
+    "brief": "An editor invites a collaborator while requesting an owner role.",
+    "explanation": "Membership administration permissions are distinct from ordinary content editing.",
+    "steps": [
+      "Create a repeatable fixture: An editor invites a collaborator while requesting an owner role. Record the starting rows and relevant UI state before making the change.",
+      "Define a capability matrix and enforce allowed target roles server-side.",
+      "Exercise each actor role against each requested membership role. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only documented administrator capabilities succeed.",
+      "Editors cannot gain ownership indirectly through invitation or role update.",
+      "Recovery evidence: Change the request method or endpoint while keeping the same intent. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change the request method or endpoint while keeping the same intent.",
+    "review": "Review the agent's proposed diff: Does every membership mutation share the same policy service?",
+    "stretch": "Generate role-matrix tests from a declarative policy table.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-paginate-comments-with-stable-cursors",
+    "parentId": "effect-sharing-members",
+    "title": "Paginate comments with stable cursors",
+    "concept": "Pagination",
+    "brief": "Several comments share a timestamp and new comments arrive between page requests.",
+    "explanation": "A cursor needs a total order and stable boundary semantics.",
+    "steps": [
+      "Create a repeatable fixture: Several comments share a timestamp and new comments arrive between page requests. Record the starting rows and relevant UI state before making the change.",
+      "Order by timestamp plus unique ID and encode both in the cursor.",
+      "Fetch pages while inserting comments around the boundary. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Existing comments appear once in the defined traversal.",
+      "Tied timestamps never cause skipped or duplicated comments.",
+      "Recovery evidence: Delete the comment that supplied the previous page's cursor. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Delete the comment that supplied the previous page's cursor.",
+    "review": "Review the agent's proposed diff: Does the cursor depend on a row still existing?",
+    "stretch": "Add cursor versioning before changing the ordering contract.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-authorize-comment-edits-by-policy",
+    "parentId": "effect-sharing-members",
+    "title": "Authorize comment edits by policy",
+    "concept": "Resource ownership",
+    "brief": "An editor tries to modify another member's comment on an editable project.",
+    "explanation": "Project edit rights do not automatically define authorship-edit rights.",
+    "steps": [
+      "Create a repeatable fixture: An editor tries to modify another member's comment on an editable project. Record the starting rows and relevant UI state before making the change.",
+      "Specify author, moderator, and owner capabilities for comment mutation.",
+      "Test same-author, other-author, removed-member, and moderator cases. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Allowed edits retain original author identity and creation time.",
+      "Unauthorized edits leave content and revision unchanged.",
+      "Recovery evidence: Remove the original author after a comment is published. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Remove the original author after a comment is published.",
+    "review": "Review the agent's proposed diff: Does historical authorship remain meaningful when membership changes?",
+    "stretch": "Add a moderator correction event instead of impersonating the original author.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-handle-removed-members-in-history",
+    "parentId": "effect-sharing-members",
+    "title": "Handle removed members in history",
+    "concept": "Historical identity",
+    "brief": "Remove a member who authored twenty comments and several project edits.",
+    "explanation": "Removing access must not erase or reassign historical authorship unintentionally.",
+    "steps": [
+      "Create a repeatable fixture: Remove a member who authored twenty comments and several project edits. Record the starting rows and relevant UI state before making the change.",
+      "Separate membership lifecycle from immutable event actor references.",
+      "Remove the member and inspect old comments and audit entries. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "History remains attributable using the declared display policy.",
+      "Removal never transfers old comments to the current owner.",
+      "Recovery evidence: Change the removed user's display name later. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change the removed user's display name later.",
+    "review": "Review the agent's proposed diff: Does history use a current profile or a recorded actor snapshot intentionally?",
+    "stretch": "Support anonymization through an explicit policy with retained event integrity.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-filter-comments-before-pagination",
+    "parentId": "effect-sharing-members",
+    "title": "Filter comments before pagination",
+    "concept": "Query correctness",
+    "brief": "A project contains private moderator comments interleaved with public member comments.",
+    "explanation": "Visibility filtering must happen before page boundaries and counts are calculated.",
+    "steps": [
+      "Create a repeatable fixture: A project contains private moderator comments interleaved with public member comments. Record the starting rows and relevant UI state before making the change.",
+      "Apply role-aware filtering in the authoritative query.",
+      "Fetch consecutive pages as viewer and moderator. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Viewer pages contain only permitted comments with coherent cursors.",
+      "Page totals and gaps do not expose hidden comment content.",
+      "Recovery evidence: Insert a hidden comment at the current cursor boundary. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Insert a hidden comment at the current cursor boundary.",
+    "review": "Review the agent's proposed diff: Does post-fetch filtering produce short pages or information leaks?",
+    "stretch": "Avoid total counts when exact private-inclusive counts would disclose hidden activity.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-validate-membership-changes-against-self-lockout",
+    "parentId": "effect-sharing-members",
+    "title": "Validate membership changes against self-lockout",
+    "concept": "Workflow UX",
+    "brief": "An owner transfers ownership and immediately loses access under the selected policy.",
+    "explanation": "A legitimate access change should clearly describe its consequence before execution.",
+    "steps": [
+      "Create a repeatable fixture: An owner transfers ownership and immediately loses access under the selected policy. Record the starting rows and relevant UI state before making the change.",
+      "Show resulting roles and enforce the same transition server-side.",
+      "Transfer ownership and inspect both users' subsequent capabilities. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The final role set matches the confirmed transition.",
+      "The original owner is not shown controls they can no longer use.",
+      "Recovery evidence: Lose the response after the transfer commits. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Lose the response after the transfer commits.",
+    "review": "Review the agent's proposed diff: Can the original owner discover the resulting state without repeating the transfer?",
+    "stretch": "Add an operation receipt visible to both affected principals where policy permits.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-make-comments-text-safe",
+    "parentId": "effect-sharing-members",
+    "title": "Make comments text-safe",
+    "concept": "Content rendering",
+    "brief": "Post a comment containing HTML, Markdown links, and an image-like payload.",
+    "explanation": "Comment formatting must preserve text safety across list, detail, and notification views.",
+    "steps": [
+      "Create a repeatable fixture: Post a comment containing HTML, Markdown links, and an image-like payload. Record the starting rows and relevant UI state before making the change.",
+      "Choose plain text or a restricted renderer with explicit allowed constructs.",
+      "Render the same payload in every comment surface. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Allowed formatting appears consistently and safely.",
+      "No script, credential-bearing link, or unexpected remote image executes.",
+      "Recovery evidence: Edit a safe comment into the hostile fixture. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Edit a safe comment into the hostile fixture.",
+    "review": "Review the agent's proposed diff: Does sanitization run on every rendering path rather than only creation?",
+    "stretch": "Add a preview that uses exactly the production rendering pipeline.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-review-list-query-tenant-scope",
+    "parentId": "effect-sharing-members",
+    "title": "Review list-query tenant scope",
+    "concept": "Agent code review",
+    "brief": "An agent optimizes member listing by fetching memberships only by user ID.",
+    "explanation": "Performance refactoring must preserve project scope and visibility constraints.",
+    "steps": [
+      "Create a repeatable fixture: An agent optimizes member listing by fetching memberships only by user ID. Record the starting rows and relevant UI state before making the change.",
+      "Trace query predicates back to authenticated principal and addressed project.",
+      "Seed two projects sharing one user and compare member-list responses. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each list contains only the addressed project's permitted memberships.",
+      "Cross-project roles cannot influence the displayed capabilities.",
+      "Recovery evidence: Swap project IDs while reusing a cached response key. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Swap project IDs while reusing a cached response key.",
+    "review": "Review the agent's proposed diff: Does caching include every authorization-relevant dimension?",
+    "stretch": "Add a query contract test that asserts both result rows and tenant isolation.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-shared-projects-return-a-useful-conflict-snapshot",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Return a useful conflict snapshot",
+    "concept": "Optimistic concurrency",
+    "brief": "Two editors change the same project goal from revision twelve.",
+    "explanation": "A conflict response should support recovery without discarding the losing draft.",
+    "steps": [
+      "Create a repeatable fixture: Two editors change the same project goal from revision twelve. Record the starting rows and relevant UI state before making the change.",
+      "Return the current authorized revision and preserve submitted field values.",
+      "Commit one edit, then submit the other against revision twelve. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The loser can compare draft and current content.",
+      "The stale command never overwrites the accepted edit.",
+      "Recovery evidence: Revoke access before building the conflict response. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Revoke access before building the conflict response.",
+    "review": "Review the agent's proposed diff: Does conflict detail obey the same read authorization as ordinary detail views?",
+    "stretch": "Offer field-level merge only when its assumptions are visible.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-keep-revision-checks-atomic",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Keep revision checks atomic",
+    "concept": "SQL updates",
+    "brief": "A service reads revision five, compares it in application code, then updates later.",
+    "explanation": "A separate read and write leaves a race between validation and mutation.",
+    "steps": [
+      "Create a repeatable fixture: A service reads revision five, compares it in application code, then updates later. Record the starting rows and relevant UI state before making the change.",
+      "Use a conditional update whose predicate includes expected revision.",
+      "Synchronize two writes after both initial reads. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only one conflicting update succeeds.",
+      "Both cannot return success with the same resulting revision.",
+      "Recovery evidence: Add a delay immediately before the database mutation. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add a delay immediately before the database mutation.",
+    "review": "Review the agent's proposed diff: Does affected-row count map to conflict without a second unsafe guess?",
+    "stretch": "Distinguish missing and conflicting rows through an authorized follow-up read.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-avoid-whole-object-conflict-merges",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Avoid whole-object conflict merges",
+    "concept": "Patch ownership",
+    "brief": "One editor changes the title while another changes the description from the same snapshot.",
+    "explanation": "A merge strategy must state which independent fields can be combined safely.",
+    "steps": [
+      "Create a repeatable fixture: One editor changes the title while another changes the description from the same snapshot. Record the starting rows and relevant UI state before making the change.",
+      "Track base values and explicit edited fields instead of spreading full snapshots.",
+      "Attempt the merge with independent and overlapping field changes. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Independent changes combine only under the documented policy.",
+      "Overlapping edits require a visible decision.",
+      "Recovery evidence: Change a hidden server-managed field during the merge. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change a hidden server-managed field during the merge.",
+    "review": "Review the agent's proposed diff: Does the merge preserve fields neither editor owns?",
+    "stretch": "Add a property-level conflict report linked to source revisions.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-handle-archived-conflicts",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Handle archived conflicts",
+    "concept": "Lifecycle races",
+    "brief": "An owner archives a project while an editor saves a stale active snapshot.",
+    "explanation": "Lifecycle transitions must not be undone by unrelated stale content updates.",
+    "steps": [
+      "Create a repeatable fixture: An owner archives a project while an editor saves a stale active snapshot. Record the starting rows and relevant UI state before making the change.",
+      "Separate status transitions from editable-content patches.",
+      "Archive, then submit the old editor's description patch. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Archive status remains intact and the edit follows the declared policy.",
+      "A stale active flag cannot restore the project.",
+      "Recovery evidence: Restore the project and retry with its current revision. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Restore the project and retry with its current revision.",
+    "review": "Review the agent's proposed diff: Does revision conflict handling accidentally resubmit an old whole entity?",
+    "stretch": "Offer an explicit restore-and-apply flow with a fresh confirmation.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-roll-out-a-nullable-column-first",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Roll out a nullable column first",
+    "concept": "Schema deployment",
+    "brief": "Add required project category while old clients still write records without it.",
+    "explanation": "Deployment order must allow old and new writers during the transition window.",
+    "steps": [
+      "Create a repeatable fixture: Add required project category while old clients still write records without it. Record the starting rows and relevant UI state before making the change.",
+      "Plan additive schema, compatible writers, backfill, then stricter enforcement.",
+      "Exercise old and new clients against each rollout stage. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Supported writers remain functional during the documented window.",
+      "The constraint is not enabled before existing rows are backfilled.",
+      "Recovery evidence: Pause backfill halfway and deploy the new reader. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Pause backfill halfway and deploy the new reader.",
+    "review": "Review the agent's proposed diff: Does the reader handle both shapes without hiding malformed values?",
+    "stretch": "Create a rollback plan that preserves data written by the new version.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-backfill-without-overwriting-edits",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Backfill without overwriting edits",
+    "concept": "Online migration",
+    "brief": "A background job fills missing categories while users set categories manually.",
+    "explanation": "Backfill should modify only rows still matching its original missing-value condition.",
+    "steps": [
+      "Create a repeatable fixture: A background job fills missing categories while users set categories manually. Record the starting rows and relevant UI state before making the change.",
+      "Use conditional updates and bounded batches with checkpoints.",
+      "Edit a row between backfill read and write. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The user's chosen category survives.",
+      "Backfill never replaces a nonmissing category with its default.",
+      "Recovery evidence: Restart the worker from its last checkpoint. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Restart the worker from its last checkpoint.",
+    "review": "Review the agent's proposed diff: Does checkpointing distinguish processed rows from successfully changed rows?",
+    "stretch": "Record counts for skipped, changed, and failed rows to verify coverage.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-validate-conflict-retries",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Validate conflict retries",
+    "concept": "Retry policy",
+    "brief": "A generic retry wrapper resubmits an update after a revision conflict.",
+    "explanation": "A business conflict is not a transient transport failure and needs new user intent.",
+    "steps": [
+      "Create a repeatable fixture: A generic retry wrapper resubmits an update after a revision conflict. Record the starting rows and relevant UI state before making the change.",
+      "Classify conflicts separately from retryable connection errors.",
+      "Inject one of each error and inspect operation attempts. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Connection retry follows its bounded policy.",
+      "Revision conflict produces no automatic stale overwrite.",
+      "Recovery evidence: Return conflict after several transient retries. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Return conflict after several transient retries.",
+    "review": "Review the agent's proposed diff: Does the retry filter inspect typed domain errors rather than message strings?",
+    "stretch": "Add a UI action that refreshes context before a deliberate retry.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-keep-migrations-reversible-in-meaning",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Keep migrations reversible in meaning",
+    "concept": "Release safety",
+    "brief": "A migration replaces free-text statuses with a smaller enum and drops original text.",
+    "explanation": "A rollback plan cannot recover information already discarded without preservation.",
+    "steps": [
+      "Create a repeatable fixture: A migration replaces free-text statuses with a smaller enum and drops original text. Record the starting rows and relevant UI state before making the change.",
+      "Retain original values or provide a reviewed mapping report before destructive conversion.",
+      "Run forward migration and the proposed rollback on unusual statuses. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The rollback's documented retained information is actually recoverable.",
+      "Unknown statuses are not silently collapsed into an arbitrary enum.",
+      "Recovery evidence: Add a status unseen in development fixtures. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add a status unseen in development fixtures.",
+    "review": "Review the agent's proposed diff: Does the release note distinguish reversible schema from reversible data semantics?",
+    "stretch": "Keep a temporary legacy column until conversion has been verified in production-like data.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-test-old-clients-after-new-writes",
+    "parentId": "effect-sharing-conflicts",
+    "title": "Test old clients after new writes",
+    "concept": "Compatibility",
+    "brief": "A new client writes category metadata that an old client cannot display.",
+    "explanation": "Old writers must not erase unfamiliar fields when editing familiar ones.",
+    "steps": [
+      "Create a repeatable fixture: A new client writes category metadata that an old client cannot display. Record the starting rows and relevant UI state before making the change.",
+      "Use narrow patches and compatibility contract fixtures.",
+      "Create with the new client, rename with the old client, then reread with the new client. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The category metadata survives the old-client edit.",
+      "The old client cannot replace the complete stored record.",
+      "Recovery evidence: Repeat through an offline queued old-client command. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Repeat through an offline queued old-client command.",
+    "review": "Review the agent's proposed diff: Does the sync adapter preserve the same patch contract as online editing?",
+    "stretch": "Set a minimum writer version when preserving compatibility becomes impossible.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-hash-invitation-secrets",
+    "parentId": "effect-sharing-invitations",
+    "title": "Hash invitation secrets",
+    "concept": "Token storage",
+    "brief": "Create an invitation link whose bearer token grants access to project Alpha.",
+    "explanation": "A database leak should not expose directly usable invitation tokens.",
+    "steps": [
+      "Create a repeatable fixture: Create an invitation link whose bearer token grants access to project Alpha. Record the starting rows and relevant UI state before making the change.",
+      "Store a cryptographic token verifier and return the raw secret only through the intended delivery path.",
+      "Inspect persisted rows and diagnostic logs after creation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The database contains no recoverable raw invitation secret.",
+      "Logs and analytics never record the full invitation URL.",
+      "Recovery evidence: Fail delivery after the invitation is created. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Fail delivery after the invitation is created.",
+    "review": "Review the agent's proposed diff: Does retry issue a new token or safely reuse an intended delivery artifact?",
+    "stretch": "Add explicit revocation and token rotation with auditable invitation identity.",
+    "minutes": 30,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-enforce-expiry-at-acceptance",
+    "parentId": "effect-sharing-invitations",
+    "title": "Enforce expiry at acceptance",
+    "concept": "Time-sensitive authority",
+    "brief": "Open an invitation one minute before expiry and submit acceptance one minute afterward.",
+    "explanation": "A rendered invitation page does not extend the token's authorization lifetime.",
+    "steps": [
+      "Create a repeatable fixture: Open an invitation one minute before expiry and submit acceptance one minute afterward. Record the starting rows and relevant UI state before making the change.",
+      "Check expiry using trusted time inside the acceptance operation.",
+      "Advance an injected clock between preview and acceptance. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Acceptance succeeds before the documented cutoff.",
+      "Expired acceptance creates no membership.",
+      "Recovery evidence: Test the exact boundary timestamp and its comparison rule. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Test the exact boundary timestamp and its comparison rule.",
+    "review": "Review the agent's proposed diff: Does the UI countdown merely reflect the server's authoritative expiry?",
+    "stretch": "Add a resend flow that revokes or clearly supersedes old invitations.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-make-acceptance-single-use",
+    "parentId": "effect-sharing-invitations",
+    "title": "Make acceptance single-use",
+    "concept": "Concurrent redemption",
+    "brief": "Two browser sessions submit the same invitation token at nearly the same moment.",
+    "explanation": "Single-use acceptance requires an atomic transition from unused to consumed.",
+    "steps": [
+      "Create a repeatable fixture: Two browser sessions submit the same invitation token at nearly the same moment. Record the starting rows and relevant UI state before making the change.",
+      "Claim the invitation and create membership within one consistency boundary.",
+      "Release two acceptance commands through a test barrier. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Exactly one allowed redemption transition occurs.",
+      "Repeated delivery never creates duplicate memberships or audit events.",
+      "Recovery evidence: Lose the successful response and retry from the same account. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Lose the successful response and retry from the same account.",
+    "review": "Review the agent's proposed diff: Does the contract treat same-account replay differently from another-account reuse?",
+    "stretch": "Return an idempotent acceptance receipt for an already accepted matching principal.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-bind-invitations-to-intended-identity",
+    "parentId": "effect-sharing-invitations",
+    "title": "Bind invitations to intended identity",
+    "concept": "Recipient policy",
+    "brief": "An invitation addressed to Alice is opened while Bob is signed in.",
+    "explanation": "Recipient-bound invitations require verified identity matching at acceptance.",
+    "steps": [
+      "Create a repeatable fixture: An invitation addressed to Alice is opened while Bob is signed in. Record the starting rows and relevant UI state before making the change.",
+      "Compare the trusted account identity with the invitation's recipient policy.",
+      "Attempt acceptance as Alice, Bob, and an unverified account. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only principals satisfying the declared recipient policy gain membership.",
+      "A client-supplied email cannot override the authenticated account.",
+      "Recovery evidence: Change account identity after the invitation preview loads. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change account identity after the invitation preview loads.",
+    "review": "Review the agent's proposed diff: Does normalization of recipient identifiers match the identity provider's contract?",
+    "stretch": "Support transferable invitations as a separate explicitly labeled product mode.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-recheck-inviter-authority",
+    "parentId": "effect-sharing-invitations",
+    "title": "Recheck inviter authority",
+    "concept": "Revocation semantics",
+    "brief": "An owner creates an invitation, then loses ownership before it is accepted.",
+    "explanation": "The product must decide whether pending invitations retain authority after role changes.",
+    "steps": [
+      "Create a repeatable fixture: An owner creates an invitation, then loses ownership before it is accepted. Record the starting rows and relevant UI state before making the change.",
+      "Implement the chosen invalidation policy and expose the resulting invitation status.",
+      "Demote the inviter and attempt acceptance afterward. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Acceptance follows the documented current-authority or issued-authority rule.",
+      "No undefined policy grants unintended elevated access.",
+      "Recovery evidence: Transfer ownership and inspect invitations issued by the old owner. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Transfer ownership and inspect invitations issued by the old owner.",
+    "review": "Review the agent's proposed diff: Does role revocation trigger any required invitation invalidation atomically?",
+    "stretch": "Add an owner dashboard for reviewing and revoking outstanding invitations.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-prevent-open-redirects-after-acceptance",
+    "parentId": "effect-sharing-invitations",
+    "title": "Prevent open redirects after acceptance",
+    "concept": "Navigation inputs",
+    "brief": "An invitation includes a returnTo parameter pointing to an external site.",
+    "explanation": "Postacceptance navigation must not turn a trusted invitation into an arbitrary redirect.",
+    "steps": [
+      "Create a repeatable fixture: An invitation includes a returnTo parameter pointing to an external site. Record the starting rows and relevant UI state before making the change.",
+      "Restrict destinations to validated internal routes or an explicit allowlist.",
+      "Accept with safe internal, protocol-relative, and external destinations. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The user lands on an allowed project page.",
+      "Untrusted destinations never receive the invitation token or session context.",
+      "Recovery evidence: Encode the external destination several different ways. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Encode the external destination several different ways.",
+    "review": "Review the agent's proposed diff: Does validation run on the parsed destination rather than a fragile string prefix?",
+    "stretch": "Strip sensitive query parameters from the final browser history entry.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-keep-token-urls-out-of-referrers",
+    "parentId": "effect-sharing-invitations",
+    "title": "Keep token URLs out of referrers",
+    "concept": "Browser boundaries",
+    "brief": "Open an invitation page that displays remote images and third-party analytics.",
+    "explanation": "A secret carried in a URL can leak through surrounding browser integrations.",
+    "steps": [
+      "Create a repeatable fixture: Open an invitation page that displays remote images and third-party analytics. Record the starting rows and relevant UI state before making the change.",
+      "Minimize third-party requests and remove the token from navigable state after exchange.",
+      "Inspect outgoing requests while loading and accepting the invitation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The token is used only by the intended acceptance endpoint.",
+      "No analytics payload or external resource request contains the secret.",
+      "Recovery evidence: Trigger a handled error and inspect its telemetry context. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Trigger a handled error and inspect its telemetry context.",
+    "review": "Review the agent's proposed diff: Does generic URL logging capture invitation credentials?",
+    "stretch": "Use a short-lived exchange step that yields a nonsecret invitation preview identifier.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-handle-existing-membership",
+    "parentId": "effect-sharing-invitations",
+    "title": "Handle existing membership",
+    "concept": "Idempotent access",
+    "brief": "Accept an editor invitation while already holding viewer membership in the same project.",
+    "explanation": "Acceptance needs an explicit role-combination policy instead of duplicate rows.",
+    "steps": [
+      "Create a repeatable fixture: Accept an editor invitation while already holding viewer membership in the same project. Record the starting rows and relevant UI state before making the change.",
+      "Define upgrade, no-op, and prohibited downgrade behavior.",
+      "Accept invitations targeting lower, equal, and higher roles. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The resulting single membership follows the documented role policy.",
+      "A lower-role invitation never accidentally removes stronger existing access.",
+      "Recovery evidence: Race invitation acceptance with an administrator role change. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Race invitation acceptance with an administrator role change.",
+    "review": "Review the agent's proposed diff: Does role comparison use policy rules rather than lexical string order?",
+    "stretch": "Return an acceptance summary showing previous and resulting capabilities.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-rate-limit-token-guessing-safely",
+    "parentId": "effect-sharing-invitations",
+    "title": "Rate-limit token guessing safely",
+    "concept": "Abuse resistance",
+    "brief": "Submit many invalid invitation tokens against one acceptance endpoint.",
+    "explanation": "Invalid attempts need bounded processing and nondisclosing responses without logging secrets.",
+    "steps": [
+      "Create a repeatable fixture: Submit many invalid invitation tokens against one acceptance endpoint. Record the starting rows and relevant UI state before making the change.",
+      "Apply an appropriate request budget and safe diagnostic counters.",
+      "Exercise valid, invalid, expired, and rate-limited attempts. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Rate-limited requests receive the documented retry behavior.",
+      "Diagnostics retain no raw guessed tokens.",
+      "Recovery evidence: Alternate accounts and source contexts in a controlled test fixture. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Alternate accounts and source contexts in a controlled test fixture.",
+    "review": "Review the agent's proposed diff: Does expensive database work happen before an inexpensive format check?",
+    "stretch": "Add monitoring for unusual invalid-token rates with aggregate privacy-preserving labels.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-shared-projects-test-anonymous-reads",
+    "parentId": "effect-sharing-rls",
+    "title": "Test anonymous reads",
+    "concept": "Database authorization",
+    "brief": "Query project rows without an authenticated database principal.",
+    "explanation": "Row-level policy should explicitly define anonymous visibility rather than inherit accidental defaults.",
+    "steps": [
+      "Create a repeatable fixture: Query project rows without an authenticated database principal. Record the starting rows and relevant UI state before making the change.",
+      "Run database queries under the actual anonymous role.",
+      "Select projects, memberships, and comments in separate fixtures. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only intentionally public data is returned.",
+      "Private rows cannot be read through direct table access.",
+      "Recovery evidence: Add a new private row and repeat without changing application code. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add a new private row and repeat without changing application code.",
+    "review": "Review the agent's proposed diff: Does the test use the real low-privilege role rather than a bypassing administrator?",
+    "stretch": "Include anonymous writes in the same capability matrix.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-test-insert-ownership-checks",
+    "parentId": "effect-sharing-rls",
+    "title": "Test insert ownership checks",
+    "concept": "Write policies",
+    "brief": "A signed-in database client inserts a project row naming a different owner.",
+    "explanation": "Insert policy must validate the proposed row, not only existing-row visibility.",
+    "steps": [
+      "Create a repeatable fixture: A signed-in database client inserts a project row naming a different owner. Record the starting rows and relevant UI state before making the change.",
+      "Add the appropriate new-row ownership condition and exercise direct inserts.",
+      "Insert one matching-owner and one forged-owner row. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The matching owner can create the intended row.",
+      "The forged ownership row is rejected by the database.",
+      "Recovery evidence: Attempt insert through an upsert path. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Attempt insert through an upsert path.",
+    "review": "Review the agent's proposed diff: Does the upsert enforce both insert and update policies correctly?",
+    "stretch": "Add explicit tests for server-managed ownership fields.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-test-update-before-and-after",
+    "parentId": "effect-sharing-rls",
+    "title": "Test update before and after",
+    "concept": "Policy semantics",
+    "brief": "A member can see a project but attempts to change its owner to an outsider.",
+    "explanation": "Update policy needs rules for selecting the old row and validating the proposed new row.",
+    "steps": [
+      "Create a repeatable fixture: A member can see a project but attempts to change its owner to an outsider. Record the starting rows and relevant UI state before making the change.",
+      "Separate visibility and allowed resulting-state checks.",
+      "Update ordinary text, project ownership, and membership-sensitive fields. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Allowed text changes persist.",
+      "Forbidden new ownership cannot pass merely because the old row was visible.",
+      "Recovery evidence: Combine permitted and forbidden changes in one statement. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Combine permitted and forbidden changes in one statement.",
+    "review": "Review the agent's proposed diff: Does a zero-row update map clearly to denial or missing state?",
+    "stretch": "Test returning clauses so write results reveal only authorized fields.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-verify-delete-restrictions",
+    "parentId": "effect-sharing-rls",
+    "title": "Verify delete restrictions",
+    "concept": "Destructive permissions",
+    "brief": "A viewer issues a direct delete against a project they can read.",
+    "explanation": "Read visibility does not imply deletion authority.",
+    "steps": [
+      "Create a repeatable fixture: A viewer issues a direct delete against a project they can read. Record the starting rows and relevant UI state before making the change.",
+      "Define deletion capabilities and test under each actual database role.",
+      "Execute delete as viewer, editor, owner, and outsider. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Only permitted roles can delete the fixture row.",
+      "Denied attempts leave related rows and project data intact.",
+      "Recovery evidence: Attempt deletion through a function or view wrapper. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Attempt deletion through a function or view wrapper.",
+    "review": "Review the agent's proposed diff: Do alternate database entry points preserve the same policy?",
+    "stretch": "Add cascade tests proving related tables cannot become an indirect deletion bypass.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-exercise-service-role-boundaries",
+    "parentId": "effect-sharing-rls",
+    "title": "Exercise service-role boundaries",
+    "concept": "Privileged adapters",
+    "brief": "A backend uses a database credential that bypasses row-level policies.",
+    "explanation": "A privileged connection requires application authorization and must not be mistaken for policy enforcement.",
+    "steps": [
+      "Create a repeatable fixture: A backend uses a database credential that bypasses row-level policies. Record the starting rows and relevant UI state before making the change.",
+      "Document which adapter uses privileged access and test its operation-level checks.",
+      "Call the privileged service as an outsider against a private project. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The service still rejects unauthorized operations.",
+      "A policy test never claims protection based on a bypassing credential.",
+      "Recovery evidence: Replace the test credential with the actual low-privilege role. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Replace the test credential with the actual low-privilege role.",
+    "review": "Review the agent's proposed diff: Does the architecture unnecessarily expose privileged access to general request handlers?",
+    "stretch": "Narrow privileged operations behind a separately reviewed service interface.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-check-membership-changes-promptly",
+    "parentId": "effect-sharing-rls",
+    "title": "Check membership changes promptly",
+    "concept": "Policy freshness",
+    "brief": "Remove a member and immediately query project comments using their existing session.",
+    "explanation": "Policy evaluation should follow current membership under the declared consistency model.",
+    "steps": [
+      "Create a repeatable fixture: Remove a member and immediately query project comments using their existing session. Record the starting rows and relevant UI state before making the change.",
+      "Base access checks on authoritative membership state.",
+      "Delete membership and repeat the same direct query. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The removed member loses the intended visibility.",
+      "Cached application role data cannot override database denial.",
+      "Recovery evidence: Run the query within an already open transaction. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Run the query within an already open transaction.",
+    "review": "Review the agent's proposed diff: Does the test state the transaction isolation and snapshot assumptions?",
+    "stretch": "Document access-revocation latency for caches and long-lived transactions.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-prevent-policy-recursion",
+    "parentId": "effect-sharing-rls",
+    "title": "Prevent policy recursion",
+    "concept": "Policy composition",
+    "brief": "A membership policy queries the membership table to decide who can read memberships.",
+    "explanation": "Self-referential authorization rules can recurse or unexpectedly expose data.",
+    "steps": [
+      "Create a repeatable fixture: A membership policy queries the membership table to decide who can read memberships. Record the starting rows and relevant UI state before making the change.",
+      "Design a nonrecursive policy structure or narrowly scoped trusted helper.",
+      "Query memberships as owner, viewer, and outsider. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Queries terminate and return the intended rows.",
+      "No recursive-policy error is hidden as an empty member list.",
+      "Recovery evidence: Add a second policy that also consults membership visibility. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add a second policy that also consults membership visibility.",
+    "review": "Review the agent's proposed diff: Does any trusted helper have an explicit safe search path and limited purpose?",
+    "stretch": "Write a dependency diagram for policy evaluation paths.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-scope-joins-and-views",
+    "parentId": "effect-sharing-rls",
+    "title": "Scope joins and views",
+    "concept": "Read surfaces",
+    "brief": "Expose a view joining projects, memberships, and user profiles.",
+    "explanation": "A view must preserve the intended caller-based visibility across all joined data.",
+    "steps": [
+      "Create a repeatable fixture: Expose a view joining projects, memberships, and user profiles. Record the starting rows and relevant UI state before making the change.",
+      "Verify view execution semantics and explicitly select permitted profile fields.",
+      "Query the view as principals from two separate projects. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each principal sees only permitted project and profile information.",
+      "Joining profiles never widens access beyond the project's policy.",
+      "Recovery evidence: Add an aggregate count to the view and inspect hidden-membership leakage. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Add an aggregate count to the view and inspect hidden-membership leakage.",
+    "review": "Review the agent's proposed diff: Does the view execute with caller or elevated privileges as intended?",
+    "stretch": "Add view queries to the same isolation matrix as direct table queries.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-make-policy-tests-mutation-sensitive",
+    "parentId": "effect-sharing-rls",
+    "title": "Make policy tests mutation-sensitive",
+    "concept": "Test quality",
+    "brief": "A policy test passes because its fixture contains no cross-project rows.",
+    "explanation": "Authorization tests need both allowed and forbidden data to prove isolation.",
+    "steps": [
+      "Create a repeatable fixture: A policy test passes because its fixture contains no cross-project rows. Record the starting rows and relevant UI state before making the change.",
+      "Seed two owners, a viewer, an outsider, and distinct private records.",
+      "Temporarily remove one policy predicate and rerun the matrix. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The weakened policy causes a specific forbidden-access test to fail.",
+      "A test that always returns an empty set cannot pass allowed-access assertions.",
+      "Recovery evidence: Swap tenant IDs in one test request. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Swap tenant IDs in one test request.",
+    "review": "Review the agent's proposed diff: Do tests verify both denial and legitimate usability?",
+    "stretch": "Add an automated mutation check for the most critical scope predicate.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-record-actor-from-trusted-context",
+    "parentId": "effect-sharing-audit",
+    "title": "Record actor from trusted context",
+    "concept": "Audit provenance",
+    "brief": "A membership change request includes an actorName claiming to be the project owner.",
+    "explanation": "Audit attribution must derive from authenticated context, not user-authored payload.",
+    "steps": [
+      "Create a repeatable fixture: A membership change request includes an actorName claiming to be the project owner. Record the starting rows and relevant UI state before making the change.",
+      "Construct actor identity inside the authorized operation.",
+      "Submit a role change with forged actor fields. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The event records the actual authenticated actor.",
+      "Client text cannot impersonate another administrator in history.",
+      "Recovery evidence: Rename the actor's profile after the event. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Rename the actor's profile after the event.",
+    "review": "Review the agent's proposed diff: Does the event intentionally retain a snapshot or resolve current display identity?",
+    "stretch": "Store both stable actor ID and a minimal historical display snapshot.",
+    "minutes": 30,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-commit-access-change-with-its-event",
+    "parentId": "effect-sharing-audit",
+    "title": "Commit access change with its event",
+    "concept": "Audit atomicity",
+    "brief": "Grant editor access, then fail audit-event insertion.",
+    "explanation": "A security-relevant state change and its mandatory audit record form one logical commit.",
+    "steps": [
+      "Create a repeatable fixture: Grant editor access, then fail audit-event insertion. Record the starting rows and relevant UI state before making the change.",
+      "Write membership and audit event in one transaction.",
+      "Inject failure at the audit insertion boundary. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Neither the membership change nor its event commits partially.",
+      "The UI never reports access granted without required history.",
+      "Recovery evidence: Retry with the same operation identity. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Retry with the same operation identity.",
+    "review": "Review the agent's proposed diff: Is audit insertion treated as mandatory rather than best-effort logging?",
+    "stretch": "Add an outbox for external audit delivery while keeping the local event atomic.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-capture-before-and-after-roles",
+    "parentId": "effect-sharing-audit",
+    "title": "Capture before and after roles",
+    "concept": "Change meaning",
+    "brief": "Demote a member from owner to viewer while other memberships change concurrently.",
+    "explanation": "An audit event should describe the actual transition that committed.",
+    "steps": [
+      "Create a repeatable fixture: Demote a member from owner to viewer while other memberships change concurrently. Record the starting rows and relevant UI state before making the change.",
+      "Read the prior role within the mutation boundary and record resulting role.",
+      "Race two role changes against the same membership revision. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The accepted event matches the stored before-and-after transition.",
+      "A losing command never records a role change that did not occur.",
+      "Recovery evidence: Replay the successful command after a lost response. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Replay the successful command after a lost response.",
+    "review": "Review the agent's proposed diff: Does idempotency prevent duplicate audit events for one transition?",
+    "stretch": "Include expected and actual revision in internal diagnostics for conflicts.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-protect-audit-visibility",
+    "parentId": "effect-sharing-audit",
+    "title": "Protect audit visibility",
+    "concept": "Sensitive history",
+    "brief": "A viewer requests an audit event containing an invitation recipient's email.",
+    "explanation": "Audit history has its own field-level visibility requirements.",
+    "steps": [
+      "Create a repeatable fixture: A viewer requests an audit event containing an invitation recipient's email. Record the starting rows and relevant UI state before making the change.",
+      "Authorize event access and redact sensitive fields by role.",
+      "Compare owner, viewer, removed-member, and outsider responses. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Each role receives only its permitted event details.",
+      "A downloadable audit export does not bypass redaction.",
+      "Recovery evidence: Change membership after the history page is loaded. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Change membership after the history page is loaded.",
+    "review": "Review the agent's proposed diff: Does cached history expire or reauthorize when access changes?",
+    "stretch": "Use separate public activity and restricted security-audit projections.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-keep-audit-events-append-only",
+    "parentId": "effect-sharing-audit",
+    "title": "Keep audit events append-only",
+    "concept": "History integrity",
+    "brief": "An administrator edits a mistaken role-change note after publication.",
+    "explanation": "Correction should preserve original events rather than silently rewrite history.",
+    "steps": [
+      "Create a repeatable fixture: An administrator edits a mistaken role-change note after publication. Record the starting rows and relevant UI state before making the change.",
+      "Append a correction event linked to the original event ID.",
+      "Correct a note and inspect both entries and ordering. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The original event remains available with its correction reference.",
+      "No edit endpoint can mutate actor, time, or committed role transition.",
+      "Recovery evidence: Try deleting the original event through the ordinary application service. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Try deleting the original event through the ordinary application service.",
+    "review": "Review the agent's proposed diff: Does database access restrict mutation of existing audit rows?",
+    "stretch": "Add integrity verification using ordered event identifiers and optional hashes.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-order-events-deterministically",
+    "parentId": "effect-sharing-audit",
+    "title": "Order events deterministically",
+    "concept": "Audit chronology",
+    "brief": "Two access changes share the same millisecond timestamp.",
+    "explanation": "History needs a stable total order without pretending timestamps are unique.",
+    "steps": [
+      "Create a repeatable fixture: Two access changes share the same millisecond timestamp. Record the starting rows and relevant UI state before making the change.",
+      "Order by timestamp plus stable event sequence or identity.",
+      "Page through events with tied timestamps. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Every event appears once in a reproducible order.",
+      "Pagination never skips an event because its timestamp matches the cursor.",
+      "Recovery evidence: Insert another tied event between page requests. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Insert another tied event between page requests.",
+    "review": "Review the agent's proposed diff: Does ordering communicate concurrency without inventing causal certainty?",
+    "stretch": "Record transaction or command IDs to group related events.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-distinguish-attempted-from-committed",
+    "parentId": "effect-sharing-audit",
+    "title": "Distinguish attempted from committed",
+    "concept": "Event taxonomy",
+    "brief": "An outsider attempts a role escalation that is denied before mutation.",
+    "explanation": "A denied attempt is operational evidence, not a successful domain change.",
+    "steps": [
+      "Create a repeatable fixture: An outsider attempts a role escalation that is denied before mutation. Record the starting rows and relevant UI state before making the change.",
+      "Use distinct event categories and safe fields for denied requests.",
+      "Compare accepted role-change history with denied-attempt diagnostics. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Accepted history contains only committed transitions.",
+      "A denial cannot look like access was actually granted.",
+      "Recovery evidence: Force a storage failure after authorization but before commit. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Force a storage failure after authorization but before commit.",
+    "review": "Review the agent's proposed diff: Does the event model distinguish denied, failed, and committed outcomes?",
+    "stretch": "Add aggregate security monitoring without flooding the user's activity feed.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-retain-meaningful-deleted-references",
+    "parentId": "effect-sharing-audit",
+    "title": "Retain meaningful deleted references",
+    "concept": "Historical links",
+    "brief": "Delete a project member's account after several audited ownership transfers.",
+    "explanation": "Historical references must remain interpretable when live profile rows disappear.",
+    "steps": [
+      "Create a repeatable fixture: Delete a project member's account after several audited ownership transfers. Record the starting rows and relevant UI state before making the change.",
+      "Use stable IDs and an intentional deleted-actor display policy.",
+      "Remove the profile fixture and render prior audit entries. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "Events remain readable and maintain correct actor association.",
+      "Missing profiles never cause the entire history query to fail.",
+      "Recovery evidence: Delete a referenced invitation while retaining its acceptance event. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Delete a referenced invitation while retaining its acceptance event.",
+    "review": "Review the agent's proposed diff: Does history rely on inner joins that erase past events?",
+    "stretch": "Include minimal immutable subject descriptors in audit payloads.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-shared-projects-export-audit-evidence-consistently",
+    "parentId": "effect-sharing-audit",
+    "title": "Export audit evidence consistently",
+    "concept": "Operational review",
+    "brief": "Export a week's access changes while a new membership mutation commits.",
+    "explanation": "An audit export needs a declared time range and stable inclusion boundary.",
+    "steps": [
+      "Create a repeatable fixture: Export a week's access changes while a new membership mutation commits. Record the starting rows and relevant UI state before making the change.",
+      "Use inclusive and exclusive range endpoints with deterministic ordering.",
+      "Export events exactly at both boundaries and during generation. Exercise the real operation boundary as well as the rendered result."
+    ],
+    "checks": [
+      "The artifact includes precisely the documented interval.",
+      "Events are neither duplicated nor omitted across adjacent weekly exports.",
+      "Recovery evidence: Retry export after the newest event arrives. Record the resulting state and prove that a fresh valid action still works."
+    ],
+    "experiment": "Retry export after the newest event arrives.",
+    "review": "Review the agent's proposed diff: Does the receipt record the snapshot cutoff separately from download time?",
+    "stretch": "Add a manifest with event count and digest for later integrity comparison.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  }
+]

@@ -1,6 +1,6 @@
+import Dexie from "dexie";
 import { db, type UserState } from "../schema";
 import { enqueueOutbox } from "../sync/outbox";
-import { validatePracticeEntries } from "./practiceRepo";
 
 export async function saveUserState(
   id: string,
@@ -61,6 +61,14 @@ export async function mergeUserState(row: UserState) {
   if (!value || typeof value !== "object")
     throw new Error("Invalid synced payload");
   if (row.id.startsWith("engineering_practice:")) {
+    // Settings saves do not need the mission catalog. A merge runs in an IDB
+    // transaction, so keep it alive while loading validation on demand.
+    const practiceModule = await Dexie.waitFor(
+      import("./practiceRepo"),
+      120_000,
+    );
+    const validatePracticeEntries: typeof import("./practiceRepo").validatePracticeEntries =
+      practiceModule.validatePracticeEntries;
     validatePracticeEntries([value]);
     if (
       row.id !==

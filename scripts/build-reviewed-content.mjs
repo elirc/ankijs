@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 // Bump this when existing installations must run the retirement/correction migration again.
-const CURRICULUM_VERSION = 17;
+const CURRICULUM_VERSION = 18;
 const RETIRED_LIBRARY_PREFIXES = ['a3000000-', 'a4000000-'];
 const TEACHING_MARKER = '<!-- recall:teaching:v1 -->';
 

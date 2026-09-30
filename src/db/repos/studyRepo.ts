@@ -10,7 +10,7 @@ import {
 } from "../../srs/preferences";
 import { newCardCandidates } from "../../srs/siblings";
 import { buildQueues, interleaveQueues } from "../../srs/queue";
-import { getDeckInfo, type Track } from "../../data/curriculum";
+import { getDeckInfo, type Track } from "../../data/curriculum-catalog";
 
 export async function getStudyPreferences(): Promise<StudyPreferences> {
   const raw = (await db.sync_meta.get("study_preferences"))?.value;

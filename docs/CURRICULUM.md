@@ -1,14 +1,16 @@
-# Current library: 3,179 cards across 90 decks
+# Current library: 3,231 cards across 92 decks
 
-The v17 core below retains its 3,103 cards and 83 decks. The guided workshop adds 76 cards across seven decks without changing existing card identities or progress. See [the full workshop inventory](WORKSHOP.md) for 38 supplied units and both capstones.
+The v18 core below has 3,155 cards and 85 decks. The guided workshop adds 76 cards across seven decks without changing existing card identities or progress. See [the full workshop inventory](WORKSHOP.md) for 38 supplied units and both capstones.
 
 # Recall curriculum
 
-The current v17 library contains 3,103 cards across 83 decks: 2,959 retained base cards plus 144 authored scenarios. It includes 712 guided lesson cards across 356 lessons, alongside 48 hands-on engineering missions. Version 15 retired the generated source-derived library added in curriculum versions 12 through 14; [the release notes](RELEASE.md) record what that does to an existing installation. The automatic retrieval layer remains retired as well; [the earlier quality review](CONTENT-REVIEW.md) documents that decision.
+The current v18 library contains 3,155 cards across 85 decks: 2,999 retained base cards plus 156 authored scenarios. It includes 752 guided lesson cards across 376 lessons, alongside 48 hands-on engineering missions. Version 15 retired the generated source-derived library added in curriculum versions 12 through 14; [the release notes](RELEASE.md) record what that does to an existing installation. The automatic retrieval layer remains retired as well; [the earlier quality review](CONTENT-REVIEW.md) documents that decision.
 
 Version 16 was a content-quality pass with no new cards: about 2,200 existing cards and lessons were rewritten for accuracy, plain wording, and phone-sized examples. Installed apps receive those rewrites through the correction migration, and review history is kept.
 
 Version 17 adds 232 cards. The new **Build real apps** track has 8 decks with 10 guided lessons (20 cards) and 6 scenarios each, for 208 cards. Another 24 scenarios go into existing decks: TypeScript, Git, Python, CSS, and HTML. Every stated output and command in the new material was run or checked against official documentation before release. Existing installations get the new decks when the app next opens; nothing else is reset.
+
+Version 18 adds 52 cards: two more Build real apps decks, 29 · Data modeling and migrations and 30 · Performance and caching basics, each with 10 guided lessons (20 cards) and 6 scenarios. The track now has 10 decks, 100 lessons, and 60 scenarios. As in version 17, every stated output was run or checked against official documentation, and existing installations get the two decks on the next app load without losing progress.
 
 | Deck | Covers | Further reading |
 | --- | --- | --- |
@@ -20,6 +22,8 @@ Version 17 adds 232 cards. The new **Build real apps** track has 8 decks with 10
 | 26 · Test a web app with Vitest | Matchers, mocks and spies, fake timers, Testing Library queries, userEvent, API and database tests | Vitest guide |
 | 27 · Debug with browser DevTools | Network panel, cache and throttling, breakpoints, source maps, cookies, service workers, computed styles | Chrome DevTools documentation |
 | 28 · Review, merge, and deploy | Pull requests, answering review, merge vs rebase, revert vs reset, `npm ci`, public `VITE_` variables, migrations, smoke checks | GitHub Docs · Pull requests |
+| 29 · Data modeling and migrations | Surrogate keys, foreign keys on the many side, join-table columns, indexing foreign keys, CHECK constraints, NULL and defaults, migration files, price snapshots, identity vs UUID | PostgreSQL 17 · Data definition |
+| 30 · Performance and caching basics | `performance.now()`, Server-Timing, batching N+1 queries, LIMIT n+1 paging, choosing a cache layer, functions that skip indexes, debounce and `useMemo` in React, `React.lazy`, delayed skeletons | MDN · Web performance |
 
 ## Historical v8 inventory
 
@@ -103,13 +107,13 @@ The following table records the superseded v8 expansion, not current counts. Cur
 | 11 · Run a reliable .NET service | C# & .NET | 16 | 64 | 80 |
 | 12 · Build a real notes app, one decision at a time | C# & .NET | 16 | 64 | 80 |
 
-1,112 cards are original Recall material, including all 144 scenarios. 1,991 cards are adapted from 30 seconds of code under CC BY 4.0: 1,211 explanation prompts and 780 code-completion prompts. See the bundled [credits](../public/content-credits.html) and [license](../public/licenses/30-seconds.txt).
+1,164 cards are original Recall material, including all 156 scenarios. 1,991 cards are adapted from 30 seconds of code under CC BY 4.0: 1,211 explanation prompts and 780 code-completion prompts. See the bundled [credits](../public/content-credits.html) and [license](../public/licenses/30-seconds.txt).
 
 The base Start here path teaches 80 ideas, and Keep going teaches 100 further ideas, through 360 paired understanding and application cards. The follow-on decks cover TypeScript, Python, debugging, testing, accessible interfaces, HTTP APIs, SQL reasoning, security, delivery, and real CRUD app problems. Each card has five explanations with plain English, a worked example, an analogy, a common mistake, and a practice prompt whose solution is hidden until requested. Older answers keep their full content and receive related supporting lessons when applicable. Browsing explanations does not change the spaced-repetition schedule.
 
 The default schedule introduces 10 new cards per local day across all decks, with due reviews first. Related introductions revisit the same idea after 1, then 3, then 7 local calendar days. Eligible familiar ideas take priority within a deck. Due reviews and learning retries are not delayed by this introduction spacing. FSRS retention defaults to 90%, configurable in Settings.
 
-The authored C# & .NET path contains 96 lessons and 192 paired cards. Together with the earlier authored paths and the 80 lessons of Build real apps, the guided set contains 356 lessons and 712 cards. The dedicated `/dotnet` page groups its decks into C# fundamentals, web backend development, and completing a working app. Focused sessions keep due reviews first and introduce new cards in deck order while sharing the existing global daily allowance. The authored path uses .NET 10 as its baseline, with official Microsoft Learn links for further reading. Source references retain their documented platform context.
+The authored C# & .NET path contains 96 lessons and 192 paired cards. Together with the earlier authored paths and the 100 lessons of Build real apps, the guided set contains 376 lessons and 752 cards. The dedicated `/dotnet` page groups its decks into C# fundamentals, web backend development, and completing a working app. Focused sessions keep due reviews first and introduce new cards in deck order while sharing the existing global daily allowance. The authored path uses .NET 10 as its baseline, with official Microsoft Learn links for further reading. Source references retain their documented platform context.
 
 Curriculum version 6 removes 434 bundled DSA, puzzle, and unrelated math cards and replaces the guided algorithm material with 38 CRUD cards. The new decks are **09 · Build your first CRUD feature** and **20 · Fix real CRUD app problems**; an early-return lesson also replaces the recursion exercise. The C# & .NET path remains available at `/dotnet`.
 
@@ -133,3 +137,7 @@ Each generated answer is extracted from its own existing lesson. Code restoratio
 | Integrations | 12 | 6 |
 | Operations | 12 | 6 |
 | AI-assisted engineering | 12 | 6 |
+
+## Navigate current and historical material
+
+The [current-route and historical-navigation guide](upskill/09-independent-practice/02-routes-and-history.md) explains which catalogs define current selectable content, how workshop identities map to missions, and why older inventory tables are preserved as history. Begin with the [placement diagnostic](upskill/09-independent-practice/01-placement.md) when choosing a route.

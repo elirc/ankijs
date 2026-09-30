@@ -1,0 +1,2051 @@
+{
+  "id": "agent-delivery",
+  "title": "Agent-assisted delivery lab",
+  "kind": "Standalone app",
+  "summary": "Practise specifying, implementing, debugging, reviewing, and releasing CRUD changes with a coding agent while owning the result.",
+  "outcome": "A reviewable portfolio of small changes with explicit acceptance criteria, observed verification, and explanations you can reproduce independently.",
+  "prerequisites": "Use a separate practice copy of the support-ticket app or another CRUD app. Keep generated data and a known working baseline.",
+  "model": [
+    "Change brief: user action, acceptance examples, non-goals, affected boundaries, and rollback conditions.",
+    "Evidence record: baseline commit, proposed diff, failing/passing checks, observed results, tradeoffs, and final commit.",
+    "Agent context: repository instructions, installed dependency versions, approved scope, and source references. These guide work but do not replace verification."
+  ],
+  "boundaries": "Human-written acceptance contract → repository inspection → bounded agent change → independent checks and review → reversible release.",
+  "milestones": [
+    {
+      "id": "effect-agent-specification",
+      "title": "Turn a vague feature into a small contract",
+      "concept": "Requirements · acceptance examples",
+      "brief": "Convert a request such as better ticket search into one reviewable change with observable behavior and explicit exclusions.",
+      "explanation": "An agent needs a task boundary it can verify. State the user action, representative data, success behavior, and at least one failure case. Separate product decisions from implementation guesses. A good brief narrows uncertainty without prescribing every line of code; it also identifies choices that need a human answer before dependent work begins.",
+      "steps": [
+        "Write your own examples for case-insensitive search, empty input, pagination, and unauthorized results. Choose one slice to implement first.",
+        "Ask the agent to inspect existing routes, services, queries, tests, and dependency versions before proposing changes. Compare its file map with your own trace.",
+        "Revise the brief into acceptance checks, non-goals, and a small diff plan. Save the baseline and explain how you will detect a regression."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The brief describes observable behavior and a concrete failure case."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The proposed files and boundaries are grounded in the repository."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Non-goals keep the first change small enough to review."
+        }
+      ],
+      "experiment": "Give the agent a deliberately ambiguous requirement about archived tickets. Check that it identifies the decision instead of silently choosing a data-loss-prone interpretation.",
+      "review": "You should be able to explain the intended result before seeing generated code. Keep assumptions visible and resolve the ones that affect correctness.",
+      "stretch": "Repeat the exercise with a different feature and compare the amount of rework caused by missing acceptance examples.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-agent-context",
+      "title": "Ground Effect code in the installed version",
+      "concept": "API verification · source inspection",
+      "brief": "Have the agent implement a small Effect operation using examples that match the project's actual package versions and conventions.",
+      "explanation": "Plausible API names are not evidence that an API exists. Inspect package versions, source exports, and repository examples before coding. Effect major versions and related packages can differ, so keep a coherent version baseline. A type check validates one part of the work; runtime behavior and dependency construction still need a focused test.",
+      "steps": [
+        "Choose a small operation with one expected error and one service requirement. Record the installed Effect version and the relevant source or documentation reference.",
+        "Ask the agent to explain the operation's success, error, and requirements types, then implement it using the existing runtime boundary.",
+        "Verify the API symbols, run type checking and a behavior test, and intentionally supply a missing dependency in a test to inspect the failure."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Every introduced API is available in the installed version."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The operation's required services are provided at a clear boundary."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Both expected failure and successful behavior are observed."
+        }
+      ],
+      "experiment": "Offer an example from a different Effect major as a tempting reference. Verify the agent notices the mismatch rather than mixing APIs until the compiler is silenced.",
+      "review": "Avoid accepting broad casts or any as a substitute for understanding an API. Ask for the exact source example that informed the implementation.",
+      "stretch": "Write a short local pattern note that explains the verified operation and its tests for the next change.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-agent-regression",
+      "title": "Prove a bug before accepting a fix",
+      "concept": "Hypothesis testing · regression evidence",
+      "brief": "Direct an agent through reproducing a CRUD defect, choosing a discriminating experiment, and validating a minimal fix.",
+      "explanation": "A failing symptom can have several causes. State at least two hypotheses and choose an experiment that distinguishes them. A regression test should fail on the baseline for the reported reason and pass after the fix. Changing a test to match a new implementation is not equivalent to proving the original behavior is repaired.",
+      "steps": [
+        "Introduce or select a reproducible defect, such as a stale edit overwriting a newer title. Record exact steps and the expected stored state.",
+        "Ask the agent for competing hypotheses and a minimal reproduction before any edits. Run the failing check yourself and inspect its failure message.",
+        "Implement the smallest justified change, rerun the same check, and test one neighboring behavior. Review test changes separately from product changes."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The regression check fails on the original defect for the expected reason."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The same behavioral check passes after the fix."
+        },
+        {
+          "id": "criterion-3",
+          "label": "A neighboring case confirms the fix did not merely suppress the symptom."
+        }
+      ],
+      "experiment": "Suggest catching every error and returning success. Explain how the acceptance test should reject this symptom-hiding workaround.",
+      "review": "Save before/after results and the causal explanation. A green command with zero discovered tests is not verification.",
+      "stretch": "Recreate a variation of the bug without the agent and identify which invariant the original fix protected.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-agent-review",
+      "title": "Review generated CRUD changes adversarially",
+      "concept": "Diff review · invariants · negative tests",
+      "brief": "Inspect an agent-produced feature for missing authorization, invalid transitions, hidden migrations, and misleading tests before accepting it.",
+      "explanation": "Generated code should be reviewed against the contract and the data invariants, not just its readability. Trace a direct request that bypasses the UI and inspect what happens if a dependency fails halfway through. Review migrations, dependencies, and tests as part of the same change because each can introduce behavior outside the visible form.",
+      "steps": [
+        "Create a review checklist tied to the feature: ownership predicate, schema boundary, transaction scope, revision handling, and draft recovery.",
+        "Read the diff before the agent's summary. Write concrete findings with a triggering input, expected outcome, and the affected code path.",
+        "Add one independent negative test for each substantive finding, then request a narrow correction and review the resulting diff again."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Findings describe reproducible behavior rather than vague style preferences."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Direct requests and intermediate failures are included in review."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Corrections are verified with tests independent of the implementation's happy path."
+        }
+      ],
+      "experiment": "Remove an owner predicate from a branch while keeping the UI unchanged. Check whether your review and direct-request test detect the access violation.",
+      "review": "Do not use the agent's confidence as evidence. Distinguish confirmed bugs, design tradeoffs, and questions that require product clarification.",
+      "stretch": "Review a second implementation of the same contract and compare which tests remain useful without modification.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-agent-refactor",
+      "title": "Refactor a Promise flow into Effect incrementally",
+      "concept": "Behavior preservation · service extraction",
+      "brief": "Move one existing async operation into Effect while preserving its observable behavior and keeping the diff easy to evaluate.",
+      "explanation": "A library migration is easier to review when it separates behavior changes from structural changes. Capture the current contract, identify expected versus unexpected failures, and extract one boundary at a time. Keep pure transformations ordinary functions where that remains clear. The goal is explicit dependencies and recovery, not wrapping every expression in a new abstraction.",
+      "steps": [
+        "Choose one Promise-based write flow and record its return values, errors, persistence effects, and UI states in contract tests.",
+        "Introduce a typed Effect operation and an adapter for the existing dependency. Keep execution at the application edge and preserve the public caller contract where practical.",
+        "Run the same tests against old and new implementations, compare the diff, and explain every intentional behavior change separately."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Existing observable behavior remains covered by unchanged contract tests."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Expected errors and service dependencies are explicit in the new operation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The refactor avoids unrelated schema, UI, and dependency changes."
+        }
+      ],
+      "experiment": "Make the dependency reject with an unexpected value and compare both implementations. Verify that the migration does not accidentally turn a real failure into successful empty data.",
+      "review": "Ask the agent to justify each abstraction and remove ones without a concrete responsibility. A larger diff is not evidence of deeper learning.",
+      "stretch": "Add a live and in-memory Layer, then explain one limitation of the fake that still requires integration testing.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-agent-release",
+      "title": "Ship with evidence and reproduce the learning",
+      "concept": "Release review · independent explanation",
+      "brief": "Prepare a small CRUD change for release with reproducible verification, a rollback plan, and a final exercise completed without the agent.",
+      "explanation": "Release evidence connects the intended behavior to the actual artifact. Record which checks ran, their results, the environment, and any unverified external integration. A rollback plan must consider data written by the new version. Finish by explaining the feature and implementing a small variation yourself so the work develops skill as well as shipping code.",
+      "steps": [
+        "Write a concise change description covering the user-visible result, affected data, verification, and remaining limits. Review the final diff and dependency changes.",
+        "Build the artifact, run a smoke journey in the target-like environment, rehearse any migration and rollback, and capture actual outputs without claiming unrun checks.",
+        "Close the agent session and implement a small variation from memory. Record where you needed help, then create a focused recall question for that gap."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The release description matches the final implementation and observed checks."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Rollback behavior accounts for records created by the new version."
+        },
+        {
+          "id": "criterion-3",
+          "label": "An independent variation demonstrates that you can explain and modify the core rule."
+        }
+      ],
+      "experiment": "Simulate a failed verification command or unavailable provider. Confirm the release notes clearly distinguish passed checks from blocked or unverified behavior.",
+      "review": "A deployed URL, a long agent transcript, and a passing build are different forms of evidence. Include the user journey and data invariants that establish the feature's behavior.",
+      "stretch": "Repeat the full specify-build-review-release loop on another project with less guidance and compare your error detection and explanation quality.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-search-contract",
+      "parentId": "effect-agent-specification",
+      "title": "Specify archived-record search behavior",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Request better ticket search with archived examples.",
+      "explanation": "Ambiguous visibility rules must be resolved before coding. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Inspect the existing search route and seed one active, one archived, and one unauthorized matching ticket.",
+        "Write expected results for active archived and unauthorized tickets.",
+        "Save the revised brief with exact expected result IDs and compare the agent's proposed file map with the repository."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each fixture has expected IDs."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Non-goals bound scope."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Agent identifies affected query path."
+        }
+      ],
+      "experiment": "Remove archived policy from the brief. The revised proposal must surface the missing visibility decision instead of inventing a rule.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Compare rework between both briefs. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-bulk-delete-contract",
+      "parentId": "effect-agent-specification",
+      "title": "Define the exact bulk action scope",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Select page one then change filter before Delete.",
+      "explanation": "Selection semantics determine which records may be deleted. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Capture selected IDs, current filter, record revisions, and the confirmation text before describing the change.",
+        "Specify selected IDs preview and conflict behavior.",
+        "Walk the brief through selection changes, a stale record, and a repeated confirmation; record the expected result for each."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Scope is explicit."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Changed rows have defined outcomes."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Confirmation names affected count."
+        }
+      ],
+      "experiment": "Insert matching records after preview. New matching records must stay outside selected-only scope unless the user explicitly chose all-matching semantics.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Choose all-matching versus selected-only semantics. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-empty-state-contract",
+      "parentId": "effect-agent-specification",
+      "title": "Specify useful empty and error states",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Open new workspace then simulate server failure.",
+      "explanation": "No data and failed loading are different outcomes. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Capture the current route's loading, empty, populated, and failed responses before proposing new text.",
+        "Write distinct interface acceptance examples.",
+        "Review wireframes or acceptance examples for all four states and verify each has a distinct condition and next action."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Empty workspace offers creation."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Failure offers retry."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Loading is not labeled empty."
+        }
+      ],
+      "experiment": "Return malformed successful response. A decode failure must become an error state rather than a successful empty collection.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Add offline-state behavior. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-money-contract",
+      "parentId": "effect-agent-specification",
+      "title": "Define currency and rounding examples",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Add line-item totals for 0.10 and 0.20.",
+      "explanation": "A price feature needs representational rules before arithmetic. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Find the app's existing money representation and write fixtures for empty input, zero, 0.10, and 0.20.",
+        "Specify decimal input storage and display contract.",
+        "Calculate expected stored and displayed values independently, then compare the proposed implementation contract with those fixtures."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Expected total is 0.30."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Excess precision has policy."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Currency is always labeled."
+        }
+      ],
+      "experiment": "Add a zero-decimal currency. The revised brief must state currency-specific precision instead of assuming every currency uses two decimals.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Explain rounding per item versus invoice. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-permission-contract",
+      "parentId": "effect-agent-specification",
+      "title": "Turn roles into an acceptance matrix",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Add editor and viewer roles to ticket app.",
+      "explanation": "Permission language must translate into command outcomes. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Identify the trusted actor source and list representative records owned by two separate workspaces.",
+        "List actor action resource combinations.",
+        "Check the matrix against direct service calls as well as route visibility; every allowed and denied row needs an oracle."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Viewer mutation is denied."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Editor succeeds in scope."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Cross-workspace case is explicit."
+        }
+      ],
+      "experiment": "Hide buttons without endpoint checks. The brief remains incomplete until direct commands reject the forbidden action independently of button visibility.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Add stale-role-change scenario. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-offline-contract",
+      "parentId": "effect-agent-specification",
+      "title": "Define what offline saving promises",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Edit a ticket with network disabled.",
+      "explanation": "Queued work cannot be called synchronized prematurely. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Inspect existing local storage and sync behavior, then draw the allowed pending-to-synced and pending-to-conflict transitions.",
+        "Specify local pending synced and conflict states.",
+        "Use the brief to predict reload, reconnection, and remote-edit behavior without relying on a generated UI mockup."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Draft survives reload."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Pending state is visible."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reconnection conflict has recovery."
+        }
+      ],
+      "experiment": "Reconnect after remote edit. The expected result must preserve the local draft while exposing the competing remote revision.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Bound offline queue retention. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-accessible-contract",
+      "parentId": "effect-agent-specification",
+      "title": "Specify keyboard behavior before UI changes",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Add a modal ticket editor.",
+      "explanation": "A screenshot cannot define accessible interaction. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Identify the modal trigger, first editable field, validation summary, submit action, and intended close target.",
+        "Write focus open submit error close sequences.",
+        "Perform the written keyboard sequence against the current interface or prototype and record focus after each transition."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Opening places focus predictably."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Errors identify fields."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Closing returns to trigger."
+        }
+      ],
+      "experiment": "Delete trigger while modal stays open. The contract must name a sensible fallback focus target when the original trigger no longer exists.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Include screen-reader status announcements. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-scope-cut",
+      "parentId": "effect-agent-specification",
+      "title": "Split a large feature into a verifiable slice",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Request full CRM import preview history and undo.",
+      "explanation": "A small change must still deliver coherent behavior. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "List the current import boundary and mark which proposed capabilities require new persistence or mutation commands.",
+        "Choose preview-only slice with fixture-based outcomes.",
+        "Compare the agent plan with the selected preview-only acceptance checks and remove unrelated implementation work."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Preview shows row errors."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No import mutation occurs."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Deferred capabilities are explicit."
+        }
+      ],
+      "experiment": "Agent begins implementing undo storage. Record the first out-of-scope file change and revise the task boundary before accepting additional code.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Write the next dependent slice. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-ambiguity-log",
+      "parentId": "effect-agent-specification",
+      "title": "Keep unresolved assumptions visible",
+      "concept": "Bounded change briefs · observable acceptance",
+      "brief": "Request automatic assignment without tie-breaking policy.",
+      "explanation": "Agent guesses cannot silently become product requirements. A useful agent task describes observable behavior and unresolved decisions before choosing implementation details. Ground the brief in the existing application and keep the first slice small enough to inspect and verify independently.",
+      "steps": [
+        "Collect two examples that expose the undefined assignment tie-breaker and identify repository inspection that is independent of it.",
+        "Record decisions and isolate independent preparatory work.",
+        "Produce a decision log separating confirmed requirements, assumptions, and blocked decisions with their dependent tasks."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Unknowns are named."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Safe inspection proceeds."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Assignment rule waits for resolution."
+        }
+      ],
+      "experiment": "Provide conflicting example expectations. Conflicting examples should remain unresolved in the log until a consistent product decision is provided.",
+      "review": "Read the brief without the generated code. Explain what evidence would prove success and which product assumptions still require an explicit decision.",
+      "stretch": "Revise the brief with a decision history. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Build independently",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-version-baseline",
+      "parentId": "effect-agent-context",
+      "title": "Ground changes in installed Effect versions",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Implement one repository operation in existing app.",
+      "explanation": "Documentation from another major version may not apply. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Read package manifest, lockfile, installed exports, and one local Effect example before drafting the operation.",
+        "Record package version and inspect actual exports.",
+        "Compile and run the proposed operation against the recorded install, preserving the symbol references used to justify it."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Used symbols exist."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Lockfile version is recorded."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Example compiles in this repository."
+        }
+      ],
+      "experiment": "Give agent an incompatible example. List the incompatible symbols and explain the supported replacement instead of mixing conventions silently.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Explain required adaptation explicitly. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-service-map",
+      "parentId": "effect-agent-context",
+      "title": "Trace real service construction",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Add notification adapter to ticket save flow.",
+      "explanation": "A declared service must be supplied at runtime. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Trace the application entrypoint through runtime construction to the ticket save operation and its required services.",
+        "Map entrypoint service layer and repository dependencies.",
+        "Exercise the production construction and a controlled test replacement, then compare the missing-service failure with expectations."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Required service is provided."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Test replacement is explicit."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Missing dependency fails visibly."
+        }
+      ],
+      "experiment": "Omit adapter from one runtime path. The omitted adapter must produce a visible construction or execution failure rather than a hidden global fallback.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Document shared versus scoped construction. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-error-channel",
+      "parentId": "effect-agent-context",
+      "title": "Identify expected errors and defects",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Implement rename returning duplicate-name conflict.",
+      "explanation": "A type signature should reflect recoverable business outcomes. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Write a duplicate-name fixture and an unexpected adapter failure before changing the operation's error model.",
+        "Explain success error and requirement types.",
+        "Compare the inferred success, expected-error, and requirements types with observed UI recovery and defect reporting."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Conflict is typed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "UI recovery is demonstrated."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unexpected defect is not swallowed."
+        }
+      ],
+      "experiment": "Throw unexpected error inside adapter. The unexpected failure must reach the defect-reporting boundary rather than becoming a successful empty result.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Review defect reporting boundary. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-existing-conventions",
+      "parentId": "effect-agent-context",
+      "title": "Reuse local patterns deliberately",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Add contact service beside existing ticket service.",
+      "explanation": "New architecture must fit actual repository conventions. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Inspect the neighboring ticket service, repository interface, dependency construction, and focused tests before adding contact behavior.",
+        "Inspect analogous code before proposing structure.",
+        "Review the proposed file organization against actual call sites and document any new abstraction with a concrete consumer."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Naming is consistent."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Runtime boundary is reused."
+        },
+        {
+          "id": "criterion-3",
+          "label": "New abstraction has stated purpose."
+        }
+      ],
+      "experiment": "Provide an outdated architecture note. Record which source is current and update the stale guidance separately from the functional change.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Resolve documentation-source disagreement. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-dependency-surface",
+      "parentId": "effect-agent-context",
+      "title": "Avoid unnecessary package additions",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Agent proposes new validation package for one field.",
+      "explanation": "A small CRUD change does not justify speculative dependencies. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Inventory existing schema, field validation, and form-error utilities relevant to the requested field change.",
+        "Check existing schema and form utilities.",
+        "Compare a minimal implementation with the proposed dependency approach, including actual import and build impact."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Existing capability is assessed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Added package has concrete need or is removed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Bundle impact is measured."
+        }
+      ],
+      "experiment": "Offer a package with overlapping APIs. The alternative package needs a concrete missing capability; overlapping APIs alone do not justify adoption.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Document maintenance tradeoffs. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-adapter-contract",
+      "parentId": "effect-agent-context",
+      "title": "Verify a provider adapter against its contract",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Wrap a fake storage provider in an Effect service.",
+      "explanation": "Mock behavior must match actual supported operations. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Create provider-shaped fixtures for success, malformed response, timeout, and permanent rejection using public teaching data.",
+        "Document request response and failure mapping.",
+        "Run the same adapter contract cases through its Effect boundary and compare domain outcomes with the documented mapping."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Malformed response is handled."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Timeout remains distinguishable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Interface matches repository use."
+        }
+      ],
+      "experiment": "Return success missing required identifier. A missing provider identifier must not be replaced with an invented receipt or treated as complete acceptance.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Add provider-shaped contract fixtures. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-resource-scope",
+      "parentId": "effect-agent-context",
+      "title": "Locate resource lifetime boundaries",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Add database session around import preview.",
+      "explanation": "Connections and subscriptions need deliberate release ownership. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Draw acquisition, readiness, use, interruption, and release for the database session used by preview.",
+        "Trace acquire use and cleanup paths.",
+        "Count active sessions after success, failure, cancellation, and repeated preview navigation; retained sessions must be explained."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Success releases resource."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Failure releases resource."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Interruption has observed cleanup."
+        }
+      ],
+      "experiment": "Cancel while request is pending. The cancelled request must release its owned session even when the normal success continuation never runs.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Measure concurrent resource use. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-context-minimum",
+      "parentId": "effect-agent-context",
+      "title": "Provide enough context without unrelated code",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Ask agent to fix stale search results.",
+      "explanation": "Task context should support the actual change boundary. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Collect the stale-search reproduction, relevant route, query client, service interface, and current package versions.",
+        "Provide route query service and current failing fixture.",
+        "Compare the agent's proposed race explanation with a manually traced request timeline before accepting implementation work."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Agent identifies race."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unrelated modules stay outside scope."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Assumptions are cited to files."
+        }
+      ],
+      "experiment": "Omit response ordering example. Record the assumption introduced by missing ordering context and add the smallest fixture that resolves it.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Compare proposed plan quality. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-api-proof",
+      "parentId": "effect-agent-context",
+      "title": "Replace invented APIs with verified usage",
+      "concept": "Repository grounding · Effect service contracts",
+      "brief": "Agent proposes a nonexistent Effect helper.",
+      "explanation": "Generated names require source evidence. Agent context should be evidence from the repository and installed dependencies. Identify the real runtime boundary and service construction, then verify proposed APIs and error behavior with focused compilation and execution.",
+      "steps": [
+        "Locate the proposed helper in installed exports and identify the actual composition pattern used by nearby code.",
+        "Inspect exports and replace with supported composition.",
+        "Compile the replacement and run its success and failure fixtures; keep a source reference for each non-obvious API choice."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Unsupported symbol is removed."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Types check."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Runtime fixture passes."
+        }
+      ],
+      "experiment": "Use same name from wrong package. A similarly named export from another package must not be imported without verifying its contract and compatibility.",
+      "review": "Compare the proposed file map and API claims with actual sources. Do not accept a plausible symbol name or a successful mock as proof of integration.",
+      "stretch": "Write a source-linked implementation note. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-lost-update-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Reproduce a stale-edit overwrite",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Two tabs edit ticket revision 5.",
+      "explanation": "A concurrency regression needs competing revisions. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Seed one ticket at revision five and arrange two writers that both read that revision before either saves.",
+        "Synchronize requests around the protected write.",
+        "Run the regression against the old and fixed paths, asserting final fields, revision, and the losing command's conflict result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old behavior loses data."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fix reports conflict."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Winning state is asserted."
+        }
+      ],
+      "experiment": "Replace concurrency with sequential requests. The sequential variant should be documented as insufficient because it does not expose the shared-read race.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Explain why the weaker test misses the bug. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-search-order-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Reproduce responses arriving backward",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Query Cedar then Birch with delayed Cedar result.",
+      "explanation": "Timing tests should control completion order directly. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Prepare two controlled query responses and start Cedar before Birch without using real-time sleeps.",
+        "Use controllable response promises.",
+        "Resolve Birch first and Cedar last, then assert visible IDs and the current query's loading state after both settle."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old results wrongly replace new."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fix retains Birch."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Loading belongs to current query."
+        }
+      ],
+      "experiment": "Resolve second request first repeatedly. Repeated reversed completion must produce the same newest-query result rather than a timing-dependent pass.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Add cancellation evidence. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-duplicate-submit-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Prove duplicate creation after a lost reply",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Create contact then retry after hidden success.",
+      "explanation": "A button test alone cannot cover network retries. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Create a command identity and fake transport that hides a committed creation response from the caller.",
+        "Use stable command fixture and persisted row count.",
+        "Retry through the real persistence boundary and inspect entity rows plus both response identities after settlement."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old implementation creates two."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fix creates one."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Both responses identify same entity."
+        }
+      ],
+      "experiment": "Retry with changed payload. Changed content under the same identity must have an explicit conflict result instead of creating a second entity.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Test operation-identity conflict. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-permission-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Test authorization beyond hidden buttons",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Viewer calls edit service directly.",
+      "explanation": "Endpoint access is the meaningful security boundary. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Seed an editor, a viewer, and a foreign workspace record, all with verified identity fixtures.",
+        "Create verified identities and scoped fixture records.",
+        "Call the service directly for each actor and inspect both returned outcomes and unchanged forbidden records."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Viewer fails."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Editor succeeds."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Foreign workspace stays unchanged."
+        }
+      ],
+      "experiment": "Remove UI entirely from test. Authorization assertions must still execute and pass without relying on a rendered interface or hidden controls.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Audit alternate mutation routes. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-clock-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Make expiry behavior deterministic",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Confirm hold at exact expiry instant.",
+      "explanation": "Sleeping is an unreliable expiry oracle. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Set the authoritative clock immediately before, at, and after a hold's expiry using fixed timestamp fixtures.",
+        "Use injectable clock and fixed timestamps.",
+        "Run the three cases repeatedly without waiting and compare outcomes with the declared equality rule."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Boundary result is stable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Before-expiry works."
+        },
+        {
+          "id": "criterion-3",
+          "label": "After-expiry fails."
+        }
+      ],
+      "experiment": "Run test under different system zones. Changing machine time zone must not alter instant-based expiry outcomes or the chosen boundary behavior.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Find hidden real-time reads. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-rollback-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Expose partial transactional writes",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Fail activity insertion after ticket update.",
+      "explanation": "A response error does not prove rollback. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Seed a known ticket revision and configure failure precisely between the required ticket and activity writes.",
+        "Inject failure inside actual transaction boundary.",
+        "Read both tables through a fresh connection after rejection, then retry without the fault and compare committed evidence."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Ticket stays unchanged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No activity survives."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry can succeed."
+        }
+      ],
+      "experiment": "Mock repository as one all-or-nothing call. The coarse mock cannot prove rollback; retain an adapter-level test that observes the intermediate failure point.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Explain what integration coverage adds. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-accessibility-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Prove a keyboard focus regression",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Close modal after failed submit.",
+      "explanation": "Visible content does not establish usable focus. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Record the opener element and the modal's expected focus order before triggering invalid submission.",
+        "Record focus sequence with keyboard interactions.",
+        "Use keyboard interaction to submit, correct, and close; assert the active element rather than only visible text."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old behavior loses focus."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fixed close returns to trigger."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Error field remains reachable."
+        }
+      ],
+      "experiment": "Remove trigger while modal is open. Removing the trigger must lead to the documented fallback target rather than leaving focus on the document body accidentally.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Test fallback focus behavior. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-data-shape-repro",
+      "parentId": "effect-agent-regression",
+      "title": "Test malformed successful responses",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Return contact list containing invalid identifier.",
+      "explanation": "HTTP 200 does not guarantee usable data. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Prepare separate fixtures for valid populated data, valid empty data, and malformed data returned with HTTP 200.",
+        "Decode at boundary with a fixture.",
+        "Observe the boundary decode result and rendered recovery action for each fixture, checking that corrupt rows never enter state."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Malformed response becomes explicit error."
+        },
+        {
+          "id": "criterion-2",
+          "label": "No corrupt row renders."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry stays available."
+        }
+      ],
+      "experiment": "Return valid empty list instead. A legitimate empty response must remain a successful empty state and must not reuse the malformed-data error branch.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Separate empty from decode-failure states. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-test-false-positive",
+      "parentId": "effect-agent-regression",
+      "title": "Challenge a test that passes the broken code",
+      "concept": "Reproduction first · focused verification",
+      "brief": "Agent checks only that Save was clicked.",
+      "explanation": "Tests need independent behavioral assertions. A regression test should fail for the reported behavior and pass for the right reason. Pin meaningful fixtures, avoid mirroring implementation details, and separate application defects from unreliable timing or environment assumptions.",
+      "steps": [
+        "Run the agent's original test against a deliberately broken save handler and record whether it still passes.",
+        "Replace click assertion with persisted-state oracle.",
+        "Assert persisted identity and fields through an independent read after reload, then rerun the intentionally broken variant."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Broken implementation now fails."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Correct save passes."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Reload verifies result."
+        }
+      ],
+      "experiment": "Stub Save to return success without writing. Returning a success response without writing must fail the new persisted-state assertion deterministically.",
+      "review": "Run the reproducer on the old behavior when possible. Ask whether a deliberately wrong fix could still satisfy the test and strengthen the oracle accordingly.",
+      "stretch": "Review assertions for implementation mirroring. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-missing-tenant-review",
+      "parentId": "effect-agent-review",
+      "title": "Find an omitted tenant predicate",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Review SQL update by ticket ID alone.",
+      "explanation": "Correct UI filtering cannot secure an unscoped update. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Seed two private tickets and trace the authenticated workspace from route handler into the generated update predicate.",
+        "Trace verified workspace into repository mutation.",
+        "Run the same update as allowed and foreign actors, checking stored fields and response disclosure as well as status."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Cross-tenant regression fails before fix."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Predicate protects update."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Allowed edit still works."
+        }
+      ],
+      "experiment": "Use a real foreign ID fixture. A real foreign identifier must leave that row untouched and must not reveal its protected field values.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Audit delete and export paths. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-coercion-review",
+      "parentId": "effect-agent-review",
+      "title": "Catch silent numeric coercion",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Agent uses Number on empty amount field.",
+      "explanation": "Invalid input cannot become a valid business zero. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "List raw input fixtures covering empty string, whitespace, zero, valid decimal, and trailing nonnumeric text.",
+        "Define empty invalid and valid decimal cases.",
+        "Compare decoded outcomes and stored values with the field contract, ensuring an invalid value never becomes numeric zero implicitly."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Empty field is rejected appropriately."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Zero remains valid if allowed."
+        },
+        {
+          "id": "criterion-3",
+          "label": "NaN never persists."
+        }
+      ],
+      "experiment": "Submit whitespace and trailing text. Whitespace and trailing text must follow explicit validation rules rather than JavaScript's permissive coercion behavior.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Review locale decimal policy. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-catch-all-review",
+      "parentId": "effect-agent-review",
+      "title": "Avoid turning every error into success",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Agent returns empty array for database failures.",
+      "explanation": "A blanket catch can erase required failure evidence. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Trace the generated catch branch and identify which failures it currently maps to a successful empty list.",
+        "Map expected absence separately from infrastructure error.",
+        "Inject absence, database outage, and permission denial separately, then compare displayed state and safe diagnostic category."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Outage shows retry state."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Empty dataset stays empty."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Diagnostics retain cause."
+        }
+      ],
+      "experiment": "Trigger permission denial through same path. Permission denial must stay distinct from both empty data and retryable storage failure where the contract requires it.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Audit other fallback branches. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-mass-assignment-review",
+      "parentId": "effect-agent-review",
+      "title": "Reject writable fields outside command scope",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Agent spreads body into ticket update.",
+      "explanation": "Request bodies cannot choose protected ownership or status. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Enumerate permitted editable fields and construct a request containing forged owner, role, and lifecycle status fields.",
+        "Decode an allowlisted command model.",
+        "Inspect the decoded command and final row, proving that allowed title edits succeed while protected fields remain authoritative."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Owner cannot be forged."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Allowed title updates."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unknown sensitive fields fail or are ignored by policy."
+        }
+      ],
+      "experiment": "Send revision and role overrides. Supplying a revision or role override must not let the client manufacture authorization or skip concurrency checks.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Document handling of unknown properties. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-transaction-review",
+      "parentId": "effect-agent-review",
+      "title": "Locate effects outside the protected write",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Patch writes order then stock in separate calls.",
+      "explanation": "Related records need consistent commit behavior. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Map every required order and inventory write and mark whether they share one actual database transaction.",
+        "Identify invariant and protect required writes.",
+        "Inject failure at each write boundary and inspect both tables after rejection and after an intentional retry."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Stock failure rolls back order."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Successful path writes both."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Retry avoids duplication."
+        }
+      ],
+      "experiment": "Fail second operation deliberately. Failure after the first write must leave no partial order or stock mutation under the stated atomic contract.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Explain cross-system limitations. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-performance-review",
+      "parentId": "effect-agent-review",
+      "title": "Reject cosmetic loading fixes",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Agent adds skeleton while eagerly loading every guide.",
+      "explanation": "A spinner does not reduce startup work. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Capture a production-build import graph, cold-load requests, and initial transferred bytes before evaluating the proposed spinner change.",
+        "Measure import graph and initial requests.",
+        "Compare before and after measurements for initial route and direct deferred-route navigation using the same browser conditions."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Unused content stays deferred."
+        },
+        {
+          "id": "criterion-2",
+          "label": "First-view bytes decrease."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Loading state remains usable."
+        }
+      ],
+      "experiment": "Navigate directly to deferred route. The direct route must load its guide successfully without pulling every other guide into the initial app entry.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Compare cached and cold loads. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-dependency-review",
+      "parentId": "effect-agent-review",
+      "title": "Review package changes beyond application code",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Small form patch upgrades several unrelated packages.",
+      "explanation": "Lockfile changes can exceed the requested scope. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Review manifest and lockfile diffs separately from source changes, identifying why every added or upgraded package is present.",
+        "Compare manifests lockfile and installed versions.",
+        "Install the resulting lockfile in the normal validation flow and use documentation matching the installed versions."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Necessary changes are justified."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unrelated upgrades are removed or separated."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Build uses coherent versions."
+        }
+      ],
+      "experiment": "Agent cites latest docs for old install. If the cited example targets another version, correct the example or deliberately justify the dependency change.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Add dependency-specific validation. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-destructive-default-review",
+      "parentId": "effect-agent-review",
+      "title": "Catch dangerous fallback behavior",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Agent defaults empty IDs to all matching rows.",
+      "explanation": "Missing selection must not mean delete everything. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Prepare explicit selected IDs and an empty selection, then inspect the generated delete command's scope fallback.",
+        "Define explicit empty-selection command outcome.",
+        "Run both cases through authorization and persistence, asserting exact deleted IDs instead of only the response count."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Empty selection deletes none."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Chosen IDs delete as authorized."
+        },
+        {
+          "id": "criterion-3",
+          "label": "API rejects ambiguous scope."
+        }
+      ],
+      "experiment": "Clear filter during confirmation. Clearing the filter must not expand the already-reviewed deletion scope or turn empty IDs into all records.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Add scope digest to preview. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-review-findings",
+      "parentId": "effect-agent-review",
+      "title": "Write actionable review comments locally",
+      "concept": "Adversarial diff review · invariant evidence",
+      "brief": "Review patch with stale-update and naming issues.",
+      "explanation": "A finding should explain behavior rather than preference. Review generated changes against the requested behavior and the surrounding invariants. Follow data and authority across boundaries, inspect the smallest relevant diff, and use concrete counterexamples instead of stylistic preferences alone.",
+      "steps": [
+        "Read the final diff and reproduce each suspected stale-update failure before drafting review findings.",
+        "Prioritize reproduction-backed correctness findings.",
+        "For each finding, include a concrete trigger, consequence, supporting location, and focused validation suggestion."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each finding has trigger."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Consequence is concrete."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Optional style is separate."
+        }
+      ],
+      "experiment": "Remove line references from draft. A finding without location evidence must be re-grounded in the current diff before it is presented as actionable.",
+      "review": "Write findings with trigger, observed consequence, and supporting location. Separate correctness failures from optional improvements so the next change remains focused.",
+      "stretch": "Create a concise reviewer checklist. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-single-boundary",
+      "parentId": "effect-agent-refactor",
+      "title": "Wrap one Promise boundary first",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Refactor ticket repository save into Effect.",
+      "explanation": "Incremental adoption should leave unrelated behavior stable. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Capture the existing repository save contract and its success and rejection fixtures before wrapping asynchronous work.",
+        "Adapt one asynchronous boundary and retain public contract.",
+        "Run unchanged caller-level fixtures against the old and refactored paths, comparing persisted values and error recovery."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Successful save matches baseline."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Expected failure remains distinguishable."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Callers still work."
+        }
+      ],
+      "experiment": "Reject the underlying Promise. The underlying rejection must enter the intended expected-error boundary without becoming a success value or detached rejection.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Identify next boundary from evidence. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-typed-errors",
+      "parentId": "effect-agent-refactor",
+      "title": "Replace stringly error branching",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Refactor duplicate-name and missing-ticket failures.",
+      "explanation": "UI recovery should depend on explicit domain errors. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Identify every UI branch that currently matches duplicate-name or missing-ticket message text.",
+        "Define distinct expected error cases.",
+        "Change message wording while keeping error variants stable, then verify each recovery branch and unexpected-defect reporting."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Each maps to correct UI."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Unknown defect stays separate."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Messages can change without branching breakage."
+        }
+      ],
+      "experiment": "Return same message for two error types. Two different error variants with identical messages must still produce their distinct documented recovery behavior.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Add exhaustive recovery handling. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-injected-storage",
+      "parentId": "effect-agent-refactor",
+      "title": "Replace a hidden global dependency",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Repository imports singleton database directly.",
+      "explanation": "Tests should control persistence without patching globals. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Trace the imported database singleton and choose the narrow construction boundary that can supply its replacement.",
+        "Introduce service interface at existing construction point.",
+        "Exercise the command with real and controlled adapters without patching module globals, then omit the service deliberately."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Production uses real storage."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Test uses controlled adapter."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Missing provision is visible."
+        }
+      ],
+      "experiment": "Instantiate route without required service. A missing service must be detected rather than silently reaching for the original singleton and invalidating test isolation.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Document service ownership. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-runtime-edge",
+      "parentId": "effect-agent-refactor",
+      "title": "Keep execution at a deliberate boundary",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Find nested runtime calls in a CRUD command.",
+      "explanation": "Running effects throughout helpers obscures lifetime and errors. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "List every runtime execution call in the request path and identify which layer should own cancellation and completion.",
+        "Compose internally and execute at request boundary.",
+        "Compose the command without executing it, then run and interrupt it at the chosen boundary while counting adapter calls."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "One execution owner is clear."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Error propagation is preserved."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Cancellation reaches composed work."
+        }
+      ],
+      "experiment": "Interrupt request while adapter waits. Interruption must reach the pending adapter work under its supported cancellation contract rather than leave detached execution.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Audit other runtime entry points. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-cleanup-refactor",
+      "parentId": "effect-agent-refactor",
+      "title": "Preserve cleanup during failure and interruption",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Refactor temporary file handling during import.",
+      "explanation": "Replacing finally must retain resource guarantees. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Capture temporary-file acquisition and all current cleanup paths, including failure before full initialization.",
+        "Use scoped acquisition and release pattern supported locally.",
+        "Run success, expected failure, defect, and interruption fixtures while inspecting owned temporary resources after settlement."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Success cleans up."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Failure cleans up."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Cancellation has observed release."
+        }
+      ],
+      "experiment": "Fail after resource acquisition. A failure immediately after acquisition must still invoke the registered release path or its explicit partial-acquisition cleanup.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Record cleanup failure policy. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-parallel-reads",
+      "parentId": "effect-agent-refactor",
+      "title": "Parallelize independent reads responsibly",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Load ticket and independent user preferences.",
+      "explanation": "Concurrent work must respect dependency and failure semantics. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Classify ticket and preference reads as independent and document the requested all-or-nothing or partial-result behavior.",
+        "Compose bounded independent effects.",
+        "Control both completions and one failure, comparing latency and final outcomes with the chosen concurrency semantics."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Both results match baseline."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Dependent reads remain ordered."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Failure policy is explicit."
+        }
+      ],
+      "experiment": "Make preferences fail while ticket succeeds. A failed preference read must yield the declared partial result or failure, not whichever outcome happens to settle first.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Choose partial-result semantics deliberately. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-retry-boundary",
+      "parentId": "effect-agent-refactor",
+      "title": "Retry only operations safe to repeat",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Refactor create-ticket plus notification flow.",
+      "explanation": "Moving retry outward may duplicate business writes. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Draw ticket creation, notification intent, provider request, and their existing operation identities before moving retry logic.",
+        "Place retry around justified adapter operation.",
+        "Count committed tickets and notification intents while injecting transient and permanent failures at different boundaries."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Ticket is created once."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Transient read can retry."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Permanent domain failure does not retry."
+        }
+      ],
+      "experiment": "Fail after ticket commit. A post-commit failure must resolve through established identity or recovery evidence instead of repeating an unprotected create.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Use idempotent command identity. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-transaction-service",
+      "parentId": "effect-agent-refactor",
+      "title": "Expose transaction scope without hiding it",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Refactor order and inventory repositories.",
+      "explanation": "Service abstraction must preserve shared transactional context. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Identify how the live adapter shares transaction ownership across order and inventory repository methods.",
+        "Provide operations sharing the intended transaction.",
+        "Inject failure between repositories and inspect both tables through a new connection to prove shared rollback semantics."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Rollback covers both writes."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Standalone operations remain valid."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Scope is visible in composition."
+        }
+      ],
+      "experiment": "Inject failure into second repository. The second repository's failure must unwind the first write, even when both abstractions pass isolated unit tests.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Avoid accidental nested transaction semantics. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-refactor-diff",
+      "parentId": "effect-agent-refactor",
+      "title": "Keep behavioral changes separate from structure",
+      "concept": "Incremental Effect adoption · preserved behavior",
+      "brief": "Agent converts Promise code and changes sort order.",
+      "explanation": "A refactor cannot silently introduce new product policy. A refactor should change structure while preserving the agreed contract. Move one boundary at a time, keep success and error behavior observable, and use dependency injection to make failure and cleanup easier to verify.",
+      "steps": [
+        "Save representative exported data and ordering fixtures, then separate syntax and service-boundary changes from product-policy edits.",
+        "Split required structure from optional behavior change.",
+        "Compare the same fixtures before and after refactoring and move any intentional sorting change into a separately reviewed task."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Baseline order remains."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Effect boundary is isolated."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Tests explain preserved contract."
+        }
+      ],
+      "experiment": "Compare exported data before and after. An export difference must be explained as an intended contract change or fixed before calling the change behavior-preserving.",
+      "review": "Compare behavior before and after with the same fixtures. Explain what the new service boundary improves and avoid counting syntax conversion alone as a reliability gain.",
+      "stretch": "Propose sort change as a separate task. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Make it reliable",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-evidence-record",
+      "parentId": "effect-agent-release",
+      "title": "Tie verification to the actual change",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Agent edits code after successful tests.",
+      "explanation": "Old passing results do not validate a newer diff. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Record the baseline revision, final diff, executed commands, and affected acceptance scenarios in a local evidence note.",
+        "Record final revision and rerun relevant checks.",
+        "After the last edit, rerun checks justified by that change and identify any checks still unexecuted rather than reusing stale claims."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Evidence matches final files."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Changed behavior is exercised."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Unrun checks are stated honestly."
+        }
+      ],
+      "experiment": "Modify a tested branch after recording results. A later branch edit invalidates the affected evidence until its relevant checks are rerun against the new final state.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Automate revision-stamped evidence. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-migration-rehearsal",
+      "parentId": "effect-agent-release",
+      "title": "Upgrade realistic existing records",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Add required owner field to existing tickets.",
+      "explanation": "Fresh-database success cannot prove migration safety. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Copy historical tickets with missing owners into an isolated database and preserve an untouched recovery fixture.",
+        "Migrate a copy containing incomplete historical rows.",
+        "Apply the migration, inspect old records, exercise normal edits, and record whether interruption permits safe resume or rollback."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old tickets stay readable."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Backfill policy is explicit."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Invalid rows have recovery."
+        }
+      ],
+      "experiment": "Interrupt migration halfway. The interrupted upgrade must restart according to its documented checkpoint or transaction policy without assigning invented ownership silently.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Rehearse resumable upgrade. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-rollback-rehearsal",
+      "parentId": "effect-agent-release",
+      "title": "Verify readable data after code rollback",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Deploy new status then run prior build.",
+      "explanation": "Reverting code does not revert schema assumptions. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Create old and new build fixtures containing the new status before choosing a rollback compatibility strategy.",
+        "Test declared compatibility or rollback migration.",
+        "Run the prior build against representative upgraded data and record which reads, edits, and recovery commands remain supported."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Old build has defined behavior."
+        },
+        {
+          "id": "criterion-2",
+          "label": "New records are not lost."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Stop condition is explicit."
+        }
+      ],
+      "experiment": "Rollback during an in-flight write. An in-flight write during rollback must have a defined result and must not leave a status neither version can interpret.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Use expand-and-contract changes. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-performance-evidence",
+      "parentId": "effect-agent-release",
+      "title": "Measure cold and warm app loading",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Lazy-load a large project guide route.",
+      "explanation": "Perceived speed claims need a repeatable measurement. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Record device conditions, build mode, cache state, initial route, and representative guide size before taking measurements.",
+        "Compare built bytes requests and route timings.",
+        "Compare initial bytes and requests plus direct-route usability; record warm navigation separately so caching does not mask the result."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Initial bytes decrease."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Direct route still works."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Warm navigation is recorded separately."
+        }
+      ],
+      "experiment": "Disable browser cache for cold run. With cache disabled, the measured reduction must still exist and the deferred guide must load when requested.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Add a meaningful performance budget. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-release-note",
+      "parentId": "effect-agent-release",
+      "title": "Write a reviewer-ready change description",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Ship conflict-aware ticket editing.",
+      "explanation": "A release note should describe final behavior. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Inspect the final conflict-aware edit behavior and collect the specific regression and browser evidence that supports it.",
+        "Document trigger outcome validation and limitation.",
+        "Give another developer the note and fixture, then check whether they can reproduce conflict recovery without chat history."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "User-visible change is concrete."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Relevant evidence is linked locally."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Abandoned approaches are omitted."
+        }
+      ],
+      "experiment": "Ask another developer to reproduce from note. Any missing setup or expected result becomes a concrete note revision rather than an unsupported claim of successful handoff.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Add rollback trigger and owner. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-independent-rebuild",
+      "parentId": "effect-agent-release",
+      "title": "Reproduce agent work without relying on hidden context",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Recreate duplicate-name handling from acceptance examples.",
+      "explanation": "Learning requires explaining and rebuilding a small slice. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Hide the generated solution and write your own success, error, and requirements outline for duplicate-name handling.",
+        "Write your own service outline then compare implementation.",
+        "Implement the small slice from acceptance examples, run fresh fixtures, and explain why each difference from the agent code exists."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "You explain error flow."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Fresh fixture passes."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Differences have reasons."
+        }
+      ],
+      "experiment": "Remove access to the generated explanation. Without the original explanation, you should still identify the validation boundary and show the actual duplicate-name recovery path.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Implement adjacent failure independently. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-failure-runbook",
+      "parentId": "effect-agent-release",
+      "title": "Prepare a concrete operational recovery path",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Outbox backlog grows after deployment.",
+      "explanation": "A generic restart instruction may conceal data problems. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Seed an isolated backlog with known job IDs, ages, and failure categories before drafting recovery steps.",
+        "Write diagnosis scoped repair and verification steps.",
+        "Execute diagnosis and bounded repair from the written procedure, then reconcile every accepted job with an explained outcome."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Runbook identifies affected IDs."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Repair is bounded."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Completion evidence accounts for work."
+        }
+      ],
+      "experiment": "Inject poison payload during rehearsal. The poison job must be isolated without making healthy jobs disappear or allowing the runbook to claim complete recovery prematurely.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Time recovery and note uncertainties. State the additional invariant first.",
+      "minutes": 45,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-backup-recovery",
+      "parentId": "effect-agent-release",
+      "title": "Prove backup usefulness with a restore",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Restore tickets comments and journals into isolated copy.",
+      "explanation": "A backup file existing is not recovery evidence. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Restore only into isolated storage with live integrations disabled, using a manifest of tickets, comments, and journals.",
+        "Compare identities relationships and schema versions.",
+        "Compare stable identities, representative values, and relationship sets; record missing data as partial recovery rather than success."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "Relationships resolve."
+        },
+        {
+          "id": "criterion-2",
+          "label": "Counts and representative values agree."
+        },
+        {
+          "id": "criterion-3",
+          "label": "Live services stay disconnected."
+        }
+      ],
+      "experiment": "Remove one dependent record from backup. The missing dependent record must produce a precise integrity finding before the restored system is declared usable.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Add preflight integrity report. State the additional invariant first.",
+      "minutes": 90,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    },
+    {
+      "id": "effect-drill-agent-delivery-portfolio-retrospective",
+      "parentId": "effect-agent-release",
+      "title": "Turn one delivery into reusable learning",
+      "concept": "Evidence-based release · reproducible learning",
+      "brief": "Review a shipped CRUD change with agent assistance.",
+      "explanation": "Completion is not the same as understanding tradeoffs. Shipping includes migration compatibility, observed verification, and a recovery path. Record what was tested against which build, distinguish unsupported claims from measured results, and leave explanations another developer can reproduce.",
+      "steps": [
+        "Select one final CRUD diff and gather its acceptance brief, failed reproduction, passing evidence, and release limitation.",
+        "Record prediction observed failure fix and remaining tradeoff.",
+        "Write a short independent explanation naming the invariant, enforcing boundary, observed failure, verified fix, and next untested assumption."
+      ],
+      "checks": [
+        {
+          "id": "criterion-1",
+          "label": "The explanation identifies the actual invariant and the service or storage boundary enforcing it."
+        },
+        {
+          "id": "criterion-2",
+          "label": "The recorded failure and passing result refer to a reproducible fixture and the final implementation."
+        },
+        {
+          "id": "criterion-3",
+          "label": "The next exercise targets a named uncertainty or limitation revealed by this delivery."
+        }
+      ],
+      "experiment": "Explain the change without reading agent prose. The explanation must remain accurate without agent prose and must cite the actual fixture and evidence rather than remembered claims.",
+      "review": "Assess the final artifact as if you had not read the conversation. Verify that evidence supports the claimed behavior and that rollback addresses data as well as code.",
+      "stretch": "Compare two alternative implementations. State the additional invariant first.",
+      "minutes": 60,
+      "stage": "Own the outcome",
+      "skill": "Effect & agentic CRUD",
+      "study": "TypeScript"
+    }
+  ],
+  "track": "Project practice"
+}

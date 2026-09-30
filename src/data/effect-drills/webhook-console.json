@@ -1,0 +1,1244 @@
+[
+  {
+    "id": "effect-drill-webhook-console-ack-before-commit",
+    "parentId": "effect-webhooks-receive",
+    "title": "Prevent acknowledgment before durable storage",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Pause receipt commit for event E1.",
+    "explanation": "Success must not precede a recoverable receipt. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Await durable acceptance before responding. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "No early success is returned.",
+      "Committed receipt is discoverable.",
+      "Failed commit returns retryable outcome."
+    ],
+    "experiment": "Crash while persistence is paused. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Measure ingestion latency separately from processing. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-malformed-envelope",
+    "parentId": "effect-webhooks-receive",
+    "title": "Reject structurally invalid envelopes",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Send missing event ID and invalid payload version.",
+    "explanation": "Malformed events cannot enter normal processing. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Decode envelope into explicit expected errors. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Invalid receipt is not queued.",
+      "Response follows contract.",
+      "Safe error detail identifies field."
+    ],
+    "experiment": "Send valid JSON with wrong types. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Retain bounded rejection metrics. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-oversized-body",
+    "parentId": "effect-webhooks-receive",
+    "title": "Bound inbound body consumption",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Stream body larger than configured maximum.",
+    "explanation": "Payload limits must apply during reading. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Stop bounded request consumption safely. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Oversized request is rejected.",
+      "Memory stays bounded.",
+      "No partial receipt becomes processable."
+    ],
+    "experiment": "Omit content-length header. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Measure concurrent oversized requests. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-restart-pending",
+    "parentId": "effect-webhooks-receive",
+    "title": "Recover accepted unprocessed events",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Commit E2 then restart before scheduling worker.",
+    "explanation": "Accepted work must survive process termination. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Discover pending receipts durably. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "E2 eventually processes.",
+      "Receipt identity is stable.",
+      "No manual event reconstruction occurs."
+    ],
+    "experiment": "Restart repeatedly before claim. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Measure oldest pending age. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-provider-identity",
+    "parentId": "effect-webhooks-receive",
+    "title": "Scope event identity by provider account",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Accounts A and B both send event 42.",
+    "explanation": "Different senders may reuse the same event ID. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use provider-account scoped receipt identity. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Both legitimate events persist.",
+      "Same-account retry deduplicates.",
+      "Projection uses correct tenant."
+    ],
+    "experiment": "Forge account field inside payload. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Resolve account from endpoint configuration. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-content-type",
+    "parentId": "effect-webhooks-receive",
+    "title": "Handle unsupported request formats explicitly",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Send form data to JSON-only endpoint.",
+    "explanation": "Parsing assumptions must match the accepted contract. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Validate media type before envelope decoding. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Unsupported input fails clearly.",
+      "Valid JSON still works.",
+      "No misleading processing error appears."
+    ],
+    "experiment": "Send JSON with unexpected charset parameter. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Document exact accepted variants. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-backpressure",
+    "parentId": "effect-webhooks-receive",
+    "title": "Reject overload before making false promises",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Reach configured pending-work threshold.",
+    "explanation": "A full durable queue cannot accept unbounded work. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Apply admission policy with retryable response. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Rejected event is not acknowledged accepted.",
+      "Healthy backlog drains.",
+      "Metrics identify overload."
+    ],
+    "experiment": "Race several requests near threshold. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Add per-tenant admission budgets. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-ingestion-dashboard",
+    "parentId": "effect-webhooks-receive",
+    "title": "Separate received from processed status",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Receive E3 while processor is paused.",
+    "explanation": "An accepted HTTP request is not completed business work. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Render receipt and processing phases distinctly. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "E3 shows pending.",
+      "No completed claim appears.",
+      "Later application updates status."
+    ],
+    "experiment": "Return ingestion success while handler later fails. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Add accessible live status updates. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-ingest-agent-debug",
+    "parentId": "effect-webhooks-receive",
+    "title": "Find events lost in ephemeral queues",
+    "concept": "Ingestion boundaries · durable acceptance",
+    "brief": "Agent enqueues to process memory before responding.",
+    "explanation": "Memory-only scheduling cannot satisfy durable acknowledgment. Receipt and domain processing are different promises. Acknowledge according to the sender contract only after durable acceptance, bound request work, and preserve enough safe metadata to diagnose rejected or interrupted ingestion.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Add crash reproduction and durable receipt discovery. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Regression loses old implementation event.",
+      "Fix survives restart.",
+      "Acknowledgment matches commit."
+    ],
+    "experiment": "Crash after response but before worker run. Record persisted state and a recovery action.",
+    "review": "Trace the acknowledgment relative to commit. Ask the agent to prove recovery from each crash point with actual receipt rows rather than console logs.",
+    "stretch": "Document process-boundary assumptions. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Build independently"
+  },
+  {
+    "id": "effect-drill-webhook-console-raw-whitespace",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Verify the exact signed bytes",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Sign compact JSON then send formatted JSON.",
+    "explanation": "Reserialized JSON is not necessarily the signed message. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Verify before parsing using original body bytes. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Changed bytes fail.",
+      "Original bytes pass.",
+      "Domain state stays unchanged on rejection."
+    ],
+    "experiment": "Reorder object keys under same signature. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Explain canonical signing only when specified. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-missing-signature",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Reject absent authentication data",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Send E4 without signature header.",
+    "explanation": "A missing header cannot mean development bypass. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Require configured authentication on protected endpoint. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Request is denied.",
+      "No receipt is processable.",
+      "Diagnostic contains no secret."
+    ],
+    "experiment": "Use an empty header instead. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Provide explicit isolated test adapter. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-timestamp-expired",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Enforce the replay window boundary",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Use signed timestamp just beyond accepted age.",
+    "explanation": "Old valid signatures may be outside allowed freshness. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Evaluate provider-specified window with trusted clock. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Expired request fails.",
+      "Boundary behavior is documented.",
+      "Fresh fixture passes."
+    ],
+    "experiment": "Skew sender clock within allowed tolerance. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Add deterministic time tests. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-future-timestamp",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Bound accepted future timestamps",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Sign request dated one day ahead.",
+    "explanation": "Far-future signatures cannot extend replay validity indefinitely. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Apply documented future-skew policy. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Excess future skew fails.",
+      "Allowed skew passes.",
+      "Reason is categorized safely."
+    ],
+    "experiment": "Test exact tolerance endpoint. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Measure clock-skew rejection rate. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-key-overlap",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Accept previous keys only during rotation",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Rotate K1 to K2 with ten-minute overlap.",
+    "explanation": "Old secrets need a bounded compatibility interval. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Resolve allowed key versions from configuration. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "K2 works immediately.",
+      "K1 expires after overlap.",
+      "Unknown key fails."
+    ],
+    "experiment": "Reload configuration during a request. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Rehearse rotation without downtime. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-signature-format",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Validate malformed signature headers",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Send odd-length hex and duplicate signature fields.",
+    "explanation": "Invalid encoding must not crash authentication. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Parse contract-specific header format defensively. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Malformed input is rejected.",
+      "Process remains healthy.",
+      "Valid multi-signature form follows contract."
+    ],
+    "experiment": "Send very long signature header. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Bound parsing work. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-constant-time-check",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Use the correct comparison primitive",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Review a patch comparing digest strings directly.",
+    "explanation": "Authentication comparison should use supported cryptographic utilities. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use provider SDK or suitable secure comparison. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Valid digest passes.",
+      "Different digest fails.",
+      "Length mismatch is handled safely."
+    ],
+    "experiment": "Send a shorter decoded signature. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Document utility preconditions. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-secret-redaction",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Keep signing secrets out of diagnostics",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Trigger failure with synthetic secret marker.",
+    "explanation": "Authentication debugging must not expose verification material. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Redact config and raw authorization fields. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Marker is absent from logs.",
+      "Failure category remains.",
+      "Client response is generic."
+    ],
+    "experiment": "Cause configuration initialization failure. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Add safe key-version observability. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-endpoint-confusion",
+    "parentId": "effect-webhooks-signatures",
+    "title": "Bind authentication to endpoint account",
+    "concept": "Authentic bytes · rotation and replay policy",
+    "brief": "Send account A signed event to B endpoint.",
+    "explanation": "A valid signature for one account cannot authorize another. Signature verification must follow the selected provider contract exactly. Preserve signed bytes, separate authentication from envelope trust, and inject configuration and time through testable boundaries without exposing secret material.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Choose verification keys from trusted endpoint configuration. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Cross-account signature fails.",
+      "A endpoint accepts correctly.",
+      "Payload account cannot override config."
+    ],
+    "experiment": "Reuse event ID across both accounts. Record persisted state and a recovery action.",
+    "review": "Review the specific signing contract and installed cryptographic API. Reject invented compatibility claims and keep every teaching fixture independent of real credentials.",
+    "stretch": "Test rotation independently per account. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-same-event-retry",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Apply identical event retries once",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Send order-created E5 three times.",
+    "explanation": "Repeated delivery cannot duplicate business quantity. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use scoped event identity and atomic application receipt. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One order effect exists.",
+      "Retries return stable outcome.",
+      "Attempts remain inspectable."
+    ],
+    "experiment": "Lose response after successful application. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Race two processors. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-digest-conflict",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Detect reused IDs with changed content",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Reuse E5 with changed amount.",
+    "explanation": "Same event ID with different bytes is not a harmless retry. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Compare accepted digest or canonical contract identity. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Conflict is quarantined.",
+      "Original projection remains.",
+      "Evidence identifies mismatch."
+    ],
+    "experiment": "Change only declared irrelevant envelope field. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Document digest normalization. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-crash-mid-apply",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Roll back interrupted projection changes",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Crash after order update before processing receipt.",
+    "explanation": "Success evidence and projection must commit together. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use one transaction for both writes. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Projection rolls back.",
+      "Event remains retryable.",
+      "Restart applies once."
+    ],
+    "experiment": "Fail receipt insertion instead. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Add related audit consistency checks. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-crash-after-commit",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Recognize established application after restart",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Commit E6 then terminate before worker marks local success.",
+    "explanation": "Lost acknowledgment cannot cause a second effect. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Read durable application receipt on retry. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Order changes once.",
+      "Event resolves completed.",
+      "Retry does not add inventory twice."
+    ],
+    "experiment": "Restart two workers simultaneously. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Separate attempt and success records. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-worker-race",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Prevent two workers applying one receipt",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Process E7 from two workers with expired claim.",
+    "explanation": "Lease ownership alone may not protect a late worker. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Guard application using durable identity and transaction. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One business effect commits.",
+      "Stale worker cannot reapply.",
+      "Attempts explain contention."
+    ],
+    "experiment": "Pause old worker until new one commits. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Add fencing where required. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-multi-effect",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Apply related domain changes consistently",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Process order-paid affecting order and inventory.",
+    "explanation": "One event cannot update order without required stock adjustment. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Commit related effects under one justified protocol. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Order and stock agree.",
+      "Failure leaves neither partial effect.",
+      "Retry is safe."
+    ],
+    "experiment": "Fail inventory write after order update. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Model external effects through outbox. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-receipt-retention",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Retain deduplication evidence for replay horizon",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Replay E8 after cleanup removes old attempts.",
+    "explanation": "Deleting receipts can re-enable old business effects. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Separate attempt retention from success identity retention. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Old event remains deduplicated.",
+      "Unneeded logs can expire.",
+      "Policy states replay horizon."
+    ],
+    "experiment": "Advance cleanup clock beyond threshold. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Archive compact idempotency records. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-external-send",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Deduplicate downstream notification intent",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Order event creates customer notice intent.",
+    "explanation": "Local projection idempotency does not automatically protect sending. A stable downstream intent prevents replay from queuing another message, while actual provider delivery still follows its own retry contract. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use transactional stable outbox identity. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One notice intent exists.",
+      "Reprocessing adds none.",
+      "Provider retry policy stays explicit."
+    ],
+    "experiment": "Crash after intent commit. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Trace receipt-to-message provenance. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-agent-idempotency-review",
+    "parentId": "effect-webhooks-deduplicate",
+    "title": "Reject unsafe check-then-write code",
+    "concept": "Idempotent application · atomic evidence",
+    "brief": "Agent checks receipt then unconditionally updates balance.",
+    "explanation": "Sequential passing tests cannot prove concurrency correctness. Duplicate receipt detection and duplicate business-effect prevention are separate responsibilities. Protect projection changes with processing evidence, compare content identity, and handle uncertain acknowledgment without assuming network delivery is exactly once.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Add synchronized parallel regression and protected write. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Unsafe patch fails race.",
+      "Corrected code applies once.",
+      "Database guard is explained."
+    ],
+    "experiment": "Run against two app instances. Record persisted state and a recovery action.",
+    "review": "Locate the constraint and transaction that establish the invariant. Challenge any check-then-insert sequence that lacks a concurrent-write protection mechanism.",
+    "stretch": "Document isolation assumptions. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-older-version",
+    "parentId": "effect-webhooks-order",
+    "title": "Ignore an older authoritative version",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Apply version 8 then version 7.",
+    "explanation": "Late delivery cannot regress a newer resource state. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Compare supported resource versions before reduction. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Projection stays at 8.",
+      "Version 7 is explained as stale.",
+      "Both receipts remain inspectable."
+    ],
+    "experiment": "Replay version 7 after restart. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Add version-gap metrics. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-missing-predecessor",
+    "parentId": "effect-webhooks-order",
+    "title": "Defer an event requiring missing context",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Receive completed before created.",
+    "explanation": "A dependent transition cannot invent its predecessor. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Implement explicit defer or authoritative-fetch policy. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "No fabricated state appears.",
+      "Deferred reason is visible.",
+      "Predecessor arrival resolves work."
+    ],
+    "experiment": "Never deliver predecessor. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Bound deferred waiting. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-sequence-gap",
+    "parentId": "effect-webhooks-order",
+    "title": "Detect missing sequence numbers",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Receive sequence 11 after 9.",
+    "explanation": "A sequence jump may mean missing business effects. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Track gap and choose documented recovery. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Gap 10 is identified.",
+      "Projection follows policy.",
+      "Recovered sequence applies consistently."
+    ],
+    "experiment": "Deliver 10 after reconciliation starts. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Define per-resource gap timeout. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-same-version-conflict",
+    "parentId": "effect-webhooks-order",
+    "title": "Reject conflicting content at one version",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Receive version 4 with two different totals.",
+    "explanation": "Equal version numbers do not justify arbitrary last-write wins. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Compare version-content identity. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Conflict is visible.",
+      "Established state is preserved.",
+      "Operator can inspect safe evidence."
+    ],
+    "experiment": "Reverse arrival order. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Add authoritative reconciliation. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-terminal-state",
+    "parentId": "effect-webhooks-order",
+    "title": "Protect domain terminal transitions",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Receive cancelled then earlier active event.",
+    "explanation": "Older updates cannot reopen a completed resource accidentally. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Apply explicit state transition policy. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Cancelled state remains.",
+      "Older active is categorized.",
+      "Valid correction uses distinct rule."
+    ],
+    "experiment": "Send provider-supported reinstatement event. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Document reversible terminal states. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-fetch-race",
+    "parentId": "effect-webhooks-order",
+    "title": "Protect reconciliation from stale fetch results",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Fetch version 6 while event version 7 arrives.",
+    "explanation": "A slow authoritative read cannot overwrite newer events. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Compare fetched version during projection commit. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Version 7 survives.",
+      "Fetch result is recorded appropriately.",
+      "Reconciliation completes honestly."
+    ],
+    "experiment": "Return fetch after several newer events. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Use revision-guarded reconciliation. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-independent-streams",
+    "parentId": "effect-webhooks-order",
+    "title": "Avoid global ordering bottlenecks",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Order A lacks sequence 3 while B has complete events.",
+    "explanation": "One resource gap need not block unrelated resources. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Partition ordering dependencies by resource. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "B progresses.",
+      "A stays explainably deferred.",
+      "Global queue remains healthy."
+    ],
+    "experiment": "Introduce gaps in several partitions. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Bound active partition concurrency. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-timestamp-ties",
+    "parentId": "effect-webhooks-order",
+    "title": "Do not invent order from equal timestamps",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Two conflicting events share provider timestamp.",
+    "explanation": "Timestamps may be insufficient for causal ordering. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use contract-supported version or reconciliation. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "No arbitrary chronology is claimed.",
+      "Ambiguity is visible.",
+      "Final state has evidence."
+    ],
+    "experiment": "Reduce timestamp precision in fixture. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Document unsupported ordering assumptions. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-reducer-permutations",
+    "parentId": "effect-webhooks-order",
+    "title": "Verify supported event permutations",
+    "concept": "Version-aware reducers · reconciliation",
+    "brief": "Permute created paid completed with allowed duplicates.",
+    "explanation": "Reducer correctness includes more than one happy sequence. Arrival order is evidence about transport, not necessarily business sequence. Choose a source-supported ordering strategy, retain reasons for ignored or deferred events, and reconcile gaps without inventing unsupported ordering guarantees.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Build table of expected final states and outcomes. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Equivalent valid sequences converge.",
+      "Invalid sequences are explained.",
+      "No event vanishes silently."
+    ],
+    "experiment": "Add late cancellation fixture. Record persisted state and a recovery action.",
+    "review": "Ask which provider field establishes order and where that guarantee is documented. Test meaningful permutations and inspect final projection plus event outcomes.",
+    "stretch": "Generate bounded permutation tests. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-replay-permission",
+    "parentId": "effect-webhooks-replay",
+    "title": "Separate inspection from replay authority",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Read-only operator clicks replay for E9.",
+    "explanation": "Reading failed events does not grant mutation rights. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Authorize replay command independently of detail read. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Replay is denied.",
+      "Event remains inspectable.",
+      "No processing job is created."
+    ],
+    "experiment": "Call replay endpoint directly. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Add narrowly scoped replay roles. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-dry-run-writes",
+    "parentId": "effect-webhooks-replay",
+    "title": "Keep dry runs free of external effects",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Dry-run order-paid replay with notification side effect.",
+    "explanation": "Preview cannot send messages or mutate live projections. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use isolated reducers and non-delivering adapters. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Live order is unchanged.",
+      "Provider sees no call.",
+      "Preview reports predicted changes."
+    ],
+    "experiment": "Inject adapter that attempts sending. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Declare unsupported prediction effects. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-bounded-selection",
+    "parentId": "effect-webhooks-replay",
+    "title": "Freeze replay scope before execution",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Preview twenty failed events then receive five more.",
+    "explanation": "A filter must not expand silently after confirmation. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Persist explicit selected IDs and limit. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Only twenty are queued.",
+      "New events stay excluded.",
+      "Scope appears in report."
+    ],
+    "experiment": "Change filter URL before confirmation. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Add reviewed incremental batches. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-overlap-replay",
+    "parentId": "effect-webhooks-replay",
+    "title": "Handle overlapping replay requests",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Replay E10 in two concurrent batches.",
+    "explanation": "Two operator batches cannot duplicate business effects. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Reuse normal processing identity and guards. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "One effect applies.",
+      "Both batches report outcome.",
+      "No duplicate notice intent appears."
+    ],
+    "experiment": "Restart one batch midway. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Track shared-event provenance. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-handler-version",
+    "parentId": "effect-webhooks-replay",
+    "title": "Record the reducer used for replay",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Replay failures after deploying handler v3.",
+    "explanation": "A replay result must identify its code interpretation. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Record handler version with each attempt. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Report names v3.",
+      "Original failure remains visible.",
+      "Outcome is reproducible with fixtures."
+    ],
+    "experiment": "Deploy v4 during batch execution. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Pin batch version or document transitions. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-replay-cancel",
+    "parentId": "effect-webhooks-replay",
+    "title": "Stop future work without erasing completed effects",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Cancel batch after seven of twenty events.",
+    "explanation": "Cancellation is not rollback of committed events. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use durable cancellation and per-event outcomes. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Seven commits remain recorded.",
+      "Remaining work stops under policy.",
+      "Summary shows partial result."
+    ],
+    "experiment": "Cancel while one event is committing. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Expose uncertain in-flight outcome. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-replay-reason",
+    "parentId": "effect-webhooks-replay",
+    "title": "Require useful operational justification",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Operator replays quarantined accounting events.",
+    "explanation": "Replay provenance must explain why work was repeated. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Validate reason and record actor. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Empty reason fails.",
+      "Stored reason links batch.",
+      "Actual actor is retained."
+    ],
+    "experiment": "Submit another user's actor ID. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Add incident reference field. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-replay-report",
+    "parentId": "effect-webhooks-replay",
+    "title": "Export a complete replay account",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Replay ten events with mixed outcomes.",
+    "explanation": "Success counts cannot hide unresolved selected events. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Produce ID-level versioned report. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "All ten IDs appear.",
+      "Outcomes are categorized.",
+      "Unresolved events are explicit."
+    ],
+    "experiment": "Interrupt report generation. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Resume report from durable batch state. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-replay-agent-review",
+    "parentId": "effect-webhooks-replay",
+    "title": "Catch preview paths using live dependencies",
+    "concept": "Controlled operations · replay evidence",
+    "brief": "Agent skips database save but still calls provider.",
+    "explanation": "A generated dry-run flag may not isolate side effects. Replay is a scoped mutation with a new operational context. Preserve original receipt identity, apply ordinary correctness rules, and make previews and cancellation describe their real limits rather than promising perfect reversibility.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Trace complete Effect service graph for preview. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Regression catches provider call.",
+      "Isolated graph makes none.",
+      "Prediction limitations are documented."
+    ],
+    "experiment": "Inject a nested sender service. Record persisted state and a recovery action.",
+    "review": "Inspect selected IDs, handler version, actor, and reason. Verify dry-run isolation and explain which effects remain committed if replay stops partway through.",
+    "stretch": "Add forbidden-effect assertions. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Make it reliable"
+  },
+  {
+    "id": "effect-drill-webhook-console-oldest-age",
+    "parentId": "effect-webhooks-operations",
+    "title": "Detect one stuck event in a busy queue",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Process fresh events while E1 stays pending for hours.",
+    "explanation": "Throughput can look healthy while old work never progresses. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Track oldest eligible age alongside queue size. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Stuck E1 triggers signal.",
+      "Throughput remains separately visible.",
+      "Operator can locate receipt."
+    ],
+    "experiment": "Keep queue length almost constant. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Define age thresholds by workload. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-poison-isolation",
+    "parentId": "effect-webhooks-operations",
+    "title": "Quarantine a permanently failing event",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Queue bad E2 between healthy unrelated events.",
+    "explanation": "One poison payload cannot consume unlimited attempts. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Bound retry policy and quarantine evidence. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Attempts stop at budget.",
+      "Healthy events finish.",
+      "Quarantine has safe reason."
+    ],
+    "experiment": "Restart after final failed attempt. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Add reviewed canary replay. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-failure-categories",
+    "parentId": "effect-webhooks-operations",
+    "title": "Separate provider outage from invalid data",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Mix schema errors timeouts and permission failures.",
+    "explanation": "Different failures require different recovery actions. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Classify expected outcomes with safe codes. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Categories remain distinct.",
+      "Permanent errors do not retry forever.",
+      "Metrics identify dominant cause."
+    ],
+    "experiment": "Wrap errors through several service layers. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Preserve typed cause without payload leakage. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-restart-accounting",
+    "parentId": "effect-webhooks-operations",
+    "title": "Account for accepted events after crashes",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Crash workers at varied processing points.",
+    "explanation": "Restart success does not prove receipt completeness. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Reconcile accepted receipts with terminal or pending states. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Every receipt has explained state.",
+      "No duplicate projection occurs.",
+      "Abandoned claims recover."
+    ],
+    "experiment": "Repeat crashes during reconciliation. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Export an incident accounting report. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-redacted-inspection",
+    "parentId": "effect-webhooks-operations",
+    "title": "Inspect failure evidence without exposing payload secrets",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Fail event containing synthetic token and email.",
+    "explanation": "Operational usefulness does not require full sensitive bodies. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Render bounded redacted payload preview. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Token is absent.",
+      "Event identity stays useful.",
+      "Authorized raw access follows separate policy."
+    ],
+    "experiment": "Search logs for synthetic marker. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Add field-level redaction tests. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-retry-jitter",
+    "parentId": "effect-webhooks-operations",
+    "title": "Avoid synchronized retry bursts",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Fail one hundred events simultaneously.",
+    "explanation": "Identical delays can overload a recovering dependency. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Use bounded provider-aware backoff strategy. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Retries spread under policy.",
+      "Budget remains finite.",
+      "Recovery does not starve new work."
+    ],
+    "experiment": "Restore provider at retry boundary. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Measure retry concurrency. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-worker-shutdown",
+    "parentId": "effect-webhooks-operations",
+    "title": "Drain or release work on shutdown",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Stop worker with one in-flight event.",
+    "explanation": "Deployment must not strand indefinite active claims. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Interrupt scoped tasks and settle claims safely. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "New work stops.",
+      "In-flight outcome is documented.",
+      "Restart recovers abandoned work."
+    ],
+    "experiment": "Force termination before graceful deadline. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Compare graceful and crash recovery. State the additional invariant first.",
+    "minutes": 45,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-canary-repair",
+    "parentId": "effect-webhooks-operations",
+    "title": "Validate a handler fix before broad replay",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Fix decoder affecting 500 quarantined events.",
+    "explanation": "A code change needs evidence before replaying all failures. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Replay a reviewed representative canary set. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Canary outcomes match oracle.",
+      "Unexpected changes stop expansion.",
+      "Remaining scope is recorded."
+    ],
+    "experiment": "Include one incompatible old payload. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Define rollout and rollback criteria. State the additional invariant first.",
+    "minutes": 90,
+    "stage": "Own the outcome"
+  },
+  {
+    "id": "effect-drill-webhook-console-operations-accessibility",
+    "parentId": "effect-webhooks-operations",
+    "title": "Make incident tables usable under pressure",
+    "concept": "Queue health · recovery runbooks",
+    "brief": "Find oldest failure using keyboard on mobile width.",
+    "explanation": "Dense status tables still need clear keyboard interaction. Operational evidence should reveal stalled work, bounded retries, and unexplained gaps. Prefer actionable age and failure categories, preserve privacy in diagnostics, and rehearse recovery against isolated representative workloads.",
+    "steps": [
+      "Trace the screen, Effect service, and storage boundary using the fixture.",
+      "Provide semantic headers filters and detail navigation. Model expected failures explicitly at the service boundary.",
+      "Verify the acceptance checks, reload, and compare visible state with committed records."
+    ],
+    "checks": [
+      "Sort is announced.",
+      "Focus survives refresh.",
+      "Actions expose full event context."
+    ],
+    "experiment": "Auto-refresh while detail is open. Record persisted state and a recovery action.",
+    "review": "Reconstruct a timeline from receipt through diagnosis to resolution. Distinguish an alert clearing from proof that every accepted event reached an explained outcome.",
+    "stretch": "Add reduced-motion status updates. State the additional invariant first.",
+    "minutes": 60,
+    "stage": "Own the outcome"
+  }
+]

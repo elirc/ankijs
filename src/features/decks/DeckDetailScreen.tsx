@@ -34,7 +34,7 @@ import {
   setNewPerDay,
 } from "../../db/repos/deckRepo";
 import { formatDue } from "../../lib/dates";
-import { getDeckInfo } from "../../data/curriculum";
+import { getDeckInfo } from "../../data/curriculum-catalog";
 import { DOTNET_TRACK } from "../../data/dotnet-path";
 import { CreateDeckDialog } from "./CreateDeckDialog";
 import { useNow } from "../../lib/useNow";

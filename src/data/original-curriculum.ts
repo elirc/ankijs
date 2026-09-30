@@ -1,0 +1,559 @@
+import type { StarterDeck } from "./curriculum-catalog";
+
+const deckId = (n: number) =>
+  `a0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+// Original, bite-sized prompts: explain, predict, debug, and choose a tradeoff.
+// IDs and card order are permanent so installing a curriculum never resets a review.
+export const originalCurriculum: StarterDeck[] = [
+  {
+    id: deckId(2),
+    name: "JavaScript & TypeScript",
+    track: "Frontend",
+    icon: "braces",
+    color: "amber",
+    description: "Know what your code actually does.",
+    topics: ["Async", "Types", "Closures"],
+    resource: {
+      label: "MDN · JavaScript guide",
+      url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide",
+    },
+    cards: [
+      [
+        'Predict the output:\n```js\nconsole.log("A");\nsetTimeout(() => console.log("B"), 0);\nPromise.resolve().then(() => console.log("C"));\nconsole.log("D");\n```',
+        "**A, D, C, B.** Synchronous work runs first, then promise microtasks, then the timer task. A zero-delay timer does not run immediately.",
+      ],
+      [
+        "What does a closure remember?",
+        '**Access to the outer variables themselves, not a copy of their values.** A function keeps its enclosing scope alive, so it sees the variable\'s *current* value when it runs.\n```js\nlet count = 1;\nconst read = () => count;\ncount = 2;\nconsole.log(read()); // 2\n```\nThis is how event handlers and callbacks "remember" data after the outer function has returned.',
+      ],
+      [
+        "What is the difference between `unknown` and `any`?",
+        "**unknown** requires narrowing before operations. **any** opts out of type checking and lets unsafe assumptions propagate. Use unknown for untrusted inputs, then validate.",
+      ],
+      [
+        "Predict the output:\n```js\nconst a = { nested: { count: 1 } };\nconst b = { ...a };\nb.nested.count = 2;\nconsole.log(a.nested.count);\n```",
+        "**2.** Object spread makes a shallow copy: `b.nested` and `a.nested` are the same object. Copy each layer you change (`{ ...a, nested: { ...a.nested, count: 2 } }`) or deep-copy plain data with `structuredClone(a)`.",
+      ],
+      [
+        "Does a TypeScript interface validate JSON from an API?",
+        "**No.** Types are erased at runtime. Parse external data with runtime validation before treating it as a trusted domain object. A type assertion does not perform validation.",
+      ],
+      [
+        "When should you use `Promise.all` versus `Promise.allSettled`?",
+        "Use **`Promise.all`** when you need *every* result and one failure should fail the whole operation (e.g. load a user and their settings). It rejects as soon as any promise rejects.\n\nUse **`Promise.allSettled`** when partial success is fine (e.g. independent dashboard widgets): it waits for all and gives `{ status, value | reason }` for each.\n\nNeither cancels the other operations.",
+      ],
+      [
+        "What does `value ?? fallback` preserve that `value || fallback` does not?",
+        "**0, false, and an empty string.** Nullish coalescing falls back only for null or undefined. Use it when those other falsy values are meaningful.",
+      ],
+      [
+        "Why can `array.forEach(async item => ...)` surprise you?",
+        "forEach ignores returned promises. The outer function does not wait for the callbacks.\n\nUse for...of with await for sequential work, or Promise.all(array.map(...)) for concurrent work.",
+      ],
+      [
+        "How does a discriminated union prevent impossible states?",
+        'Give each variant a literal discriminator and only its valid fields.\n```ts\ntype Result =\n  | { status: "ok"; data: string }\n  | { status: "error"; message: string };\n```\nChecking status narrows the available fields.',
+      ],
+      [
+        "What is a practical use for `never`?",
+        "Exhaustiveness checks. Assigning an unhandled union variant to never causes a compile error when a new case is added. It also describes functions that cannot return normally.",
+      ],
+      [
+        "How would you cancel a fetch when a screen is no longer relevant?",
+        "**Pass an `AbortController`'s signal to `fetch` and call `abort()` in cleanup.**\n```js\nuseEffect(() => {\n  const ctrl = new AbortController();\n  fetch(url, { signal: ctrl.signal })\n    .then(r => r.json()).then(setData)\n    .catch(e => { if (e.name !== 'AbortError') setError(e); });\n  return () => ctrl.abort();\n}, [url]);\n```\nTreat an expected `AbortError` differently from a real network failure.",
+      ],
+      [
+        "Debounce versus throttle: which fits search-as-you-type?",
+        "**Debounce.** It waits until typing has paused (e.g. 300 ms), then searches once. **Throttle** instead caps how often an action runs during continuous events, such as scroll or resize handlers.",
+      ],
+      [
+        "What does `const` guarantee for an object?",
+        "The binding cannot be reassigned. Its object can still be mutated. Object.freeze is shallow; TypeScript readonly is a compile-time restriction. Neither is a general deep-immutability solution.",
+      ],
+      [
+        "Why is a generic function often safer than one using `any`?",
+        "A generic preserves relationships between input and output types.\n```ts\nfunction first<T>(items: T[]): T | undefined {\n  return items[0];\n}\n```\nThe return type reflects the item type and the empty case.",
+      ],
+      [
+        "What does `await` do to the JavaScript thread?",
+        "It suspends the current async function until the awaited value settles. It does **not** block the whole thread. Other queued work can run while the function is suspended.",
+      ],
+      [
+        "A UI receives responses for searches “rea” and “react” out of order. What bug can occur?",
+        "An older response can overwrite the newer results. Abort obsolete requests or compare request IDs before applying results. Debouncing alone does not prevent this race.",
+      ],
+    ],
+  },
+  {
+    id: deckId(3),
+    name: "React & frontend",
+    track: "Frontend",
+    icon: "react",
+    color: "blue",
+    description: "Build interfaces that stay predictable.",
+    topics: ["State", "Effects", "Accessibility"],
+    resource: { label: "React · Learn", url: "https://react.dev/learn" },
+    cards: [
+      [
+        "Why can three calls to `setCount(count + 1)` increment only once?",
+        "They all read the same render’s count snapshot. Use updater functions when the next state depends on previous state:\n```tsx\nsetCount(c => c + 1);\n```\nThree such calls apply three increments.",
+      ],
+      [
+        "When should a calculation be in render instead of an Effect?",
+        "When it can be derived purely from current props and state, such as filtering a list. Storing derived state in an Effect adds a render and risks inconsistent values.",
+      ],
+      [
+        "Why are array indices risky as keys for a reorderable list?",
+        "React associates state with element identity. An index can now point to a different item after reordering, causing input values or component state to follow the wrong item. Use stable item IDs.",
+      ],
+      [
+        "What should an Effect’s cleanup undo?",
+        "The resources its setup acquired: subscriptions, timers, listeners, or requests. Cleanup runs before a changed Effect is set up again and on unmount.",
+      ],
+      [
+        "Why does mutating an array in React state cause problems?",
+        "React decides whether to re-render by comparing the old and new state with `Object.is`. Mutating the array keeps the **same reference**, so React may skip the update, and earlier snapshots change too. Create a new array and copy changed objects:\n```tsx\nsetItems(items => items.map(item =>\n  item.id === id ? { ...item, done: true } : item\n));\n```",
+      ],
+      [
+        "When would you use a ref instead of state?",
+        "For values that must persist between renders but do not determine the rendered UI, such as a DOM node, timer ID, or synchronous in-flight guard. Updating a ref does not trigger a render.",
+      ],
+      [
+        "An Effect reads `query` but has `[]` dependencies. What is the risk?",
+        "The Effect keeps the initial query and does not rerun when it changes. Include reactive dependencies or redesign the Effect. Suppressing the dependency warning can hide stale closures.",
+      ],
+      [
+        "What is a controlled input?",
+        "Its value is driven by React state and updated through an event handler. Keep its value defined (for example, an empty string) to avoid switching between controlled and uncontrolled modes.",
+      ],
+      [
+        "Why might a memoized child still rerender?",
+        "A prop can have a new identity, such as an inline object or callback. Its own state or consumed context can also change. Measure before adding memoization.",
+      ],
+      [
+        "What does lifting state up solve?",
+        "It gives related components one source of truth in their closest common owner. Share the value and update callbacks rather than synchronizing independent copies.",
+      ],
+      [
+        "What should happen to focus when a modal opens and closes?",
+        "**Move focus into the modal when it opens, keep Tab inside it, close on Escape, and return focus to the button that opened it.** Give the dialog an accessible name. The native `<dialog>` element with `showModal()` handles most of this (focus, Escape, inert background) for you.",
+      ],
+      [
+        "A button contains only a trash icon. What is missing?",
+        '**An accessible name**, e.g. `<button aria-label="Delete card">`. Screen readers otherwise announce just "button". Hide the decorative icon with `aria-hidden="true"` and keep the tap target large (about 44×44 px).',
+      ],
+      [
+        "Why use a native `<button>` instead of a clickable `<div>`?",
+        "A button provides keyboard activation, focus behavior, semantics, and disabled support. A div requires these to be reimplemented correctly.",
+      ],
+      [
+        "How do you choose between local state and global state?",
+        "Keep state close to its consumers. Share it when multiple distant consumers need the same source of truth. Server caches, form drafts, and transient UI state have different lifetimes.",
+      ],
+      [
+        "What problem does an Error Boundary solve, and what does it miss?",
+        "**It shows fallback UI instead of a blank screen when a child component throws while rendering** (or in lifecycle methods/constructors below it). It does **not** catch errors in event handlers, async code (`setTimeout`, promise callbacks), server rendering, or the boundary itself; handle those with try/catch or error state. In React 19 you still write one as a class component (or use the `react-error-boundary` package).",
+      ],
+      [
+        "A page works at 1440px but overflows on a phone. Name three things to inspect.",
+        "Fixed widths, flex/grid children without min-width: 0, and long unbroken content such as code. Use responsive tracks, wrapping text, and horizontally scrollable code blocks.",
+      ],
+    ],
+  },
+  {
+    id: deckId(4),
+    name: "System design",
+    track: "Backend",
+    icon: "network",
+    color: "mint",
+    description: "Think in tradeoffs, boundaries, and scale.",
+    topics: ["Caching", "Reliability", "Distribution"],
+    resource: {
+      label: "AWS · Builders’ Library",
+      url: "https://aws.amazon.com/builders-library/",
+    },
+    cards: [
+      [
+        "Before drawing a system-design architecture, what do you clarify?",
+        "Users and core operations, expected traffic and data size, latency and availability goals, consistency needs, and scope. State assumptions so tradeoffs can be evaluated.",
+      ],
+      [
+        "Horizontal versus vertical scaling: what changes?",
+        "**Vertical** scaling gives one machine more resources. **Horizontal** scaling adds machines and requires distributing work and often state. More machines introduce coordination and failure modes.",
+      ],
+      [
+        "What is a cache-aside read flow?",
+        "Look up the cache; on a miss, read the source of truth and populate the cache. Decide how stale data is tolerated and how writes invalidate or refresh cached entries.",
+      ],
+      [
+        "What is a cache stampede, and one way to reduce it?",
+        "Many requests rebuild the same expired cache entry at once. Coalesce refreshes, use a refresh lock, or serve stale data while refreshing. Jittered expirations reduce synchronized misses.",
+      ],
+      [
+        "Why does a payment retry need an idempotency key?",
+        "The first request may have succeeded even if its response was lost. A stable key lets the server return the original outcome instead of creating another charge. Persist the key and result atomically with the operation.",
+      ],
+      [
+        "What does eventual consistency promise?",
+        "If updates stop and replication succeeds, replicas eventually converge. Reads can temporarily return stale data. It does not by itself promise a fixed convergence time or read-your-writes behavior.",
+      ],
+      [
+        "What tradeoff does CAP describe during a network partition?",
+        "During a network partition, a distributed system must choose per request between **consistency** (every read sees the latest write, known as linearizability) and **availability** (every request gets a non-error answer). So it either rejects/delays some requests or serves possibly stale data. Without a partition, both are possible.",
+      ],
+      [
+        "Why might a message consumer see the same event twice?",
+        "With at-least-once delivery, an acknowledgement can be lost after processing. Make consumers idempotent, commonly by recording processed event IDs with the resulting side effect.",
+      ],
+      [
+        "What does the transactional outbox pattern prevent?",
+        "It avoids a database update succeeding while its corresponding event is never queued. Write domain changes and an outbox record in one transaction; a worker retries delivery. Consumers still need duplicate handling.",
+      ],
+      [
+        "Why are retries with no backoff dangerous?",
+        "They can amplify overload. Use capped exponential backoff, jitter, a retry limit or deadline, and retry only suitable failures. Keep non-idempotent operations safe.",
+      ],
+      [
+        "What is a circuit breaker?",
+        "A guard that temporarily stops calling a failing dependency after a threshold. It can allow limited probes later. This reduces repeated wasted work while exposing a clear fallback or error.",
+      ],
+      [
+        "Replication vs sharding: which one splits the data so each node holds a different part?",
+        "**Sharding** divides different data across nodes. **Replication** keeps copies of data on multiple nodes. They can be combined; sharding complicates cross-shard queries and rebalancing.",
+      ],
+      [
+        "Why are p95/p99 latency useful alongside the average?",
+        "They show how slow the tail of requests is. A reasonable average can hide a poor experience for some users, especially when a request depends on many downstream calls.",
+      ],
+      [
+        "How does a token bucket rate limiter allow bursts?",
+        "Tokens refill at a set rate up to a capacity. Each request consumes tokens. The capacity permits a bounded burst while the refill rate limits long-term throughput.",
+      ],
+      [
+        "What should a useful service-level objective specify?",
+        "A user-relevant indicator, a target, and a measurement window, such as the fraction of successful requests within a latency threshold over 30 days. It should guide operational choices.",
+      ],
+      [
+        "How would you roll out a risky behavior change safely?",
+        "Use a reversible flag or canary, observe meaningful metrics, expand gradually, and define rollback criteria before rollout. Verify schema changes remain compatible with old and new code.",
+      ],
+    ],
+  },
+  {
+    id: deckId(5),
+    name: "Databases & SQL",
+    track: "Backend",
+    icon: "database",
+    color: "rose",
+    description: "Ask better questions of your data.",
+    topics: ["Queries", "Indexes", "Transactions"],
+    resource: {
+      label: "PostgreSQL · Tutorial",
+      url: "https://www.postgresql.org/docs/current/tutorial.html",
+    },
+    cards: [
+      [
+        "What do the four ACID properties stand for?",
+        "**Atomicity:** all or none. **Consistency:** preserve defined invariants. **Isolation:** control interference between concurrent transactions. **Durability:** committed data survives failures within the system’s guarantees.",
+      ],
+      [
+        "A LEFT JOIN is followed by `WHERE right.active = true`. What can go wrong?",
+        "Unmatched rows have NULL on the right, so the WHERE clause removes them. If all left rows should remain, put the right-side condition in the JOIN’s ON clause.",
+      ],
+      [
+        "Why not index every column?",
+        "Indexes consume storage and add write/maintenance cost. Choose them based on query predicates, joins, ordering, selectivity, and real execution plans.",
+      ],
+      [
+        "What is the N+1 query problem?",
+        "One query fetches N records, followed by one extra query for each record. Use a join, eager loading, or a batched lookup to reduce round trips.",
+      ],
+      [
+        "Write a query to find duplicate emails in a users table.",
+        "```sql\nSELECT email, COUNT(*)\nFROM users\nGROUP BY email\nHAVING COUNT(*) > 1;\n```\nWHERE filters input rows; HAVING filters groups.",
+      ],
+      [
+        "What does a composite B-tree index on `(user_id, created_at)` suit?",
+        "Queries that filter by user_id and then filter or order by created_at. Column order matters; queries on created_at alone may not benefit equally. Confirm with an execution plan.",
+      ],
+      [
+        "How can two concurrent read-modify-write operations lose an increment?",
+        "Both read the same old value and write the same incremented value. Use an atomic update, an appropriate lock, or optimistic concurrency with a version check.",
+      ],
+      [
+        "What is keyset pagination?",
+        "Fetch rows after the last seen ordered key instead of skipping an offset. Use a unique tie-breaker, for example `(created_at, id)`, so equal timestamps do not skip records.",
+      ],
+      [
+        "Why can OFFSET pagination become expensive on later pages?",
+        "The database may still have to scan and discard the preceding rows. Inserts and deletes can also shift offsets, causing duplicates or gaps. Keyset pagination helps for sequential traversal.",
+      ],
+      [
+        "What is a transaction’s atomicity boundary?",
+        "All operations in that transaction commit together or roll back together. An external HTTP call is generally outside that database transaction and needs separate coordination.",
+      ],
+      [
+        "What does `NULL = NULL` return in SQL?",
+        "**NULL (unknown), not true.** Any `=` comparison with NULL yields NULL, and `WHERE` keeps only rows that are true, so `WHERE col = NULL` matches nothing. Use `IS NULL` / `IS NOT NULL` (or `IS [NOT] DISTINCT FROM` for null-safe comparison).",
+      ],
+      [
+        "How does normalization help with data integrity?",
+        "It reduces duplicated facts and update anomalies by representing relationships explicitly. Denormalize deliberately for measured read needs, with a plan to keep copies consistent.",
+      ],
+      [
+        "When should a uniqueness rule live in the database?",
+        "When it must hold under concurrency, such as a unique username. A pre-insert application check alone has a race. Use a unique constraint and handle the resulting conflict.",
+      ],
+      [
+        "What do you inspect first in a slow query’s execution plan?",
+        "Actual versus estimated row counts, large scans, expensive joins/sorts, and repeated loops. Check whether filters and indexes match the workload. EXPLAIN ANALYZE actually executes the query.",
+      ],
+      [
+        "How do you safely add a required column to a large live table?",
+        "**In stages:** add the column (nullable, or with a constant default), deploy code that writes it, backfill existing rows in batches, then enforce NOT NULL. In PostgreSQL 11+, `ADD COLUMN ... DEFAULT 'x' NOT NULL` with a constant default is a fast metadata change. A later `SET NOT NULL` scans the table under a lock; adding `CHECK (col IS NOT NULL) NOT VALID` and then `VALIDATE` first avoids a long lock.",
+      ],
+      [
+        "Why should backup restoration be tested?",
+        "A backup is useful only if it can be restored within required recovery time and data-loss limits. Verify schema compatibility, completeness, and application behavior after restoration.",
+      ],
+    ],
+  },
+  {
+    id: deckId(6),
+    name: "APIs & networking",
+    track: "Backend",
+    icon: "globe",
+    color: "blue",
+    description: "Understand the request behind the response.",
+    topics: ["HTTP", "Security", "Web platform"],
+    resource: {
+      label: "MDN · HTTP",
+      url: "https://developer.mozilla.org/en-US/docs/Web/HTTP",
+    },
+    cards: [
+      [
+        "What happens, broadly, when you open an HTTPS URL?",
+        "Resolve the hostname, establish a transport connection and secure session as needed, send an HTTP request, receive a response, and render it. Caches and reused connections can skip work; HTTP/3 uses QUIC.",
+      ],
+      [
+        "401 versus 403: what is the useful distinction?",
+        '**401 Unauthorized** means "we don\'t know who you are": credentials are missing, invalid, or expired, so log in again. **403 Forbidden** means "we know who you are, but you\'re not allowed": logging in again as the same user won\'t help.',
+      ],
+      [
+        "What does HTTP method idempotency mean?",
+        "Repeating the same request has the same intended server effect as making it once. It does not require identical responses. GET, PUT, and DELETE are defined as idempotent; POST generally is not.",
+      ],
+      [
+        "Why is CORS not API authentication?",
+        "CORS controls what browser scripts may read across origins. Non-browser clients are not restricted by it. The server still needs authentication and authorization for protected data.",
+      ],
+      [
+        "What is the difference between authentication and authorization?",
+        "**Authentication:** who is making the request? **Authorization:** may that identity perform this operation on this resource? Enforce authorization on the server for every protected action.",
+      ],
+      [
+        "How does SQL parameterization prevent a common injection attack?",
+        "It keeps SQL structure separate from data values, so input is not interpreted as query syntax. Do not build SQL by concatenating user text. Dynamic identifiers require separate validation.",
+      ],
+      [
+        "What is an ETag useful for?",
+        "A client can send If-None-Match to validate a cached representation and receive 304 when unchanged. If-Match can support conditional writes that prevent overwriting a changed resource.",
+      ],
+      [
+        "When is a 429 response useful?",
+        "When a caller exceeds a rate limit. Clients should respect Retry-After when provided and avoid immediate retry loops. The API should explain a sensible retry policy.",
+      ],
+      [
+        "What does TLS protect, and what does it not protect?",
+        "It provides transport encryption, integrity, and peer authentication when validated correctly. It does not prevent application authorization bugs, compromised endpoints, or unsafe handling after decryption.",
+      ],
+      [
+        "A fetch resolves successfully for a 500 response. Why?",
+        "**`fetch` only rejects for network failures (no response at all).** A 404 or 500 is still a response, so the promise resolves. Check `res.ok` yourself:\n```js\nconst res = await fetch('/api/cards');\nif (!res.ok) throw new Error(`HTTP ${res.status}`);\nconst cards = await res.json();\n```",
+      ],
+      [
+        "What is CSRF, and when does it matter?",
+        "An attacker tricks a browser into making an unwanted authenticated request, often using automatically attached cookies. Use appropriate SameSite cookies, CSRF defenses, and origin checks for relevant state changes.",
+      ],
+      [
+        "What is stored XSS?",
+        "Malicious script is persisted and later rendered unsafely for other users. Use context-appropriate output encoding, avoid unsafe HTML injection, sanitize when HTML is required, and add defense-in-depth such as CSP.",
+      ],
+      [
+        "Why should a frontend bundle never contain a service-role secret?",
+        "Browser assets are downloadable. Any bundled secret is available to users. Privileged credentials belong on a trusted server; public client keys require server-enforced access rules.",
+      ],
+      [
+        "Why set a timeout or deadline on a network request?",
+        "**Because a dependency can hang forever**, holding connections, memory, and the user's patience. Bound the wait, e.g. `fetch(url, { signal: AbortSignal.timeout(5000) })`. After a timeout the outcome may be unknown (a write might have succeeded), so only retry safe or idempotent operations.",
+      ],
+      [
+        "What enables a web app to reopen without a network connection?",
+        "**A service worker that caches the app's files (HTML, JS, CSS)**, plus IndexedDB for user data. The worker must have been installed and cached those files on an earlier online visit. Service workers only run over HTTPS (or on `localhost` during development).",
+      ],
+      [
+        "When would you choose server-sent events over WebSockets?",
+        "For one-way server-to-client updates over HTTP, SSE can be simpler and offers reconnection behavior. WebSockets fit bidirectional message flows. Consider infrastructure and connection limits.",
+      ],
+    ],
+  },
+  {
+    id: deckId(7),
+    name: "Testing & debugging",
+    track: "Practice",
+    icon: "bug",
+    color: "amber",
+    description: "Find the cause. Ship with confidence.",
+    topics: ["Test design", "Debugging", "Reliability"],
+    resource: {
+      label: "Testing Library · Guiding principles",
+      url: "https://testing-library.com/docs/guiding-principles/",
+    },
+    cards: [
+      [
+        "A bug report says “sometimes my progress disappears.” What do you do first?",
+        "Gather a concrete reproduction: steps, expected and observed behavior, device/browser, timing, and network state. Find the smallest repeatable failure before changing code.",
+      ],
+      [
+        "What makes a regression test valuable?",
+        "It fails for the original bug and passes for the intended behavior. Assert a meaningful user or domain outcome, not merely that a helper was called.",
+      ],
+      [
+        "Unit versus integration tests: where is the boundary?",
+        "A unit test isolates a small piece of logic. An integration test verifies that collaborating parts work across a real boundary, such as repository and database. Use both where their failure signals are useful.",
+      ],
+      [
+        "What is the arrange–act–assert pattern?",
+        "**Arrange** data and dependencies. **Act** on the behavior once. **Assert** the observable outcome. Keeping these distinct makes test intent and failures easier to read.",
+      ],
+      [
+        "A test passes alone but fails in the suite. What should you suspect?",
+        "Shared state, leaked mocks, clocks, event listeners, database records, or ordering assumptions. Reset owned state and clean up resources; do not rely on execution order.",
+      ],
+      [
+        "Why can mocking every dependency make a test misleading?",
+        "The test can verify an invented world where interfaces or behavior do not match production. Keep a few meaningful integration tests through real boundaries and mock only what the test needs to control.",
+      ],
+      [
+        "What would you test for a daily new-card limit?",
+        "Zero limit, exact exhaustion, partially used limit, another deck’s reviews, local midnight boundaries, suspended/deleted cards, and a new card reviewed more than once.",
+      ],
+      [
+        "How can you test asynchronous UI without fixed sleeps?",
+        "Wait for the observable state, such as a visible answer or persisted record, using bounded async assertions. Fixed sleeps are either slow or flaky and do not describe the expected behavior.",
+      ],
+      [
+        "What is property-based testing good at?",
+        "Generating many inputs to check invariants, such as sorting preserving elements and producing ordered output. It complements specific examples and can expose cases you did not anticipate.",
+      ],
+      [
+        "How do you distinguish a cause from a correlated log message?",
+        "Form a falsifiable hypothesis, change one relevant variable, and reproduce the result. Trace the data and control flow. The last log before a crash may be an innocent bystander.",
+      ],
+      [
+        "What is a useful minimal reproduction?",
+        "The smallest setup, input, and sequence that still demonstrates the failure. Remove unrelated layers until you can name the violated assumption.",
+      ],
+      [
+        "Why is code coverage alone not proof of correctness?",
+        "Executed code can have weak or missing assertions. A test may touch a branch without checking the right outcome. Prioritize invariants and realistic failure cases.",
+      ],
+      [
+        "A save button is tapped twice before the database responds. What do you test?",
+        "Only one mutation is committed, controls show an in-progress state, and failures allow retry. A synchronous guard prevents duplicate events before a disabled-state rerender.",
+      ],
+      [
+        "What belongs in an actionable error message?",
+        "What failed, whether data was saved, and the next useful step. Keep sensitive values out of logs and UI. Preserve diagnostic context for investigation.",
+      ],
+      [
+        "What would you measure before optimizing a slow screen?",
+        "A representative workload, end-to-end latency, render/CPU cost, database calls, and network time. Identify the largest contributor, change it, then compare using the same workload.",
+      ],
+      [
+        "Which test is stronger: “calls save” or “reopening shows the edited card”?",
+        "The second checks a durable user outcome across a boundary. A call assertion can still pass when saving the wrong data or failing to persist. Choose the scope appropriate to the risk.",
+      ],
+    ],
+  },
+  {
+    id: deckId(8),
+    name: "Engineering craft",
+    track: "Practice",
+    icon: "git",
+    color: "violet",
+    description: "Read code, review changes, own the outcome.",
+    topics: ["Git", "Code review", "Architecture"],
+    resource: {
+      label: "Pro Git · The book",
+      url: "https://git-scm.com/book/en/v2",
+    },
+    cards: [
+      [
+        "You have 10 minutes to understand an unfamiliar feature. Where do you start?",
+        "Trace one user action from entry point through domain logic and persistence to the visible outcome. Identify the source of truth, side effects, and failure handling before reading every file.",
+      ],
+      [
+        "What should a useful pull request description explain?",
+        "The concrete problem, resulting behavior, why this approach fits, relevant validation, and material risks. Give a before/after example when it makes the change easier to review.",
+      ],
+      [
+        "What is the difference between `git revert` and `git reset`?",
+        "**revert** creates a commit that undoes another commit. **reset** moves a branch reference and may also change the index and working tree depending on mode. Revert is often suitable for shared history.",
+      ],
+      [
+        "What makes a code review comment actionable?",
+        "Name the specific behavior or risk, explain why it matters, and suggest a concrete alternative or ask a focused question. Separate required fixes from optional preferences.",
+      ],
+      [
+        "What is an invariant? Give an example from a flashcard app.",
+        "A property that must remain true across valid operations. Example: a committed card review updates the scheduling state and records its review log together. Partial success would violate that invariant.",
+      ],
+      [
+        "Why separate pure scheduling logic from database code?",
+        "Pure logic is deterministic for given inputs and easier to test. The repository owns persistence and transaction boundaries. Each layer has fewer reasons to change.",
+      ],
+      [
+        "A helper name says `getUser`, but it also deletes stale sessions. What is the issue?",
+        "The name hides a consequential side effect. Make the operation explicit or separate querying from cleanup so callers can reason about its behavior.",
+      ],
+      [
+        "How can you disagree constructively about architecture?",
+        "Agree on goals and constraints, compare concrete alternatives, make tradeoffs explicit, and use a small experiment when evidence is missing. Record the decision and what would trigger revisiting it.",
+      ],
+      [
+        "What is a good first step before refactoring unfamiliar code?",
+        "Capture its observable behavior and contracts with focused tests or examples. Identify callers and edge cases, then make a small behavior-preserving change.",
+      ],
+      [
+        "Why are smaller, coherent commits useful?",
+        "They are easier to review, explain, revert, and bisect. Each should represent a logical change that keeps the project in a useful state.",
+      ],
+      [
+        "How does `git bisect` help locate a regression?",
+        "It performs a binary search over commits between known good and bad revisions. A reproducible check classifies each midpoint until the introducing commit is isolated.",
+      ],
+      [
+        "What belongs in a lightweight architecture decision record?",
+        "Context and constraints, the decision, alternatives considered, and consequences. Include enough reasoning that a later engineer can tell whether the original assumptions still hold.",
+      ],
+      [
+        "Why is “add retries” an incomplete fix for a failing write?",
+        "A timed-out request may already have committed. Establish idempotency, classify retryable failures, and bound retries with backoff and deadlines. Otherwise a reliability fix can duplicate effects.",
+      ],
+      [
+        "You find an unrelated bug while implementing a feature. What should you do?",
+        "Assess whether it blocks the feature or threatens correctness. Fix a directly related issue with clear validation; record an independent issue separately so the change remains reviewable.",
+      ],
+      [
+        "What distinguishes a useful abstraction from premature generalization?",
+        "A useful abstraction captures a stable concept or repeated responsibility and makes its users simpler. Avoid parameters and extension points for hypothetical needs with no clear consumer.",
+      ],
+      [
+        "How should you structure an interview story about a difficult bug?",
+        "Explain the impact and constraints, your hypotheses and investigation, the evidence that isolated the cause, the fix and validation, and what changed to prevent recurrence. Be clear about your contribution.",
+      ],
+    ],
+  },
+];

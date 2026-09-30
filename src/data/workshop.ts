@@ -1,15 +1,7 @@
-import data from "./workshop-units.json";
+import data from "./workshop-units.json" with { type: "json" };
 import type { EngineeringMission } from "./engineering-missions";
 export const workshopUnits = data;
-export const workshopGroups = [
-  "Capstones",
-  "Debugging",
-  "Code review",
-  "SQL concurrency",
-  "Integrations",
-  "Operations",
-  "AI-assisted engineering",
-];
+export { workshopGroups } from "./workshop-groups.ts";
 export const workshopMissions: EngineeringMission[] = workshopUnits.map(
   (unit) => ({
     id: "lab-" + unit.id,

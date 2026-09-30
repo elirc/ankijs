@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
+    "effect:check": "node --experimental-strip-types scripts/build-effect-library.mjs && node --experimental-strip-types --test scripts/effect-lab-model.test.mjs",
     "content:build": "node scripts/build-reviewed-content.mjs",
     "content:check": "node scripts/export-retrieval-baseline.mjs && node scripts/check-reviewed-content.mjs",
     "content:runtime": "vite build --config scripts/quality-check.config.mjs && node artifacts/quality-check/check.mjs",
@@ -19,7 +20,11 @@
     "format": "prettier --write \"src/**/*.tsx\" \"src/**/*.ts\" \"src/**/*.css\"",
     "format:check": "prettier --check \"src/**/*.tsx\" \"src/**/*.ts\" \"src/**/*.css\"",
     "workshop:check": "node --test public/workshop/checks/*.test.mjs public/workshop/capstone/typescript/reference/server.test.mjs",
-    "workshop:content": "node scripts/check-workshop.mjs"
+    "workshop:content": "node scripts/check-workshop.mjs",
+    "effect:build": "node --experimental-strip-types scripts/build-effect-library.mjs --write",
+    "startup:data": "node --experimental-strip-types scripts/build-startup-data.mjs",
+    "startup:check": "node --experimental-strip-types scripts/build-startup-data.mjs --check && node scripts/measure-startup.mjs --check",
+    "startup:benchmark": "node scripts/benchmark-startup.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

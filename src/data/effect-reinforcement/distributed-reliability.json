@@ -1,0 +1,650 @@
+{
+  "project": {
+    "title": "Distributed reliability",
+    "summary": "Reason about replication, partitions, outboxes, retries, queues, observability, and recovery using small deterministic failure labs.",
+    "outcome": "A local reliability harness with explicit guarantees, bounded failure behavior, and evidence from replay and restore drills.",
+    "prerequisites": "System design foundations, transactions, Effect service boundaries, and a persistent CRUD operation.",
+    "model": [
+      "Task: tenantId, taskId, version, payload; authoritative writes remain in one transactional store by default.",
+      "Operation receipt: scoped key, payload fingerprint, status, result, retention deadline.",
+      "Outbox and consumer receipt: eventId, entityId, entityVersion, payloadVersion, attempts, delivery or quarantine state.",
+      "Recovery manifest: snapshot time, schema version, included stores, validation procedure, RPO and RTO."
+    ],
+    "boundaries": "Simulate replicas and transport locally first. Keep business state and delivery intent in one transaction; model every external acknowledgment, stale read, retry, and restore boundary explicitly.",
+    "resources": [
+      {
+        "label": "PostgreSQL: standby replication",
+        "url": "https://www.postgresql.org/docs/current/warm-standby.html"
+      },
+      {
+        "label": "PostgreSQL: transaction isolation",
+        "url": "https://www.postgresql.org/docs/current/transaction-iso.html"
+      },
+      {
+        "label": "RabbitMQ: acknowledgments and confirms",
+        "url": "https://www.rabbitmq.com/docs/confirms"
+      },
+      {
+        "label": "Google SRE: service-level objectives",
+        "url": "https://sre.google/sre-book/service-level-objectives/"
+      },
+      {
+        "label": "Effect: resource scopes",
+        "url": "https://effect.website/docs/v3/resource-management/scope"
+      }
+    ],
+    "id": "distributed-reliability",
+    "kind": "Standalone app",
+    "track": "System design",
+    "milestones": [
+      {
+        "id": "effect-distributed-reliability-consistency",
+        "title": "Choose consistency per operation",
+        "concept": "Replication, freshness, and authoritative reads",
+        "brief": "Build a local primary-and-delayed-copy simulator for a task board. Let writes commit to the primary while the copy applies updates two seconds later.",
+        "explanation": "Consistency describes what observations are permitted, not a single performance label for an entire application. A task edit may require authoritative current state while a dashboard can tolerate a delayed projection. Replication introduces a second observation point with a lag policy; PostgreSQL documents distinct synchronous and asynchronous behavior, so choose the actual configured guarantee instead of assuming every replica is current. Begin with one primary unless measured read demand or recovery requirements justify replication. Effect repository interfaces should reveal whether a read is authoritative or may be stale.",
+        "steps": [
+          "Implement a deterministic primary store and replica queue with two-second propagation; expose separate current-task and dashboard reads.",
+          "Specify read-after-write behavior for the writer and acceptable lag for other dashboard users, including a stale indicator.",
+          "Trace one write through both stores and compare observed versions at 0.5, 1.5, and 2.5 seconds after commit."
+        ],
+        "checks": [
+          "The writer's confirmation uses committed authoritative data.",
+          "Delayed dashboard results are labeled under the stated freshness policy.",
+          "Permission decisions never silently use a replica whose lag violates the authorization contract."
+        ],
+        "experiment": "Pause propagation for 20 seconds and verify the application changes its behavior when the freshness limit is exceeded.",
+        "review": "Explain the difference between transaction isolation, replica freshness, and availability using three separate examples from the fixture.",
+        "stretch": "Add a maximum-lag routing policy and measure the additional primary load during replica interruption.",
+        "stage": "Build independently",
+        "minutes": 90,
+        "workedExample": "Version 10 commits at t=0 s. The primary returns 10 at t=0.5 s while the delayed copy still returns 9. At t=2 s it applies 10, and a read at t=2.5 s sees 10. An explicit two-second propagation model explains the difference without treating the stale value as a failed commit.",
+        "retrieval": [
+          {
+            "question": "Does replication guarantee read-after-write?",
+            "answer": "Not by itself. The guarantee depends on acknowledgment, propagation, read routing, and the configured consistency policy."
+          },
+          {
+            "question": "Which reads need authority?",
+            "answer": "Those enforcing current invariants or permissions under the product contract; informational views may accept explicitly bounded staleness."
+          }
+        ]
+      },
+      {
+        "id": "effect-distributed-reliability-outbox",
+        "title": "Commit business state and delivery intent together",
+        "concept": "Transactional outbox and idempotent consumption",
+        "brief": "Creating a task must eventually update a search projection. Use one database transaction for the task and its event intent, then tolerate repeated publication.",
+        "explanation": "Writing business state and publishing to another system are two independently failing actions. A transactional outbox stores the domain change and delivery intent in one local commit. A relay publishes afterward and records progress; a crash after publication but before recording progress can cause another publication. Therefore design consumers for duplicates instead of claiming exactly-once transport. Keep the first implementation as a database-backed worker when sufficient. A broker may add routing or operational features later, but it does not remove the atomicity boundary between its acknowledgment and the producer's database.",
+        "steps": [
+          "Store task T and outbox event E in one transaction, including stable event identity, entity version, and payload version.",
+          "Implement a bounded relay that marks delivery progress only after the chosen downstream acknowledgment.",
+          "Make the projection consumer commit its effect and processed-event identity atomically, scoped to the intended consumer."
+        ],
+        "checks": [
+          "No committed task requiring projection lacks recoverable delivery intent.",
+          "Rolling back task creation also rolls back its outbox event.",
+          "Publishing E twice produces one logical projection effect under the consumer contract."
+        ],
+        "experiment": "Crash the relay after publication and before marking E delivered, then restart and observe the duplicate delivery.",
+        "review": "Trace each crash window and distinguish at-least-once delivery attempts from the logical effect being deduplicated.",
+        "stretch": "Add outbox retention tied to consumer recovery needs and document replay limitations.",
+        "stage": "Build independently",
+        "minutes": 90,
+        "workedExample": "Transaction 1 commits T and E together. The relay publishes E, then crashes before its delivered marker. Restart publishes E again. The consumer's first transaction writes projection version 1 and receipt E; the second finds receipt E and performs no additional effect. Two deliveries produced one guarded logical update.",
+        "retrieval": [
+          {
+            "question": "Does an outbox guarantee exactly-once transport?",
+            "answer": "No. It preserves intent across the local commit boundary; relay crash windows can still cause duplicate delivery."
+          },
+          {
+            "question": "Where must deduplication live?",
+            "answer": "At the consumer's authoritative effect boundary, with the receipt and effect committed atomically when possible."
+          }
+        ]
+      },
+      {
+        "id": "effect-distributed-reliability-retry-budget",
+        "title": "Give retries one owner and one deadline",
+        "concept": "Timeouts, backoff, jitter, and safe retry classification",
+        "brief": "A read has a 900 ms caller deadline and a dependency that sometimes stalls. Build a retry policy that improves recovery without exceeding the caller's budget.",
+        "explanation": "Retries consume capacity and time; they are not free reliability. Classify errors by whether another attempt can help and whether repeating the operation is safe. A timeout may leave a mutation's outcome unknown, so do not blindly retry unsafe writes. Assign retry ownership at one layer to avoid multiplication across wrappers. Use bounded backoff and jitter to spread simultaneous attempts, but keep the total deadline authoritative. Effect cancellation and scoped cleanup help manage local work; they do not prove that an external service stopped processing an already-sent request.",
+        "steps": [
+          "Define retryable transient read failures separately from validation, authorization, and ambiguous mutation outcomes.",
+          "Allocate a 900 ms total budget, per-attempt limit, maximum attempts, and bounded waits; propagate remaining time to dependency calls.",
+          "Use controlled failures and a clock to record attempts, elapsed time, final typed outcome, and released resources."
+        ],
+        "checks": [
+          "Validation and authorization failures are attempted once.",
+          "The complete operation respects its total deadline under the local test model.",
+          "An ambiguous unsafe write is reconciled or protected by idempotency before repetition."
+        ],
+        "experiment": "Place three-attempt retries at two nested layers and observe attempt multiplication, then remove one owner.",
+        "review": "Explain why a short timeout can increase load when it triggers retries against a dependency already overloaded.",
+        "stretch": "Compare fixed retry delays with deterministic jittered schedules for 100 simultaneous clients.",
+        "stage": "Make it reliable",
+        "minutes": 90,
+        "workedExample": "Three 200 ms attempts plus two 100 ms waits consume 800 ms, leaving 100 ms within a 900 ms budget before other overhead. Two independent layers each allowing three attempts can produce up to nine downstream attempts. A single owner makes that amplification visible and controllable.",
+        "retrieval": [
+          {
+            "question": "Does timeout mean no side effect occurred?",
+            "answer": "No. The remote operation may complete after the caller stops waiting; safe repetition requires an appropriate protocol."
+          },
+          {
+            "question": "What is jitter for?",
+            "answer": "It spreads retry timing across clients to reduce synchronized bursts; it does not make unsafe operations idempotent."
+          }
+        ]
+      },
+      {
+        "id": "effect-distributed-reliability-queue-delivery",
+        "title": "Separate transport acknowledgments from business completion",
+        "concept": "At-least-once delivery and consumer commit order",
+        "brief": "Deliver event E to a local consumer twice, including a crash after its database commit but before its transport acknowledgment.",
+        "explanation": "A producer confirmation and a consumer acknowledgment refer to different boundaries. RabbitMQ documents these as independent mechanisms: broker acceptance does not imply that the consumer's business transaction completed. A consumer that acknowledges before committing can lose work on a crash; acknowledging afterward can allow redelivery if the acknowledgment is lost. Design the business effect to tolerate that duplicate window. Start with a local durable queue model to make the sequence visible, then map its semantics to the chosen broker instead of assuming all products behave identically.",
+        "steps": [
+          "Define acknowledgment as following the consumer's durable effect and processed-event receipt, committed together where possible.",
+          "Implement a failure-injectable consumer with pause points before commit, after commit, and before acknowledgment.",
+          "Replay each crash point using stable event identity and inspect broker-visible delivery state separately from business rows."
+        ],
+        "checks": [
+          "Crash before commit leaves the event eligible for another delivery.",
+          "Crash after commit cannot cause a second guarded business effect.",
+          "Transport and business completion metrics have different names and meanings."
+        ],
+        "experiment": "Temporarily acknowledge before commit, crash at that boundary, and demonstrate the lost business outcome in the local fixture.",
+        "review": "Trace why neither acknowledgment order eliminates all failure windows without an idempotent effect protocol.",
+        "stretch": "Add a downstream external side effect and identify the new atomicity boundary it creates.",
+        "stage": "Make it reliable",
+        "minutes": 90,
+        "workedExample": "E is delivered, then the consumer commits business row R and receipt E. It crashes before acknowledging. The transport redelivers E; the receipt check finds it already processed and acknowledges without creating another R. Two deliveries occurred, one guarded effect committed, and no exactly-once transport claim is needed.",
+        "retrieval": [
+          {
+            "question": "What does publisher confirmation establish?",
+            "answer": "Acceptance at the configured broker boundary, not completion of the consumer's business operation."
+          },
+          {
+            "question": "Why acknowledge after commit?",
+            "answer": "It avoids declaring success before durable business state exists, while duplicate handling covers the remaining redelivery window."
+          }
+        ]
+      },
+      {
+        "id": "effect-distributed-reliability-slo",
+        "title": "Measure user outcomes instead of process uptime",
+        "concept": "SLIs, SLOs, and error budgets",
+        "brief": "Define a task-save success indicator for a rolling 30-day window. Distinguish rejected user input from failed valid save attempts.",
+        "explanation": "An SLI is a measurement definition; an SLO sets its target over a specified window. Make the denominator, exclusions, and observation point explicit so the number matches user experience. Process uptime is not equivalent to successful saves. Use a separate latency indicator or define a combined good-event rule deliberately. Error budgets convert the target into permitted bad events or time under the chosen model, not permission to lose arbitrary data. Instrument durability and correctness failures separately even when an availability target is met.",
+        "steps": [
+          "Define eligible valid authorized save attempts and a good outcome as durable success within the agreed response boundary.",
+          "Compute a 99.9% target over 100,000 eligible requests, recording missing telemetry and timeout ambiguity explicitly.",
+          "Expose counts and a small local dashboard with window, numerator, denominator, and latency distribution rather than only a green status."
+        ],
+        "checks": [
+          "The fixture allows 100 bad events at 99.9% over 100,000 eligible attempts.",
+          "Validation rejections follow the declared denominator policy instead of changing it silently.",
+          "A durability defect is visible even if availability remains within budget."
+        ],
+        "experiment": "Inject 150 failed eligible saves and inspect both total budget exhaustion and the particular error categories.",
+        "review": "Explain why changing the denominator after an incident can make a metric look healthy without improving the product.",
+        "stretch": "Add separate indicators for job acceptance and export completion within ten minutes.",
+        "stage": "Own the outcome",
+        "minutes": 90,
+        "workedExample": "At 100,000 eligible attempts and 99.9% target, the allowed bad fraction is 0.001, giving 100 bad events. If 150 fail, observed success is 99.85% and the request-based budget is exceeded by 50 events. This calculation does not establish a time-based outage allowance.",
+        "retrieval": [
+          {
+            "question": "What separates SLI from SLO?",
+            "answer": "The SLI defines what is measured; the SLO specifies the acceptable target and evaluation window."
+          },
+          {
+            "question": "Why separate export acceptance and completion?",
+            "answer": "They are different promises and can fail independently; one fast enqueue does not prove the user received an export."
+          }
+        ]
+      },
+      {
+        "id": "effect-distributed-reliability-recovery",
+        "title": "Prove recovery with a restore drill",
+        "concept": "Backups, RPO, RTO, and verification",
+        "brief": "Your local board takes hourly backups. Delete its live task data in a disposable fixture, restore into a separate database, and measure what was lost and how long recovery took.",
+        "explanation": "Backups are useful only if they can restore the required state with acceptable loss and delay. Recovery point objective bounds acceptable lost history; recovery time objective bounds acceptable restoration time under a defined incident. A replica can copy deletion and is not a substitute for historical recovery. Keep backup creation, retention, integrity, access, and restoration as separate checks. Restore into an isolated location before switching traffic, and verify application-level invariants rather than merely opening a database file. Never use real user data for a destructive learning fixture.",
+        "steps": [
+          "Define a one-hour RPO and 20-minute RTO for a disposable dataset, including what starts and ends the recovery clock.",
+          "Create a backup, write additional timestamped tasks, then simulate loss of the live fixture and restore into a new location.",
+          "Verify tenant isolation, task counts, operation receipts, and pending jobs before declaring recovery complete."
+        ],
+        "checks": [
+          "The restore never overwrites the original source or unrelated workspace data.",
+          "Measured lost writes are compared with the stated RPO.",
+          "Recovery time includes validation and application readiness, not only file copying."
+        ],
+        "experiment": "Make the newest backup unreadable and repeat using an older copy, recording which objective is now missed.",
+        "review": "Explain why a successful backup command does not by itself prove recoverability.",
+        "stretch": "Document recovery of encryption keys or credentials separately without including secrets in the exercise artifact.",
+        "stage": "Own the outcome",
+        "minutes": 90,
+        "workedExample": "A backup at 10:00 contains 1,000 tasks. Failure at 10:45 follows 90 additional creates, so restoring only that backup loses 45 minutes and 90 tasks. If restore plus checks takes 14 minutes, this fixture meets a one-hour RPO and 20-minute RTO, subject to the defined boundaries.",
+        "retrieval": [
+          {
+            "question": "What does RPO describe?",
+            "answer": "The acceptable amount of lost history, commonly expressed as time before the incident."
+          },
+          {
+            "question": "What does RTO include?",
+            "answer": "The defined recovery interval through usable, verified service restoration, not just the duration of copying backup bytes."
+          }
+        ]
+      }
+    ]
+  },
+  "drills": [
+    {
+      "id": "effect-distributed-reliability-partition-policy",
+      "title": "Define behavior during a partition",
+      "concept": "Unavailable authority and operation-specific tradeoffs",
+      "brief": "Disconnect the task service from its authoritative membership store for 30 seconds. Decide which reads and writes can safely continue.",
+      "explanation": "A partition is a communication failure, not merely slow code. During it, a node cannot safely infer whether inaccessible state is unchanged. A useful design chooses behavior per operation: a public cached description might remain available, while an authorization-sensitive assignment may fail closed. Avoid the slogan that every system simply picks two of three features; the meaningful question is which consistency and availability promises survive a partition for the relevant operations. Local replicas or caches do not establish current authority merely because they are reachable.",
+      "steps": [
+        "List task viewing, assignment, permission changes, and report reads with the state each requires and its stale-data tolerance.",
+        "Use an Effect service replacement that returns authority-unavailable during a controlled 30-second interval.",
+        "Implement explicit unavailable or degraded responses, preserving pending drafts and avoiding speculative authoritative writes."
+      ],
+      "checks": [
+        "Assignment cannot succeed using an unverified stale membership decision.",
+        "Permitted stale reports disclose their observation age.",
+        "Recovery does not automatically replay unsafe mutations submitted under uncertain authority."
+      ],
+      "experiment": "Remove a member in the authoritative store while the application is disconnected, then attempt assignment using the old cached membership.",
+      "review": "Explain why a reachable cache is not proof that its authorization information is still valid.",
+      "stretch": "Define a deliberately offline-capable operation with a conflict policy and compare its contract with assignment.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "At t=0 s, cached membership permits user U. At t=5 s, authority removes U while the application is partitioned until t=30 s. An assignment at t=10 s cannot establish current permission from the cache. Returning unavailable preserves the rule; accepting it chooses a weaker authorization contract.",
+      "retrieval": [
+        {
+          "question": "What does a failed authority call establish?",
+          "answer": "Only that communication failed or exceeded its budget; it does not establish the remote state or whether a prior mutation committed."
+        },
+        {
+          "question": "Can different operations choose different partition behavior?",
+          "answer": "Yes. An informational stale read and an invariant-enforcing write can have different explicit availability and consistency requirements."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-consistency"
+    },
+    {
+      "id": "effect-distributed-reliability-concurrent-updates",
+      "title": "Prevent lost updates with explicit conflict handling",
+      "concept": "Optimistic concurrency and transaction retries",
+      "brief": "Two editors load task version 5. One changes its title and the other changes its status; preserve the chosen semantics when both save.",
+      "explanation": "A read-modify-write sequence can overwrite a concurrent change unless the authoritative update checks what was read or applies a safe atomic operation. A version predicate makes conflicts visible rather than silently resolving them with last arrival. Some independent field edits can be merged, but that is a product decision requiring invariant checks, not an automatic property of JSON patches. Transaction isolation and retry requirements depend on the database mode. Retrying a rejected transaction must repeat its decision from fresh state, with external side effects kept outside the retried body.",
+      "steps": [
+        "Require expectedVersion on edits and perform a conditional update that increments the version only on a match.",
+        "Return a typed conflict with enough current state for an explicit reload or approved field-level merge.",
+        "Use barriers to submit both version-5 updates concurrently and inspect row count, versions, and user-visible conflict states."
+      ],
+      "checks": [
+        "Only one unconditional version-5 replacement succeeds.",
+        "The losing draft remains available for reconciliation.",
+        "A retry reads fresh state and revalidates the operation's invariant before committing."
+      ],
+      "experiment": "Make both editors change the same title and prove that automatic blind replay would discard one user's intent.",
+      "review": "Explain the distinction between a retryable database transaction conflict and a user-level edit conflict requiring a decision.",
+      "stretch": "Add a safe increment operation and compare its atomic semantics with replacing an entire record.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "A and B read version 5. A's WHERE version=5 update changes one row to version 6. B's identical predicate then matches zero rows, so B receives Conflict. If B reloads and explicitly merges its status, a new expectedVersion=6 update can commit version 7 without reverting A's title.",
+      "retrieval": [
+        {
+          "question": "Why retain the losing draft?",
+          "answer": "The conflict is about concurrent intent; discarding the draft would lose user work before reconciliation."
+        },
+        {
+          "question": "Does retry mean repeat the old write unchanged?",
+          "answer": "No. A transaction retry needs fresh reads and valid semantics; a user conflict may require an explicit merge or confirmation."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-consistency"
+    },
+    {
+      "id": "effect-distributed-reliability-idempotency",
+      "title": "Bind retries to one logical operation",
+      "concept": "Idempotency keys, payload hashes, and retention",
+      "brief": "The create-task response is lost after commit. Repeat operation key K with the same payload, then repeat K with a different title.",
+      "explanation": "An idempotency key identifies one logical operation, not all requests with similar content. Scope it by tenant and operation type, bind it to a normalized payload fingerprint, and retain the authoritative result for a defined window. The key claim and business effect need concurrency-safe coordination; a check-then-insert race can still duplicate work. Reusing a key for different intent should be rejected. Expiry limits the guarantee, so document what an old retry does. External provider effects may require a separate idempotency protocol and cannot inherit database guarantees by naming the same key.",
+      "steps": [
+        "Define the key scope, normalized fingerprint fields, retention interval, and in-progress versus completed responses.",
+        "Atomically claim K, create the task, and store its result under a concurrency-safe strategy.",
+        "Submit two simultaneous same-key requests, then a same-key different-payload request, and inspect durable identities."
+      ],
+      "checks": [
+        "Same key and payload resolve to one task result.",
+        "Same key with changed intent returns a conflict without another task.",
+        "The documented expiry behavior is tested rather than described as permanent deduplication."
+      ],
+      "experiment": "Drop the reply after commit and retry K; separately simulate a retry after the retention window expires.",
+      "review": "Explain why disabling a submit button is useful UX but cannot replace durable idempotency.",
+      "stretch": "Add a reconciliation endpoint for callers whose operation remains in an uncertain state.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "K with fingerprint H1 commits task T at t=1 s, but the reply disappears. A retry at t=3 s finds completed K/H1 and returns T. A request using K/H2 is rejected. If receipts expire after 24 hours, behavior beyond that interval needs an explicit contract; it is not an eternal one-task guarantee.",
+      "retrieval": [
+        {
+          "question": "What identifies the same operation?",
+          "answer": "A stable key in the defined tenant and operation scope, bound to the same normalized intent."
+        },
+        {
+          "question": "Why fingerprint the payload?",
+          "answer": "It prevents accidental key reuse from silently returning an unrelated result or applying changed intent."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-outbox"
+    },
+    {
+      "id": "effect-distributed-reliability-relay-recovery",
+      "title": "Recover delivery without skipping intent",
+      "concept": "Outbox progress and poison-event handling",
+      "brief": "An outbox contains events E1, E2, and E3. E2 is malformed for the current consumer; make progress visible without silently deleting the event.",
+      "explanation": "Durable intent needs an operational recovery path. A relay cursor that advances past an unrecorded failure can lose work, while retrying an invalid event forever can block healthy events. Decide whether ordering is required per entity and whether unrelated entities may progress independently. Record attempt count, last safe error, and an explicit quarantined state. Corrected payloads or replay require a controlled policy that preserves identity and auditability. Avoid including credentials or entire sensitive payloads in error records. A queue being empty is not proof that every event succeeded if failures were discarded.",
+      "steps": [
+        "Create E1 for task A, invalid E2 for task A, and E3 for task B, with explicit stream ordering requirements.",
+        "Implement bounded attempts and quarantine with event identity, reason, and a reviewed replay path.",
+        "Process the fixture and show which events may advance, which remain blocked, and how operators inspect unresolved intent."
+      ],
+      "checks": [
+        "E2 remains discoverable with a safe diagnostic rather than disappearing.",
+        "Task B can progress if its independent ordering contract permits it.",
+        "Task A cannot silently skip required state transitions merely to clear backlog."
+      ],
+      "experiment": "Restart while E2 is quarantined and verify its state and recovery instructions remain durable.",
+      "review": "Explain why total queue size must be read alongside quarantine count and per-stream progress.",
+      "stretch": "Add a repaired consumer version and replay E2 under an explicit compatibility policy.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "E1 updates task A from version 1 to 2. E2 should apply version 3 but cannot decode, so A's stream stops at 2. E3 belongs to task B and may complete independently. The healthy backlog can reach zero while one quarantined event still requires attention; zero backlog is not universal success.",
+      "retrieval": [
+        {
+          "question": "When may later events proceed?",
+          "answer": "When their ordering and dependency contracts permit it; unrelated entity streams can often progress independently."
+        },
+        {
+          "question": "Why preserve failed intent?",
+          "answer": "It supports diagnosis, controlled repair, and evidence that a promised outcome remains unresolved rather than silently lost."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-outbox"
+    },
+    {
+      "id": "effect-distributed-reliability-backpressure",
+      "title": "Reject excess work before memory becomes the queue",
+      "concept": "Admission limits and bounded Effect concurrency",
+      "brief": "A local service can process 20 requests/s but receives 50/s for ten seconds. Add a finite waiting capacity and a predictable overload response.",
+      "explanation": "Backpressure communicates that downstream capacity is limited. Admission control decides which work enters a finite system and what callers observe when it is full. Unbounded promises, fibers, or queue entries merely defer failure until memory or latency becomes unacceptable. Bound both active work and waiting work, and distinguish service time from queue delay. Rejection can be more honest than accepting work that cannot meet its deadline. Tenant fairness and priority may matter, but start with a simple measurable policy and add complexity only when its failure is demonstrated.",
+      "steps": [
+        "Configure four active handlers at 200 ms each and a waiting limit of 40; expose an explicit overload error.",
+        "Generate 50 arrivals/s for ten seconds and record accepted, completed, queued, and rejected requests.",
+        "Propagate cancellation for callers that abandon waiting, ensuring they no longer occupy admission slots."
+      ],
+      "checks": [
+        "At most four handlers execute and 40 requests wait.",
+        "Every arrival is accounted for as accepted or rejected without silent loss.",
+        "Canceling a queued caller releases its waiting capacity."
+      ],
+      "experiment": "Disable the waiting limit for a short controlled simulation and compare backlog and tail latency; restore the bound before real load.",
+      "review": "Explain why a larger queue improves burst absorption but can worsen latency and prolong recovery.",
+      "stretch": "Add per-tenant admission shares and compare one noisy tenant with several small tenants.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "Ideal service capacity is four / 0.2 s = 20 requests/s. At 50 arrivals/s, excess demand is 30 requests/s. A 40-request waiting buffer fills in roughly 40/30 = 1.33 seconds under simplified steady rates; later excess arrivals must be rejected or controlled upstream.",
+      "retrieval": [
+        {
+          "question": "Is a queue a capacity increase?",
+          "answer": "No. It stores waiting work; sustained throughput still depends on processing capacity."
+        },
+        {
+          "question": "Why count canceled waiters?",
+          "answer": "They must leave admission accounting, or dead requests can consume capacity and falsely keep the system full."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-retry-budget"
+    },
+    {
+      "id": "effect-distributed-reliability-deadline-propagation",
+      "title": "Spend the remaining deadline deliberately",
+      "concept": "Nested calls and cleanup reserve",
+      "brief": "A request has one second end to end. Authentication consumes 200 ms and storage acquisition consumes another 150 ms before a dependency call begins.",
+      "explanation": "A deadline is a boundary-wide limit, while a timeout often describes one local wait. Giving every nested call the original timeout can make total duration exceed the user's budget. Propagate remaining time and reserve enough for mapping the result, releasing resources, and sending a response. Stop starting work that cannot fit its minimum useful budget. Interruption should trigger local finalization through scopes, but provider cancellation semantics need separate verification. An agent-generated timeout wrapper is incomplete if it only races promises while leaving unlimited background operations running.",
+      "steps": [
+        "Represent the original deadline using a consistent elapsed-time source and calculate remaining budget at each boundary.",
+        "Allocate a cleanup reserve and reject or skip attempts that cannot fit useful work within the remaining time.",
+        "Inject delays into authentication, pool acquisition, and provider response; record both response duration and active resources afterward."
+      ],
+      "checks": [
+        "Nested calls use remaining budget rather than resetting the full second.",
+        "No new retry begins after its useful budget is exhausted.",
+        "Locally owned resources are released and any uncancelable provider work is explicitly accounted for."
+      ],
+      "experiment": "Make the provider ignore cancellation and finish late. Verify that late results cannot overwrite an already finalized response state.",
+      "review": "Distinguish the caller's waiting lifetime, local resource lifetime, and remote side-effect lifetime.",
+      "stretch": "Use a controlled clock to cover the exact deadline boundary without wall-clock sleeps.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "From 1,000 ms, authentication spends 200 ms and acquisition 150 ms, leaving 650 ms. Reserving 50 ms for cleanup gives at most 600 ms for the dependency. A new full 1,000 ms timeout there would permit roughly 1,350 ms before cleanup and violate the original boundary.",
+      "retrieval": [
+        {
+          "question": "Why reserve cleanup time?",
+          "answer": "The operation still needs to release resources and present an outcome after dependency work stops."
+        },
+        {
+          "question": "Does interruption prove remote cancellation?",
+          "answer": "No. It governs local computation; the provider may continue, so late effects and ambiguous outcomes need their own handling."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-retry-budget"
+    },
+    {
+      "id": "effect-distributed-reliability-event-ordering",
+      "title": "Order only the stream that needs it",
+      "concept": "Per-entity versions and reordered delivery",
+      "brief": "Task T has events for versions 4, 5, and 6. Deliver them as 4, 6, 5 and define whether the projection can converge without a global event order.",
+      "explanation": "Ordering guarantees have scope. A sequence for one entity does not establish order across every tenant or topic. Some projections replace a full snapshot and can ignore older versions; others apply deltas and require missing transitions before proceeding. Choose the event contract explicitly. Multiple consumers, retries, and redelivery can affect observed processing order even when enqueue order is known. Avoid promising total order when the product needs only per-task coherence. A local controlled delivery fixture is enough to test version rules before adopting partitioned infrastructure.",
+      "steps": [
+        "Choose full-snapshot or delta semantics and document the version scope and gap behavior.",
+        "Implement a projection that rejects stale versions; for deltas, retain or retry gaps instead of applying them blindly.",
+        "Deliver versions 4, 6, and 5 with duplicates, then inspect the final state and unresolved-gap records."
+      ],
+      "checks": [
+        "An older event cannot overwrite a newer accepted snapshot.",
+        "Delta processing does not silently skip a required version.",
+        "Events for unrelated tasks can proceed without an invented global ordering dependency."
+      ],
+      "experiment": "Drop version 5 entirely and compare recovery for a full version-6 snapshot versus a version-6 delta.",
+      "review": "Explain which ordering requirement follows from the business invariant and which would be unnecessary coordination.",
+      "stretch": "Add a rebuild from authoritative state and state how it closes a persistent gap.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "For full snapshots, apply version 4, then 6; later version 5 is stale and ignored, leaving 6. For deltas, receiving 6 after 4 reveals a missing transition: hold 6 until 5 arrives or rebuild. The same delivery sequence needs different behavior because payload semantics differ.",
+      "retrieval": [
+        {
+          "question": "Does a UUID order events?",
+          "answer": "No. Identity alone supplies neither a business sequence nor a globally coordinated order."
+        },
+        {
+          "question": "When can gaps be skipped?",
+          "answer": "When the event contract carries sufficient complete state or another proved rule makes intermediate transitions unnecessary."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-queue-delivery"
+    },
+    {
+      "id": "effect-distributed-reliability-poison-messages",
+      "title": "Recover poison messages without infinite churn",
+      "concept": "Bounded attempts, quarantine, and safe replay",
+      "brief": "A consumer receives 99 valid events and one unsupported payload version. Ensure that failure remains visible while healthy independent work progresses.",
+      "explanation": "Transient failures may benefit from retry; permanently invalid input does not become valid through repetition. Decode envelopes before business effects and classify unsupported versions separately from temporary dependency failures. After bounded attempts where appropriate, preserve failed work in a quarantine record with safe diagnostics and a controlled replay path. Dead-lettering is an operational state, not successful processing. Replay must consider consumer versions, deduplication retention, and ordering requirements. A coding agent should not fix the queue by deleting the failing message or broadly swallowing its error.",
+      "steps": [
+        "Seed 100 events with one unsupported version and define retry categories and maximum attempts.",
+        "Record quarantine identity, tenant, payload version, first failure time, attempts, and sanitized reason; preserve recovery access without leaking secrets.",
+        "Process valid independent events and implement an explicit replay action after deploying a compatible decoder."
+      ],
+      "checks": [
+        "Ninety-nine valid independent events complete under the fixture contract.",
+        "The unsupported event remains inspectable and does not retry forever.",
+        "Replay preserves operation identity and cannot bypass consumer deduplication rules."
+      ],
+      "experiment": "Restart before replay and verify quarantine survives; then replay twice to check the business effect remains guarded.",
+      "review": "Explain why a falling queue depth may conceal unresolved failures if quarantine is omitted from the dashboard.",
+      "stretch": "Add an alert based on quarantine age and ownership rather than repeatedly paging for every retry.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "If 100 events arrive and one is unsupported, completion is 99/100, not 100/100 merely because the active queue becomes empty. Quarantine count is one. After a compatible consumer replays that identity and commits its receipt, completion becomes 100/100; replaying again does not add another logical effect.",
+      "retrieval": [
+        {
+          "question": "Why avoid retrying invalid payloads indefinitely?",
+          "answer": "Repeated attempts consume capacity without changing the deterministic decoding outcome."
+        },
+        {
+          "question": "Is dead-lettered equivalent to done?",
+          "answer": "No. It records unresolved work requiring an explicit discard, correction, or replay decision."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-queue-delivery"
+    },
+    {
+      "id": "effect-distributed-reliability-observability",
+      "title": "Make one failed request explainable",
+      "concept": "Structured telemetry and causal correlation",
+      "brief": "A task save commits, its response is lost, and the outbox delivery retries. Build telemetry that can connect these facts without logging task contents.",
+      "explanation": "Observability should answer concrete operational questions. Metrics summarize rates and distributions, logs capture selected events, and traces connect a request's dependency path. Correlation identifiers are useful when their scope is explicit: request ID identifies one attempt, operation ID joins logical retries, and event ID joins deliveries. Avoid high-cardinality tenant or operation IDs as unbounded metric labels; retain them in controlled logs or traces where appropriate. Redact secrets and unnecessary user data. A healthy telemetry pipeline must also account for sampling and missing observations rather than treating absence as proof of success.",
+      "steps": [
+        "Define structured events for attempt start, transaction commit, response failure, event publication, and consumer completion, carrying scoped correlation IDs.",
+        "Add counters for eligible outcomes and histograms for latency plus bounded labels such as operation and error category.",
+        "Run a lost-response fixture and reconstruct the sequence from safe telemetry, checking it against durable records."
+      ],
+      "checks": [
+        "Two request attempts share one logical operation ID but have distinct request IDs.",
+        "Repeated deliveries retain the same event identity.",
+        "The investigation needs no raw task title, credential, or unbounded metric label."
+      ],
+      "experiment": "Drop selected trace spans and determine which facts remain provable from durable state and counters.",
+      "review": "Explain what each telemetry signal can establish and where sampling or logging gaps limit certainty.",
+      "stretch": "Add a correlation link from the UI's support reference to a sanitized operation lookup.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "Request R1 commits operation K and event E, then loses its response. Retry R2 uses K and returns the existing task. E publishes twice before consumer receipt E is durable. Logs join R1/R2 through K and deliveries through E; a metric counts two attempts but one logical creation.",
+      "retrieval": [
+        {
+          "question": "Why distinguish request and operation IDs?",
+          "answer": "Several transport attempts can belong to one user intent; merging them would hide retries or exaggerate business throughput."
+        },
+        {
+          "question": "Why avoid IDs as metric labels?",
+          "answer": "Their unbounded cardinality can make metric storage and queries expensive; bounded categories serve aggregate monitoring."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-slo"
+    },
+    {
+      "id": "effect-distributed-reliability-burn-rate",
+      "title": "Alert on actionable budget consumption",
+      "concept": "Windowed error rates and low-traffic limits",
+      "brief": "A service targets 99.9% successful saves. Compare a short incident with normal low-volume variation and design an alert that prompts useful action.",
+      "explanation": "Burn rate compares the observed bad-event fraction with the allowed fraction. It helps express how quickly a request-based error budget is being consumed, but the window and sample size determine what the ratio means. A short spike and a sustained degradation need different attention. Avoid treating a single failed request among a tiny sample as precise evidence of long-term reliability. Use multiple windows, minimum-volume rules where suitable, and clear runbook actions. The alert should identify the impacted operation and symptom rather than guess a root cause from one metric.",
+      "steps": [
+        "Compute bad-event fractions and burn rates for 20 failures among 1,000 requests and one failure among ten requests.",
+        "Implement a local evaluation over short and longer windows, with the sample counts visible beside rates.",
+        "Attach an action sequence that checks scope, recent changes, dependency health, and safe mitigation without automatically replaying unsafe writes."
+      ],
+      "checks": [
+        "Twenty failures in 1,000 requests produce 2% errors and a 20× burn rate against 0.1%.",
+        "Low-volume samples remain visible and are not presented as precise long-term forecasts.",
+        "The alert links to a concrete diagnostic and mitigation procedure."
+      ],
+      "experiment": "Generate a two-minute spike followed by recovery, then a lower sustained failure rate, and compare alert timing.",
+      "review": "Explain why burn rate is a normalized observed rate rather than a prediction guaranteed to continue.",
+      "stretch": "Add job-age alerts for accepted work that never reaches completion despite healthy request responses.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "With allowed error fraction 0.001, an observed 20/1,000 = 0.02 yields burn rate 0.02/0.001 = 20. One failure in ten requests yields 100×, but its tiny denominator makes interpretation highly uncertain. The counts and windows are essential context, not optional decoration.",
+      "retrieval": [
+        {
+          "question": "What is burn rate normalized against?",
+          "answer": "The allowed bad-event fraction implied by the SLO, using the same event definition."
+        },
+        {
+          "question": "Why use more than one window?",
+          "answer": "It helps distinguish brief noise from sustained budget consumption while retaining sensitivity to serious incidents."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-slo"
+    },
+    {
+      "id": "effect-distributed-reliability-recovery-integrity",
+      "title": "Restore related state coherently",
+      "concept": "Backup consistency and workflow reconciliation",
+      "brief": "Restore tasks, operation receipts, and outbox records from a common recovery point. Investigate what happens when those collections come from different times.",
+      "explanation": "A recoverable application includes more than its main entity table. Idempotency receipts, workflow intent, schema version, and referenced objects may determine whether retries and jobs behave correctly after restoration. Mixing independently captured states can create impossible combinations, such as a receipt pointing to a missing task or a task whose required event is absent. Use a backup mechanism with an understood consistency boundary and document separately stored resources. Recovery may require reconciliation with external systems that did not roll back. Replaying everything blindly can duplicate irreversible effects.",
+      "steps": [
+        "Create a fixture with task T, receipt K, and outbox E committed together, then capture a consistent backup.",
+        "Construct a deliberately mismatched restore with old tasks and newer receipts to demonstrate the inconsistency.",
+        "Add validation queries for broken references, missing intent, and duplicate operation effects, followed by an explicit reconciliation report."
+      ],
+      "checks": [
+        "The consistent restore preserves transactional relationships.",
+        "The mixed restore is detected before user traffic resumes.",
+        "External side effects are reconciled using durable identity rather than assumed to have rolled back."
+      ],
+      "experiment": "Restore to a point before an already-delivered external notification and examine whether replay would send it again.",
+      "review": "Explain which recovery state is authoritative and which external outcomes require consultation or deduplication.",
+      "stretch": "Include schema and decoder versions in the recovery manifest and test an older snapshot against compatible code.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "At 10:05, T, K, and E commit atomically. Restoring tasks from 10:00 but receipts from 10:10 yields K→T while T is missing. A same-key retry might incorrectly return a nonexistent result. A common recovery point avoids that combination; validation should detect it before service resumes.",
+      "retrieval": [
+        {
+          "question": "Why back up receipts and jobs too?",
+          "answer": "They determine retry and deferred-work behavior; restoring entities alone may break operation guarantees."
+        },
+        {
+          "question": "Does database restore undo external effects?",
+          "answer": "No. Emails, webhooks, and provider writes may remain and need reconciliation or idempotent replay."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-recovery"
+    },
+    {
+      "id": "effect-distributed-reliability-incident-review",
+      "title": "Turn a recovery exercise into a design improvement",
+      "concept": "Failure timelines and evidence-led review",
+      "brief": "Run a 12-minute simulated database outage followed by queue recovery. Produce a review that separates observed facts, estimates, and untested assumptions.",
+      "explanation": "An incident review should explain the user impact, detection, system behavior, recovery, and concrete changes supported by evidence. Avoid blaming the component nearest the error message without tracing the causal path. Include accepted but unfinished work as well as request failures. Ask a coding agent to organize logs and propose hypotheses, then verify timestamps and counts against durable state. Prefer a small actionable correction over adding an entire distributed subsystem without evidence. Preserve uncertainty where sampling, clock differences, or missing data prevent a complete explanation.",
+      "steps": [
+        "Run the outage with two arriving jobs/minute and six completions/minute after restoration; record requests, accepted jobs, and oldest age.",
+        "Build a timeline with evidence links, labeling clock source and distinguishing facts from inferred causes.",
+        "Select one bounded corrective change, implement or specify its acceptance fixture, and record a trigger for revisiting larger architecture changes."
+      ],
+      "checks": [
+        "The review accounts for failed requests and accepted unfinished work separately.",
+        "Backlog recovery estimates match the measured rates within stated assumptions.",
+        "Each corrective action names an owner, observable outcome, and verification procedure."
+      ],
+      "experiment": "Remove one telemetry source and revise the confidence of the timeline rather than inventing missing events.",
+      "review": "Explain what evidence would falsify the proposed root cause and why the selected correction addresses user impact.",
+      "stretch": "Repeat the exercise after the correction and compare the same outcome measurements.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "Twelve minutes at two jobs/minute adds 24 jobs. Recovery at six completions/minute with two arrivals/minute yields four jobs/minute spare, so the initial backlog drains in six minutes under constant rates. Service restoration at minute 12 does not mean all accepted exports are complete until approximately minute 18.",
+      "retrieval": [
+        {
+          "question": "Why distinguish restoration from backlog completion?",
+          "answer": "New requests may succeed while previously accepted work still waits; they are different user outcomes."
+        },
+        {
+          "question": "What makes a corrective action verifiable?",
+          "answer": "A concrete changed behavior and a repeatable fixture that could demonstrate whether the change worked."
+        }
+      ],
+      "parentId": "effect-distributed-reliability-recovery"
+    }
+  ]
+}

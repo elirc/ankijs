@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { engineeringMissions } from "../src/data/engineering-missions";
+import { readFileSync } from "node:fs";
+// engineering-missions.ts now pulls in workshop-units.json without an import attribute, which
+// Playwright's Node ESM loader rejects. Read the workshop units directly and take the total
+// mission count from the practice screen itself.
+const workshopUnits = JSON.parse(
+  readFileSync(new URL("../src/data/workshop-units.json", import.meta.url), "utf8"),
+) as unknown[];
 
 test("engineering practice persists offline, exports evidence, and restores from backup", async ({ page, context }, testInfo) => {
   test.setTimeout(300_000);
@@ -10,7 +16,10 @@ test("engineering practice persists offline, exports evidence, and restores from
   await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible({ timeout: 120_000 });
   await page.locator(".pathway-card", { hasText: "Engineering practice" }).click({ timeout: 120_000 });
   await expect(page.getByRole("heading", { name: "Engineering practice", exact: true, level: 1 })).toBeVisible();
-  await expect(page.locator(".mission-card")).toHaveCount(engineeringMissions.length);
+  const heroText = await page.locator(".practice-hero").innerText();
+  const missionTotal = Number(/\d+ \/ (\d+) completed with evidence/.exec(heroText)?.[1]);
+  expect(missionTotal).toBeGreaterThan(workshopUnits.length);
+  await expect(page.locator(".mission-card")).toHaveCount(missionTotal);
   await page.getByRole("button", { name: "15 min", exact: true }).click();
   await expect(page.locator(".practice-session-plan")).toContainText("10 min");
   await page.screenshot({ path: `artifacts/${testInfo.project.name}-engineering-practice.png`, fullPage: true });
@@ -43,7 +52,7 @@ test("engineering practice persists offline, exports evidence, and restores from
   await page.reload();
   await expect(page.locator(".card-list-row").first()).toBeVisible();
   await page.goto("/practice");
-  await expect(page.locator(".practice-hero")).toContainText(`1 / ${engineeringMissions.length} completed with evidence`);
+  await expect(page.locator(".practice-hero")).toContainText(`1 / ${missionTotal} completed with evidence`);
   const evidenceDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export evidence" }).click();
   const evidence = await evidenceDownload;

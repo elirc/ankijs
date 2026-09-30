@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 const manifest = JSON.parse(readFileSync(new URL('../src/data/section-expansion-manifest.json', import.meta.url), 'utf8')) as {version: number; totalCards: number; chunks: string[]};
+// Workshop cards (2 per unit) are runtime-built outside the manifest; see src/data/curriculum.test.ts.
+const workshopUnits = JSON.parse(readFileSync(new URL('../src/data/workshop-units.json', import.meta.url), 'utf8')) as unknown[];
+const runtimeTotal = manifest.totalCards + workshopUnits.length * 2;
 
 // Avoid continuous trace screenshots during the IndexedDB migration.
 test.use({trace: 'off'});
@@ -32,12 +35,13 @@ test('library upgrades safely, restores its own backup, and studies offline', as
       txn.objectStore('cards').put({...card, suspended: true});
     txn.objectStore('cards').put(edited); txn.objectStore('cards').put(deleted); txn.objectStore('cards').put(stale);
     txn.objectStore('cards').delete(IDBKeyRange.bound('a2000000-', 'a2000000-￿'));
-    txn.objectStore('sync_meta').delete(`starter_curriculum_v${version}`);
+    // The install key now carries a suffix (e.g. `_workshop1`); clear every current-version key.
+    txn.objectStore('sync_meta').delete(IDBKeyRange.bound(`starter_curriculum_v${version}`, `starter_curriculum_v${version}￿`));
     await new Promise<void>((resolve, reject) => { txn.oncomplete = () => resolve(); txn.onabort = () => reject(txn.error); });
     database.close();
     return {count: rows.length, edited: edited.id, deleted: deleted.id, stale: stale.id, variant: variant.id, variantFront: variant.front, deckId: variant.deck_id};
   }, manifest.version);
-  expect(before.count).toBe(manifest.totalCards);
+  expect(before.count).toBe(runtimeTotal);
   await page.reload();
   await homeReady(page);
   const after = await page.evaluate(async ({edited, deleted, stale}) => {
@@ -51,7 +55,7 @@ test('library upgrades safely, restores its own backup, and studies offline', as
     database.close();
     return {count, edited: editedCard, deleted: deletedCard, stale: staleCard};
   }, before);
-  expect(after.count).toBe(manifest.totalCards + 1);
+  expect(after.count).toBe(runtimeTotal + 1);
   expect(after.edited.front).toBe('My preserved explanation');
   expect(after.edited.reps).toBe(9);
   expect(after.edited.due).toBe('2030-01-01T00:00:00.000Z');

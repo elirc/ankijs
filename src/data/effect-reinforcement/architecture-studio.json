@@ -1,0 +1,646 @@
+{
+  "project": {
+    "title": "Architecture studio",
+    "summary": "Design and review a tenant-scaled CRUD app with search, media, regional choices, safe evolution, and evidence-producing coding-agent workflows.",
+    "outcome": "A reviewable local architecture packet with runnable failure fixtures, staged migrations, scoped guarantees, and reproducible handoff.",
+    "prerequisites": "System design foundations and distributed reliability; comfortable with Effect services, transactions, and basic CRUD authorization.",
+    "model": [
+      "Tenant-scoped Task and Project records own authoritative state; read projections and search results remain derived.",
+      "Attachment: tenantId, attachmentId, objectKey, version, state, expectedSize, checksum policy, expiry.",
+      "Tenant routing: authoritative home, migration state, version; region authority changes require an explicit protocol.",
+      "Design evidence: requirement, assumption or measurement, fixture, result, limitation, decision, revisit trigger."
+    ],
+    "boundaries": "Begin with one modular application and transactional database. Add local adapters for object storage, search, regions, and agent tools; introduce distributed mechanisms only for a stated requirement or measured limitation.",
+    "resources": [
+      {
+        "label": "Amazon S3: consistency model",
+        "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html"
+      },
+      {
+        "label": "PostgreSQL: standby replication",
+        "url": "https://www.postgresql.org/docs/current/warm-standby.html"
+      },
+      {
+        "label": "PostgreSQL: transaction isolation",
+        "url": "https://www.postgresql.org/docs/current/transaction-iso.html"
+      },
+      {
+        "label": "Effect: resource scopes",
+        "url": "https://effect.website/docs/v3/resource-management/scope"
+      }
+    ],
+    "id": "architecture-studio",
+    "kind": "Standalone app",
+    "track": "System design",
+    "milestones": [
+      {
+        "id": "effect-architecture-studio-tenant-design",
+        "title": "Design tenant-scoped CRUD from the invariant outward",
+        "concept": "Tenant identity, ownership, and modular deployment",
+        "brief": "Build a project board for 500 tenants using one application and one database. Each task belongs to exactly one tenant and every access must preserve that boundary.",
+        "explanation": "Tenant scale is not merely total row count. Isolation, authorization, workload skew, and operational recovery shape the design. Begin with shared infrastructure and explicit tenant-scoped keys when that meets requirements. Derive tenant context from verified identity, not an arbitrary body field. Scope lookups, updates, uniqueness rules, caches, jobs, and agent tools consistently. A database-generated ID or random identifier is not an authorization mechanism. Physical tenant separation can be justified by isolation or operational needs, but introduces provisioning and migration costs that should be named rather than assumed away.",
+        "steps": [
+          "Define Task(tenantId, taskId, version) and tenant-scoped command interfaces; require verified tenant context at the service boundary.",
+          "Implement create, get, update, and list with tenant predicates and documented within-tenant uniqueness, including background job access.",
+          "Seed two tenants with deliberately similar names and identifiers, then exercise UI, repository, and agent-tool entry points."
+        ],
+        "checks": [
+          "Tenant A cannot read or mutate Tenant B through any supported entry point.",
+          "Uniqueness errors follow the declared tenant scope rather than implying global name uniqueness.",
+          "Jobs and cached results retain verified tenant context."
+        ],
+        "experiment": "Submit Tenant B's task ID under Tenant A's session and repeat with an agent tool that bypasses the UI.",
+        "review": "Trace tenant authority from authentication through Effect services to the final query, identifying every place an untrusted value could replace it.",
+        "stretch": "Compare shared tables with one-database-per-tenant for a concrete restore or isolation requirement.",
+        "stage": "Build independently",
+        "minutes": 90,
+        "workedExample": "Tenant A and Tenant B each have task slug 'launch'. A unique constraint on (tenantId, slug) permits both, while a global slug constraint would reject one. Querying WHERE tenantId=A AND slug='launch' returns only A's row. An opaque task ID does not remove the need for that authorization boundary.",
+        "retrieval": [
+          {
+            "question": "Why distrust tenantId in the body?",
+            "answer": "The caller can modify it; the effective tenant must come from verified authorization context and permitted selection."
+          },
+          {
+            "question": "Does a random ID provide isolation?",
+            "answer": "No. Low guessability is not access control, and disclosed or logged identifiers still require tenant authorization."
+          }
+        ]
+      },
+      {
+        "id": "effect-architecture-studio-read-write-search",
+        "title": "Separate models without prematurely separating services",
+        "concept": "Authoritative writes and derived read models",
+        "brief": "Build task edits, dashboard counts, and text search for 100,000 seeded tasks. Measure the database-native baseline before adding a separate search engine.",
+        "explanation": "Different access patterns can use different representations without requiring independently deployed services. The write model protects invariants; a read projection supports a particular query; a search index supports retrieval semantics. Derived models need a source, update protocol, freshness target, rebuild path, and authorization policy. Start with indexes and available database search features that satisfy the workload. A separate engine is warranted by measured relevance, query, scale, or isolation needs, not merely because the word search appears in a requirement. Keep writes authoritative even when projections lag.",
+        "steps": [
+          "Implement tenant-scoped task mutations and baseline list, count, and search queries over a representative seeded dataset.",
+          "Add one derived dashboard projection with versioned updates and an explicit five-second freshness target.",
+          "Measure latency and query work before deciding whether a separate search component solves an actual limitation."
+        ],
+        "checks": [
+          "Edits validate against authoritative state rather than a stale search result.",
+          "Projection freshness is measured and visible.",
+          "The decision compares database-native and separate-engine alternatives using the same workload."
+        ],
+        "experiment": "Pause projection updates for 20 seconds while continuing writes, then inspect UI freshness and recovery behavior.",
+        "review": "Explain why logical command/query separation does not require separate databases or services.",
+        "stretch": "Add a relevance requirement that the baseline cannot meet and prototype only that missing capability.",
+        "stage": "Build independently",
+        "minutes": 90,
+        "workedExample": "A task commits at t=0 s and appears in the projection at t=3 s, meeting a five-second fixture target. A search result at t=1 s may omit it, while the author still sees committed task data from the write response. These observations are compatible because the two paths promise different freshness.",
+        "retrieval": [
+          {
+            "question": "What is authoritative for edits?",
+            "answer": "The owning write model, which validates current permissions and invariants; a search hit is only a candidate."
+          },
+          {
+            "question": "When is a separate read store justified?",
+            "answer": "When measured query, relevance, scaling, or isolation needs outweigh synchronization and operational costs."
+          }
+        ]
+      },
+      {
+        "id": "effect-architecture-studio-media-consistency",
+        "title": "Coordinate metadata with object storage explicitly",
+        "concept": "Upload state machines and cross-store consistency",
+        "brief": "Add task attachments with metadata in the database and bytes in a local object-store adapter. A two-megabyte upload may succeed even when metadata finalization fails.",
+        "explanation": "Two stores do not share a transaction merely because one application calls both. Model attachment intent, upload, verification, and readiness explicitly. Use unique object keys and an authoritative metadata pointer rather than overwriting a shared name. Amazon S3 documents strong consistency for supported object operations, but that does not make a database update and an object upload atomic together. The same boundary exists with a local file adapter. Do not expose an attachment as ready until required object verification and metadata state agree; preserve recovery paths for either partial outcome.",
+        "steps": [
+          "Create pending attachment metadata with tenant, attachment ID, object key, expected size, checksum policy, and expiry.",
+          "Upload bytes through a replaceable adapter, then verify the required attributes and conditionally finalize metadata to ready.",
+          "Build a reconciler for uploaded-but-pending and metadata-with-missing-object cases, using a disposable directory or local service."
+        ],
+        "checks": [
+          "A ready attachment references verified retrievable bytes under the fixture contract.",
+          "A failed upload never appears as a completed attachment.",
+          "Retrying finalization uses the existing identity instead of creating duplicate metadata."
+        ],
+        "experiment": "Fail metadata commit after a successful two-megabyte upload, restart, and recover or expire the pending record deliberately.",
+        "review": "Draw the two-store commit boundary and explain why object-store consistency alone cannot remove it.",
+        "stretch": "Add content scanning as another explicit state before readiness.",
+        "stage": "Make it reliable",
+        "minutes": 90,
+        "workedExample": "Attachment A receives key tenant-7/A and expected size 2,000,000 bytes. Upload succeeds, but finalization fails. The database still says pending while the object exists. Reconciliation verifies size and checksum under the chosen policy, then commits ready for A; it does not need to upload a second object.",
+        "retrieval": [
+          {
+            "question": "What does strong object consistency not provide?",
+            "answer": "It does not create an atomic transaction across object storage and an unrelated metadata database."
+          },
+          {
+            "question": "Why use immutable unique keys?",
+            "answer": "They prevent retries or stale workers from overwriting another attachment's bytes and make authoritative pointer changes explicit."
+          }
+        ]
+      },
+      {
+        "id": "effect-architecture-studio-multi-region",
+        "title": "Choose a region strategy from actual requirements",
+        "concept": "Latency, failure domains, and write authority",
+        "brief": "Compare a single-region board with a home-region-per-tenant design. Users are split across two simulated locations with 20 ms versus 140 ms round-trip latency.",
+        "explanation": "Multi-region design adds communication delay, failover authority, replicated-state uncertainty, and operational work. Start by identifying whether the requirement is read latency, regional outage recovery, or concurrent global writes; these are different problems. A single write region with cached public reads may satisfy the first without solving the others. Tenant home regions can localize writes, but cross-region collaboration and moves still need explicit routing. Do not assume globally unique names, synchronous commits at local latency, or conflict-free multi-writer behavior. Model realistic network delays locally before choosing a distributed mechanism.",
+        "steps": [
+          "Write separate targets for interactive latency, acceptable regional outage, and data-loss tolerance; compare them with the single-region baseline.",
+          "Simulate 20 ms and 140 ms network round trips around the same Effect service and trace required sequential calls.",
+          "Record a decision for one write authority per tenant, read routing, replication assumptions, and an evidence-based trigger for more complexity."
+        ],
+        "checks": [
+          "The decision identifies one authoritative write location for each tenant.",
+          "Latency estimates include remote coordination rounds where required.",
+          "Outage and data-loss promises match the stated replication and failover protocol."
+        ],
+        "experiment": "Disconnect the simulated home region and observe whether reads degrade, writes fail, or a controlled failover begins according to the contract.",
+        "review": "Explain why adding a second region does not automatically provide safe automatic failover or globally local writes.",
+        "stretch": "Measure a cross-region collaborative workflow and identify its unavoidable authority boundary.",
+        "stage": "Make it reliable",
+        "minutes": 90,
+        "workedExample": "A workflow requiring three sequential remote round trips at 140 ms spends about 420 ms on network waiting before server work. At 20 ms it spends about 60 ms. Combining calls or moving read-only work can reduce rounds; adding synchronous remote coordination cannot be treated as free.",
+        "retrieval": [
+          {
+            "question": "What requirement justifies multi-region work?",
+            "answer": "A concrete latency, recovery, residency, or availability need that simpler measured designs cannot meet."
+          },
+          {
+            "question": "Can all regions accept writes safely by default?",
+            "answer": "No. Concurrent authority requires an explicit conflict or coordination protocol and compatible business invariants."
+          }
+        ]
+      },
+      {
+        "id": "effect-architecture-studio-schema-evolution",
+        "title": "Deploy schema changes in compatible phases",
+        "concept": "Expand, migrate, contract, and rollback windows",
+        "brief": "Replace task.assigneeName with assigneeId while old and new application versions overlap for 20 minutes. Preserve usable reads and writes throughout the rollout.",
+        "explanation": "Application and schema deployments rarely switch atomically. Expand-migrate-contract separates adding compatible structure, populating it, moving readers and writers, and eventually removing old structure. Define which versions coexist and how each represents missing or conflicting data. A backfill is operational work with load and restart requirements, not a one-off unbounded script. Rolling application code back does not automatically reverse transformed data or recover a dropped column. Keep the contract phase outside the rollback window until evidence shows old readers and writers are gone.",
+        "steps": [
+          "Add nullable assigneeId and compatible readers before removing assigneeName; define the authoritative mapping and ambiguous-name behavior.",
+          "Implement bounded, resumable backfill with progress checkpoints and conditional updates that avoid overwriting newer edits.",
+          "Run old and new local app versions against the expanded schema, then verify cutover and delay destructive contraction."
+        ],
+        "checks": [
+          "Both supported versions function during the 20-minute overlap.",
+          "Backfill can restart without corrupting edits made during migration.",
+          "Dropping the old field is blocked until old usage and rollback requirements are satisfied."
+        ],
+        "experiment": "Stop the backfill halfway, make a task assignment through the new version, then resume and inspect whether the new value survives.",
+        "review": "Explain why deployment rollback and data rollback require separate plans.",
+        "stretch": "Add event-payload versioning so queued older jobs remain decodable during the schema transition.",
+        "stage": "Own the outcome",
+        "minutes": 90,
+        "workedExample": "For 12,000 rows at 200 rows/batch, the backfill needs 60 batches. A checkpoint after batch 30 leaves 6,000 rows. Conditional updates populate only still-unmigrated rows, so a concurrent user edit that sets assigneeId is not overwritten merely because the job resumes from an older plan.",
+        "retrieval": [
+          {
+            "question": "Why expand before switching code?",
+            "answer": "It creates a compatibility interval where both versions can operate against the schema."
+          },
+          {
+            "question": "When is contraction safe?",
+            "answer": "After unsupported versions and old data dependencies are gone, validation passes, and the required rollback window closes."
+          }
+        ]
+      },
+      {
+        "id": "effect-architecture-studio-architecture-evidence",
+        "title": "Run an evidence-based architecture studio",
+        "concept": "Design artifacts, experiments, and agent boundaries",
+        "brief": "Prepare a reviewable tenant-board design using the preceding labs. Ask a coding agent to challenge one important assumption and build the smallest local experiment.",
+        "explanation": "A design review should connect requirements to choices and choices to observable evidence. Keep a concise artifact set: requirements, workload estimates, ownership diagram, failure sequences, decision record, and reproducible experiment results. Mark every numerical claim as measured, calculated, or assumed. Give agents bounded tasks with acceptance criteria and allowed files, then inspect the actual changes and outputs. Do not let a confident narrative stand in for a running fixture. Prefer a modular monolith unless a measured or explicitly required property warrants distribution.",
+        "steps": [
+          "Create the artifact set for 500 tenants, 40 peak writes/s, a 300 ms p95 save target, and a documented recovery objective.",
+          "Select the riskiest assumption, such as hot-tenant fairness or search authorization lag, and give the agent a bounded local fixture to test.",
+          "Review code, run the lightweight fixture, and update the architecture decision with evidence, limitations, and a concrete revisit trigger."
+        ],
+        "checks": [
+          "Each proposed component traces to a requirement or observed limitation.",
+          "The experiment is reproducible and its outputs support the stated conclusion.",
+          "The review records at least one unresolved uncertainty instead of claiming the design is proven universally."
+        ],
+        "experiment": "Give the agent an attractive but unsupported scaling claim and require it to produce a falsifying test before accepting the component.",
+        "review": "Explain which decision changed because of evidence and which remains provisional because the fixture lacks production realism.",
+        "stretch": "Prepare a short review packet that another engineer can assess without conversation history.",
+        "stage": "Own the outcome",
+        "minutes": 90,
+        "workedExample": "The estimate predicts 40 writes/s; the fixture sustains 60 writes/s at 250 ms p95 on its stated dataset. That provides 20 writes/s measured throughput margin for this environment, not proof of production capacity. The decision keeps one write store and lists larger data, skew, and recovery as remaining validation needs.",
+        "retrieval": [
+          {
+            "question": "What should an agent task contain?",
+            "answer": "A bounded question, allowed changes, fixture, observable acceptance criteria, and required evidence rather than an unrestricted instruction to optimize."
+          },
+          {
+            "question": "What makes a design claim provisional?",
+            "answer": "Its assumptions or measurement coverage remain incomplete, so the claim applies only within the documented conditions."
+          }
+        ]
+      }
+    ]
+  },
+  "drills": [
+    {
+      "id": "effect-architecture-studio-tenant-fairness",
+      "title": "Keep one noisy tenant from consuming every slot",
+      "concept": "Workload skew and admission fairness",
+      "brief": "Ten tenants share eight job slots. Tenant A submits 1,000 exports while each other tenant submits one; compare FIFO behavior with a bounded fairness policy.",
+      "explanation": "Average tenant load conceals skew. A small number of large tenants can dominate shared queues, pools, or expensive queries even when aggregate throughput looks healthy. Measure per-tenant impact without creating uncontrolled metric-label cardinality. Admission quotas and scheduling shares can protect smaller workloads, but unused shares may need borrowing to preserve utilization. Define the fairness objective and starvation behavior before choosing an algorithm. Separate deployment or sharding is a later option when measured interference cannot be controlled adequately within the shared service.",
+      "steps": [
+        "Implement a local scheduler with eight global slots and at most two active exports per tenant, allowing a documented borrowing policy if desired.",
+        "Compare completion latency for nine small tenants under plain FIFO and the bounded policy while recording utilization.",
+        "Expose safe tenant-level diagnostic samples and aggregate fairness indicators without labeling every metric by arbitrary tenant ID."
+      ],
+      "checks": [
+        "No tenant exceeds its active cap under the non-borrowing fixture.",
+        "Small tenants make progress while A still has queued work.",
+        "Global execution never exceeds eight slots."
+      ],
+      "experiment": "Give A very long jobs and other tenants short ones; inspect whether count-based fairness also meets the intended latency objective.",
+      "review": "Explain the tradeoff between strict shares, work conservation, and starvation protection using observed completion traces.",
+      "stretch": "Add weighted admission for explicitly purchased capacity without allowing unbounded queue growth.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "With eight slots and two active jobs per tenant, A can occupy two slots while six remain available to others. Plain FIFO can place all eight slots on A's first jobs and delay every small tenant. The bounded policy changes waiting distribution without increasing the total eight-slot processing capacity.",
+      "retrieval": [
+        {
+          "question": "Why can aggregate p95 hide unfairness?",
+          "answer": "A large tenant can dominate the sample while a small tenant experiences unacceptable latency with few requests."
+        },
+        {
+          "question": "Does fairness add capacity?",
+          "answer": "No. It changes allocation and waiting behavior; total processing capacity still depends on the shared resources."
+        }
+      ],
+      "parentId": "effect-architecture-studio-tenant-design"
+    },
+    {
+      "id": "effect-architecture-studio-tenant-sharding",
+      "title": "Introduce a routing boundary only when justified",
+      "concept": "Shard keys, hot tenants, and migration safety",
+      "brief": "A measured hot tenant contributes 70% of database work. Design a possible tenant move while retaining the shared-database default for everyone else.",
+      "explanation": "Sharding divides ownership across stores and adds routing, migration, and cross-shard query costs. A tenant key often aligns with CRUD isolation, but one exceptionally hot tenant can still dominate its shard. Do not infer global uniqueness or atomic transactions across shards. Maintain an authoritative routing directory and a clear migration state machine so writers cannot independently choose old and new homes. Start with an offline or briefly paused tenant move when the product permits it; a live dual-write migration needs a stronger reconciliation protocol and should not be improvised by an agent.",
+      "steps": [
+        "Record the measured bottleneck and compare indexing, quotas, and tenant isolation before accepting a shard boundary.",
+        "Design tenant routing with one authoritative location and explicit moving/read-only states; scope IDs and uniqueness guarantees accordingly.",
+        "Simulate moving one tenant between two local databases with writes paused, copied rows validated, routing switched, and rollback conditions defined."
+      ],
+      "checks": [
+        "At every point, one location is authoritative for tenant writes.",
+        "The move preserves task, receipt, and job relationships.",
+        "Cross-tenant reports disclose their aggregation strategy rather than assuming one database transaction."
+      ],
+      "experiment": "Crash after copying but before switching routing and verify the tenant still has one unambiguous write destination.",
+      "review": "Explain why copying rows is not sufficient evidence that the tenant migration is complete.",
+      "stretch": "Specify what extra protocol would be necessary to migrate without pausing writes.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "If Tenant A causes 700 of 1,000 query-work units/s, moving nine small tenants cannot remove A's 700-unit hotspot. Isolating A may protect others, but its destination still needs that capacity. During a paused move, directory state stays old until validation succeeds; only then does one atomic routing change select new.",
+      "retrieval": [
+        {
+          "question": "What makes a shard key useful?",
+          "answer": "It aligns common transactions and access patterns with one ownership boundary while distributing actual workload."
+        },
+        {
+          "question": "Does sharding create global uniqueness?",
+          "answer": "No. Uniqueness remains within its enforced scope unless a separate coordinated global mechanism exists."
+        }
+      ],
+      "parentId": "effect-architecture-studio-tenant-design"
+    },
+    {
+      "id": "effect-architecture-studio-projection-rebuild",
+      "title": "Rebuild a projection without losing concurrent changes",
+      "concept": "Snapshot checkpoints and catch-up",
+      "brief": "Rebuild dashboard counts while 100 task changes occur. Define a source checkpoint so the rebuilt model neither misses nor double-applies changes.",
+      "explanation": "A derived view should be reconstructible, but rebuilding while writes continue creates a handoff problem. A snapshot and change stream need a compatible checkpoint or a deliberately simpler write pause. Reading all rows and then starting event consumption can miss changes in between; replaying overlap can double-count deltas unless idempotent. For a learning implementation, a brief paused-write rebuild or a versioned full-state projection may be sufficient. Avoid claiming a universal algorithm without knowing the storage snapshot and log semantics. Keep the old view available until the replacement is validated.",
+      "steps": [
+        "Choose a supported snapshot-and-checkpoint protocol or explicitly pause writes during a local rebuild; document its user impact.",
+        "Build into a new generation, apply required catch-up events with deduplication, and compare counts against authoritative queries.",
+        "Switch the active projection pointer only after validation and keep a bounded rollback window."
+      ],
+      "checks": [
+        "Every source change belongs to the snapshot or catch-up range with no unexplained gap.",
+        "Overlapping replay cannot count one task twice.",
+        "Readers see one complete generation rather than a partially rebuilt table."
+      ],
+      "experiment": "Insert updates exactly at the snapshot-to-stream boundary and verify that the chosen protocol accounts for them.",
+      "review": "Explain why an event offset alone is insufficient unless its relationship to the snapshot is defined.",
+      "stretch": "Add deletion and validate that rebuilt counts do not resurrect removed records.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "A snapshot contains 1,000 active tasks through checkpoint 500. Catch-up events 501–600 contain 70 creates and 30 archives, producing 1,040 active tasks. Replaying event 501 twice must not add a second task. Switching only after comparison with the authoritative count makes the generation reviewable.",
+      "retrieval": [
+        {
+          "question": "Why build a new generation?",
+          "answer": "It allows validation and an atomic reader switch without exposing a half-built view."
+        },
+        {
+          "question": "What is the dangerous handoff gap?",
+          "answer": "Changes occurring after the snapshot's coverage but before the consumer's starting point can be omitted unless the protocol closes that interval."
+        }
+      ],
+      "parentId": "effect-architecture-studio-read-write-search"
+    },
+    {
+      "id": "effect-architecture-studio-search-authorization",
+      "title": "Treat search results as candidates",
+      "concept": "Stale indexes, permission changes, and pagination",
+      "brief": "A private task remains in search for five seconds after its access is revoked. Prevent stale index state from exposing its title or contents.",
+      "explanation": "Search freshness and authorization freshness are different contracts. An index can lag while the authoritative service remains correct, but rendering indexed content before checking access can leak data. Apply tenant filters in the query as defense in depth and reauthorize sensitive candidates before returning protected fields when the index cannot enforce the current policy. This can affect pagination: removing unauthorized candidates may produce fewer results than the requested page size. Define cursor and refill behavior explicitly rather than silently weakening authorization to make pages look full.",
+      "steps": [
+        "Index stable task identity, tenant, version, and only the content permitted by the storage policy.",
+        "Filter candidates by tenant and validate current access before exposing protected fields, using a bounded hydration query.",
+        "Test revocation, deletion, stale versions, and a page where half the candidates are no longer authorized."
+      ],
+      "checks": [
+        "Revoked content is never returned merely because the index still contains it.",
+        "Hydration and refill have finite work limits.",
+        "Pagination documents sparse pages or a bounded refill strategy and stable cursor semantics."
+      ],
+      "experiment": "Pause indexing, revoke access to a task, and search for its unique title from the formerly authorized account.",
+      "review": "Explain why hiding a result in the browser after sending its content is not an authorization boundary.",
+      "stretch": "Add a deletion tombstone and measure how quickly the index converges without relying on convergence for access control.",
+      "stage": "Build independently",
+      "minutes": 45,
+      "workedExample": "Search returns ten candidate IDs; authoritative checks reject four revoked tasks and one deleted task. The response contains five permitted results under a sparse-page policy. Returning all ten titles before filtering would expose protected content even if the UI later hid five cards.",
+      "retrieval": [
+        {
+          "question": "Why reauthorize candidates?",
+          "answer": "The index may lag permission or deletion changes; current authority must govern protected output."
+        },
+        {
+          "question": "Does a full page outweigh authorization?",
+          "answer": "No. Sparse results or bounded refilling are acceptable contract choices; leaking stale content is not a valid pagination fix."
+        }
+      ],
+      "parentId": "effect-architecture-studio-read-write-search"
+    },
+    {
+      "id": "effect-architecture-studio-orphan-cleanup",
+      "title": "Clean orphaned uploads without racing active work",
+      "concept": "Grace periods, ownership checks, and reconciliation",
+      "brief": "Pending uploads expire after one hour, but one upload may still be running near the cutoff. Build cleanup that cannot delete a newly finalized attachment.",
+      "explanation": "Orphan cleanup is a consistency operation, not simply deleting old files. Age identifies candidates; authoritative state and an ownership protocol decide whether deletion is safe. A cleanup scan can race with finalization between reading metadata and removing bytes. Introduce a guarded transition such as pending→deleting, then require finalization to reject deleting records, or choose another proved protocol. A grace period reduces risk but does not by itself eliminate races. Keep deletion retryable and observable, and scope every key to the intended tenant and disposable storage root in local experiments.",
+      "steps": [
+        "Define pending, ready, deleting, and deleted transitions with conditional version checks and a one-hour pending expiry.",
+        "Select expired candidates, atomically claim deletion, and remove only their exact recorded keys; record failed deletes for retry.",
+        "Pause cleanup after selection while attempting finalization, then verify that only one compatible transition wins."
+      ],
+      "checks": [
+        "Ready attachments cannot be claimed by the pending cleanup path.",
+        "A finalizer cannot mark a deletion-owned record ready.",
+        "Repeated cleanup converges without deleting another attachment or scanning unrelated paths."
+      ],
+      "experiment": "Crash after object deletion but before recording deleted, then retry and handle an already-absent object as defined.",
+      "review": "Explain why an age threshold and a second unguarded read still do not establish an atomic ownership decision.",
+      "stretch": "Add reconciliation for an object that exists with no metadata and specify a conservative quarantine policy.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "A pending record at version 3 expires at t=3,600 s. Cleanup conditionally changes pending/version 3 to deleting/version 4. A late finalizer expecting pending/version 3 matches zero rows and cannot publish a broken ready pointer. If finalization wins first, cleanup's predicate fails and the ready object remains.",
+      "retrieval": [
+        {
+          "question": "Is a grace period a lock?",
+          "answer": "No. It changes timing but does not prevent concurrent finalization; a guarded state transition supplies ownership."
+        },
+        {
+          "question": "Why tolerate already-absent objects on retry?",
+          "answer": "A prior delete may have succeeded before progress recording failed, so recovery must account for ambiguous completion."
+        }
+      ],
+      "parentId": "effect-architecture-studio-media-consistency"
+    },
+    {
+      "id": "effect-architecture-studio-media-deletion",
+      "title": "Make attachment deletion convergent",
+      "concept": "Tombstones and retryable object removal",
+      "brief": "A user deletes an attachment while a download link is cached. Define immediate product visibility separately from eventual byte cleanup and link expiry.",
+      "explanation": "Deletion spans metadata, derived views, object bytes, and possibly issued access links. Marking metadata deleted can immediately prevent new authorized access through the application, while object removal may happen asynchronously. Existing signed or cached links require their own expiry and revocation assumptions; do not promise instant universal revocation without a mechanism that enforces it. Persist deletion intent and make cleanup idempotent. Tombstones or version rules can prevent delayed index and list updates from resurrecting a deleted attachment. State retention and recovery obligations before physically erasing data.",
+      "steps": [
+        "Define deletion states, visibility rules, maximum issued-link lifetime, and when physical cleanup is required.",
+        "Commit the metadata tombstone and cleanup intent together, then remove the exact object key with bounded retries.",
+        "Replay delayed upload and projection events after deletion and verify version-aware consumers preserve the tombstone."
+      ],
+      "checks": [
+        "New application reads stop exposing the attachment after authoritative deletion.",
+        "Cleanup survives restart and tolerates an already-missing object.",
+        "Delayed events cannot restore the deleted attachment's visible state."
+      ],
+      "experiment": "Fail object deletion twice while metadata remains deleted; inspect pending cleanup age and the behavior of an already-issued link.",
+      "review": "Explain the difference between hiding metadata, denying new access, expiring issued capabilities, and removing bytes.",
+      "stretch": "Add a retention hold that prevents physical removal while preserving user-visible deletion semantics.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "A link issued at 12:00 expires at 12:10. Metadata deletion at 12:03 stops new application access, but the existing link may remain usable for up to seven minutes under this contract. Object cleanup at 12:05 may shorten that period; the design must not promise immediate revocation solely from the metadata change.",
+      "retrieval": [
+        {
+          "question": "Why persist deletion intent?",
+          "answer": "Otherwise a crash after metadata deletion can leave bytes indefinitely without a recoverable cleanup record."
+        },
+        {
+          "question": "What prevents resurrection?",
+          "answer": "Authoritative tombstones or version checks that reject older upload and projection events after deletion."
+        }
+      ],
+      "parentId": "effect-architecture-studio-media-consistency"
+    },
+    {
+      "id": "effect-architecture-studio-failover-authority",
+      "title": "Prevent two primaries during recovery",
+      "concept": "Fencing, failover decisions, and stale replicas",
+      "brief": "Primary A becomes unreachable while standby B is four seconds behind. Design a failover drill that does not assume A has stopped accepting writes.",
+      "explanation": "Unreachable and stopped are different facts. Promoting a standby without preventing the old authority from writing can create split ownership. Failover needs a supported fencing or authority-transfer mechanism, plus a decision about acknowledged data not yet replicated. PostgreSQL replication documentation describes durability differences by configuration; your fixture must name its chosen policy. A local simulation can teach the state machine without claiming production failover expertise. Keep recovery objectives and routing changes separate from election mechanics, and require evidence before opening writes on the new authority.",
+      "steps": [
+        "Model A, B, a routing directory, and an explicit fencing control, with B lagging by four seconds.",
+        "Pause communication to A but allow it to run; require confirmed fencing before enabling B's writes.",
+        "Record last durable replicated position, potential lost acknowledged writes, promotion time, and client reconciliation behavior."
+      ],
+      "checks": [
+        "The simulation never has two permitted write authorities after promotion.",
+        "Potential data loss is quantified rather than hidden by a successful health check.",
+        "Clients reconcile uncertain operations using identity instead of blindly creating new writes."
+      ],
+      "experiment": "Make fencing fail while B is healthy; verify promotion remains blocked under the chosen safety policy.",
+      "review": "Explain which evidence establishes old-authority exclusion and which merely establishes network unreachability.",
+      "stretch": "Compare the latency and availability consequences of a synchronous replication policy for the same workload.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "A acknowledges writes through sequence 104, while B contains through 100. If A fails permanently and only B is recoverable, up to four acknowledged operations are absent in this fixture. Promoting B cannot recreate them. Fencing prevents divergent new writes, but it does not repair missing replicated history.",
+      "retrieval": [
+        {
+          "question": "Why is a failed health check insufficient?",
+          "answer": "It proves only failed observation from that checker; the old node may still serve other clients."
+        },
+        {
+          "question": "Does fencing guarantee zero data loss?",
+          "answer": "No. It controls future authority; recovery of prior acknowledged writes depends on the replication and durability policy."
+        }
+      ],
+      "parentId": "effect-architecture-studio-multi-region"
+    },
+    {
+      "id": "effect-architecture-studio-region-conflicts",
+      "title": "Design conflict behavior before multi-writer writes",
+      "concept": "Business invariants and merge semantics",
+      "brief": "Two disconnected regions edit the same task title and reserve the last project slot. Compare fields that can merge with invariants that need coordination.",
+      "explanation": "Multi-writer availability trades simple centralized decisions for conflict handling or coordination. Some operations commute, such as adding distinct tags under a defined set model. Replacing a title or reserving the final scarce slot has different semantics. Last-write-wins depends on a chosen ordering and may discard intent; wall-clock timestamps are not a universal proof of causal order. Avoid describing every conflict as eventually resolved if the merge violates a business invariant. Keep a single authority for constrained operations unless a specific allocation or coordination design is justified.",
+      "steps": [
+        "Classify task operations as safely mergeable, conflict-presenting, or requiring coordinated authority, with examples and counterexamples.",
+        "Simulate disconnected edits using explicit operation IDs and entity versions rather than assuming clocks agree.",
+        "Implement a visible conflict for title replacement and preserve single-authority quota reservation; compare with a defined tag-union merge."
+      ],
+      "checks": [
+        "Two title edits do not silently claim both intents survived.",
+        "Concurrent slot reservations cannot exceed the authoritative quota.",
+        "Independent tag additions converge only under the documented set semantics."
+      ],
+      "experiment": "Skew one regional clock by five minutes and show why timestamp-based last-write-wins can choose an unexpected result.",
+      "review": "Explain why convergence of bytes is weaker than preservation of business correctness or user intent.",
+      "stretch": "Design an escrow-like preallocation of quota for regions and state its utilization tradeoff.",
+      "stage": "Make it reliable",
+      "minutes": 45,
+      "workedExample": "A has one remaining project slot. Both regions independently see one and accept a create, producing two projects for one slot after merge. No choice of final title resolves that quota violation. Allocating the slot to one authority avoids overbooking; the disconnected other region must defer or reject that constrained operation.",
+      "retrieval": [
+        {
+          "question": "What does convergence establish?",
+          "answer": "Replicas eventually agree under a protocol; it does not prove the agreed state satisfies every business invariant."
+        },
+        {
+          "question": "When can operations merge without conflict?",
+          "answer": "When their defined semantics commute or a proven merge rule preserves the required invariants and user contract."
+        }
+      ],
+      "parentId": "effect-architecture-studio-multi-region"
+    },
+    {
+      "id": "effect-architecture-studio-migration-load",
+      "title": "Bound the operational cost of a backfill",
+      "concept": "Batching, contention, and adaptive pacing",
+      "brief": "Backfill 60,000 tasks while foreground edits target 300 ms p95. Compare a giant transaction with 500-row batches and explicit pauses.",
+      "explanation": "Migration correctness includes its effect on the live workload. Large transactions can retain locks or resources for too long, increase rollback cost, and make progress hard to observe. Small batches reduce individual work units but add overhead and still need a stable selection strategy. Choose keyset progress or another resumable approach that tolerates concurrent changes; an offset can shift under insertions or deletions. Pace the job using measured foreground latency and contention rather than assuming the first batch size is safe. Keep the migration's own error and retry policy bounded.",
+      "steps": [
+        "Implement 500-row batches with stable progress keys, conditional updates, and recorded counts for changed, skipped, and failed rows.",
+        "Run representative foreground edits during backfill and collect p95, lock wait, and batch duration.",
+        "Pause or reduce batch rate when the defined foreground threshold fails, then resume from durable progress."
+      ],
+      "checks": [
+        "Interrupting after any batch leaves a valid restart point.",
+        "Concurrent edits are not reverted by stale backfill values.",
+        "The report separates total migration duration from foreground impact."
+      ],
+      "experiment": "Inject one malformed row and verify that the recovery policy neither loops forever nor silently declares every row migrated.",
+      "review": "Explain how batch size and pause duration trade migration completion time against foreground resource availability.",
+      "stretch": "Compare a fixed schedule with a simple feedback policy driven by measured contention.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "60,000 rows / 500 rows per batch = 120 batches. If each takes 0.4 s and waits 0.6 s, nominal duration is 120 s before retries. Database-active time is about 48 s distributed over that interval; the pauses reduce duty cycle but do not prove foreground latency is acceptable without measurement.",
+      "retrieval": [
+        {
+          "question": "Why avoid offset-based progress on changing data?",
+          "answer": "Rows can move between offsets as data changes, causing skips or repeated work."
+        },
+        {
+          "question": "Does a smaller batch guarantee safety?",
+          "answer": "No. Index work, locks, row size, and workload vary; foreground measurements determine whether the chosen pacing is acceptable."
+        }
+      ],
+      "parentId": "effect-architecture-studio-schema-evolution"
+    },
+    {
+      "id": "effect-architecture-studio-deployment-compatibility",
+      "title": "Test mixed versions and job payloads",
+      "concept": "Rolling deployment contracts and safe rollback",
+      "brief": "Deploy worker version 2 while version-1 jobs remain queued and version-1 web instances still create them. Define the compatibility matrix explicitly.",
+      "explanation": "A deployment is a period of mixed state, not a single instant. API payloads, event envelopes, database fields, and worker behavior can evolve at different rates. Version messages where interpretation changes and support the planned overlap deliberately. Unknown versions should produce a visible quarantined or rejected outcome rather than guessed decoding. Rollback must account for data and jobs produced by the newer version; returning old binaries can fail if they cannot understand newly persisted state. Prefer additive changes and compatibility adapters before irreversible removals.",
+      "steps": [
+        "Create a matrix of web versions, worker versions, payload versions, and schema state, marking supported combinations.",
+        "Seed ten version-1 jobs and ten version-2 jobs, then run the planned worker upgrade and rollback sequence locally.",
+        "Implement explicit decoding and an unsupported-version outcome with durable quarantine and recovery instructions."
+      ],
+      "checks": [
+        "Version-2 workers process retained version-1 jobs under the declared contract.",
+        "Rollback either supports new jobs or safely pauses them with an explicit recovery path.",
+        "Unsupported envelopes never execute guessed business effects."
+      ],
+      "experiment": "Rollback the worker after version-2 jobs are accepted and inspect whether those jobs remain recoverable rather than lost or misinterpreted.",
+      "review": "Explain why a passing new-version-only test does not establish rolling-deployment compatibility.",
+      "stretch": "Add a feature flag that delays producing version-2 payloads until compatible consumers are available.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "Before rollout, ten v1 jobs wait. New web instances add ten v2 jobs. A v2 worker accepting both formats can process all 20. A rolled-back v1 worker accepting only v1 must leave the ten v2 jobs visibly paused or quarantined; it cannot truthfully claim universal rollback compatibility.",
+      "retrieval": [
+        {
+          "question": "What must rollback consider besides binaries?",
+          "answer": "Schema changes, persisted payloads, derived state, and external effects created by the newer version."
+        },
+        {
+          "question": "Why delay new payload production?",
+          "answer": "It can preserve a compatibility window until every required consumer understands the new contract."
+        }
+      ],
+      "parentId": "effect-architecture-studio-schema-evolution"
+    },
+    {
+      "id": "effect-architecture-studio-adversarial-review",
+      "title": "Challenge the strongest architecture claim",
+      "concept": "Counterexamples, invariant review, and agent-generated code",
+      "brief": "An agent says the board is tenant-safe, exactly-once, and horizontally scalable. Turn those slogans into narrowly stated, testable claims.",
+      "explanation": "Broad architecture adjectives often hide different mechanisms and scopes. Tenant safety depends on every access path; duplicate suppression depends on identity, atomicity, and retention; scaling depends on the actual bottleneck and coordination boundaries. Ask for a concrete counterexample before accepting a claim. Review generated code for bypass paths such as imports, admin tools, workers, and cache lookups. Keep tests tied to meaningful invariants rather than mirroring implementation details. A failed adversarial fixture is useful evidence that improves the design, not something to explain away with a new slogan.",
+      "steps": [
+        "Rewrite the three slogans as scoped claims with assumptions, observable outcomes, and known exclusions.",
+        "Inspect one foreground path and two bypass paths, tracing tenant authority, retry identity, and shared resource use.",
+        "Build targeted counterexamples: cross-tenant ID, lost response with duplicate delivery, and one hot tenant monopolizing a shared pool."
+      ],
+      "checks": [
+        "Tenant checks cover non-UI paths as well as normal requests.",
+        "The duplicate claim names its retention window and authoritative effect boundary.",
+        "The scaling claim identifies the shared resource whose capacity was actually measured."
+      ],
+      "experiment": "Expire an idempotency receipt and replay the old operation, then revise any claim that implied permanent deduplication.",
+      "review": "Explain why one counterexample disproves a universal claim while many passing fixtures still require stated coverage limits.",
+      "stretch": "Have the agent propose a smaller guarantee that the current implementation can actually substantiate.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "An operation receipt lives 24 hours. Retrying the same key after one hour returns the original task, but after 25 hours a fresh operation may be created under the expiry contract. The evidence supports deduplication within retention, not permanent exactly-once creation. A precise guarantee is more useful than the stronger inaccurate label.",
+      "retrieval": [
+        {
+          "question": "Why inspect bypass paths?",
+          "answer": "Workers, imports, tools, and administrative code can violate invariants even when the main endpoint is correct."
+        },
+        {
+          "question": "How should a failed counterexample change the review?",
+          "answer": "Narrow or repair the claim, add a meaningful regression fixture, and record the remaining boundary explicitly."
+        }
+      ],
+      "parentId": "effect-architecture-studio-architecture-evidence"
+    },
+    {
+      "id": "effect-architecture-studio-review-handoff",
+      "title": "Package a design for independent ownership",
+      "concept": "Runbooks, limitations, and reproducible handoff",
+      "brief": "Hand the local board and design packet to another engineer or coding agent. Make normal operation, failure recovery, and future decisions understandable without private context.",
+      "explanation": "Ownership requires more than a finished implementation. A reviewer needs to know what runs locally, what is only simulated, which guarantees were verified, and how to recover when they fail. Keep setup, seed data, experiment commands, expected observations, and cleanup boundaries explicit. Preserve architecture decisions and revisitation criteria so the next agent can reason from evidence rather than rediscovering intent. Include safe operational procedures for queued work, schema changes, and restores. Do not imply a hosted deployment exists merely because local experiments and diagrams are complete.",
+      "steps": [
+        "Write a concise handoff with local startup, fixture generation, key invariants, and links to the decision record and failure traces.",
+        "Include one recovery runbook for stuck jobs and one for restoring a disposable backup, each with expected state before reopening traffic.",
+        "Have the reviewer follow the commands, record discrepancies, and revise the packet until the evidence can be reproduced."
+      ],
+      "checks": [
+        "The packet clearly distinguishes implemented local behavior from simulated distributed mechanisms.",
+        "A reviewer can reproduce one success and one failure without additional explanation.",
+        "Open risks have measurable next experiments or explicit accepted limits."
+      ],
+      "experiment": "Remove an undocumented environment assumption, such as a preexisting seed directory, and observe whether setup fails clearly and recoverably.",
+      "review": "Explain which artifact best supports each major guarantee and which future change would invalidate that evidence.",
+      "stretch": "Create a bounded follow-up task for the highest remaining risk, including its evidence threshold.",
+      "stage": "Own the outcome",
+      "minutes": 45,
+      "workedExample": "The packet contains six reproducible fixtures: five pass and one exposes a stale-index authorization defect. The handoff must report five verified outcomes plus one unresolved defect, not six completed guarantees. After repair and rerun, the evidence can support the narrower tested contract while production deployment remains a separate, unperformed action.",
+      "retrieval": [
+        {
+          "question": "What belongs in an honest handoff?",
+          "answer": "Runnable instructions, observed results, assumptions, limitations, recovery steps, and explicit distinction between local and deployed behavior."
+        },
+        {
+          "question": "When should evidence be revisited?",
+          "answer": "When changes affect its assumptions, such as schema, traffic shape, topology, provider semantics, or authorization policy."
+        }
+      ],
+      "parentId": "effect-architecture-studio-architecture-evidence"
+    }
+  ]
+}

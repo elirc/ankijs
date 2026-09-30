@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
-import { curriculum } from "../data/curriculum";
+import { curriculum } from "../data/curriculum-catalog";
 import {
   getLearningSettings,
   learningDefaults,

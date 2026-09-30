@@ -45,9 +45,9 @@ alone does nothing for an existing install.
 
 - The Workshop track (7 decks, 2 cards per unit) is built **at runtime** from
   `src/data/workshop-units.json` (`src/data/workshop.ts`, `curriculum.ts`); it is not in the manifest,
-  so `content:check` still reports the manifest total (3,103) while the app has 3,179.
-- Installed on phones by the seed install key `starter_curriculum_v17_workshop1` (`src/db/seed.ts`),
-  not by a `CURRICULUM_VERSION` bump. Validate with `npm run workshop:content`
+  so `content:check` still reports the manifest total (3,155 at v18) while the app has 3,231.
+- Installed on phones by the seed install key `starter_curriculum_v${manifest version}_workshop1`
+  (`src/db/seed.ts`; `..._v18_workshop1` at v18), not by a `CURRICULUM_VERSION` bump itself. Validate with `npm run workshop:content`
   (`scripts/check-workshop.mjs`) and `npm run workshop:check` (node tests for the workshop files).
 - **Limit:** workshop card text has **no correction path**. Changing the install key again
   (`..._workshop2`, ...) re-runs `installStarterDecks`, but that only adds missing decks/cards (new
@@ -325,3 +325,48 @@ actions, SameSite Lax default, --env-file, VITE_ exposure); low RAM — no paral
   v5" timed out at 60 s (host throughput, test near its 60 s limit), timed out again alone, then 6/6
   PASS on a third run (78 s); content:check PASS (3,103); lint PASS (41 s); build PASS (150 entries /
   1,463 KiB).
+- 2026-09-28, T0-v18: **v18 tooling ready** in `artifacts/content-v18/` (nothing in `src/`/`scripts/`
+  touched, nothing committed, no heavy jobs run). Scope: WP **c9** deck 7009 "29 · Data modeling and
+  migrations" (database/violet) and **c10** deck 7010 "30 · Performance and caching basics"
+  (network/amber), 10 lessons + 6 scenarios each, v17 staging format; integrate later with
+  `scripts/build-applied-lessons.mjs` + reviewed-scenarios append, as in I1.
+  Files: `BRIEF.md` (v17 rubric + duplication guard incl. `workshop-units.json`, per-topic overlap
+  map, appendix of all 80 Build-real-apps lesson titles, 7001–7008 scenarios and all 38 workshop
+  units), `validate.mjs <c9|c10>|--all [--skip-export] [--staging-dir d]` (v17 checks + applied-lessons
+  keys, workshop question/evidence/rubric fronts, title uniqueness vs lesson files + workshop, exact
+  deck id/name/icon/color, non-fatal near-duplicate WARN), `preview.mjs`, `render.mjs` (copy of the
+  builder's renderer; reproduces all 160 applied-lesson + 144 scenario cards exactly),
+  `scratch/selftest/selftest.mjs` (47 cases: adapted v17 c4/c1 fixtures PASS, 45 single-fault inputs
+  FAIL with the expected message — all pass), `backup-v17w-data/` (copy of `src/data/` at b10e2a5).
+  Suggested key areas: `app-model-`/`scn-model-` (c9), `app-perf-`/`scn-perf-` (c10). High overlap
+  risk (see BRIEF map): pagination, measure-first, debounce/throttle, expand/contract, HTTP caching
+  (7001), many-to-many (7004). Heavy-job lock for v18 agents: `artifacts/heavy-lock`.
+  Next: launch authors c9, c10 (prompt: "Read update.md and artifacts/content-v18/BRIEF.md; you are
+  WP <id>; write artifacts/content-v18/staging/<id>.json + <id>.report.md; verify by running; pass
+  validate.mjs <id> and resolve its WARNs; don't touch src/"), then reviewers, then integration.
+- 2026-09-28, c9: **c9 authored** — `artifacts/content-v18/staging/c9.json` (deck 7009, 10 lessons + 6 scenarios) + `c9.report.md`; `validate.mjs c9` PASS, 0 WARN; all SQLite claims run (`scratch/c9/verify.py`, `run_examples.py`, knex migrate demo), PG-only facts cited to docs/17. Nothing in `src/`/`scripts/` touched, nothing committed. Next: R-c9 review.
+- 2026-09-28, c10: **c10 authored** — `artifacts/content-v18/staging/c10.json` (deck 7010, 10 lessons + 6 scenarios) + `c10.report.md`; `validate.mjs c10` PASS, 0 WARN; outputs run in `scratch/c10` (node/Express 5/React 19+happy-dom/Rolldown/python sqlite3), browser/PG facts cited. Real `vite build` skipped (heavy-lock held). Nothing in `src/`/`scripts/` touched, nothing committed. Next: R-c10 review.
+- 2026-09-28, R-c9: **R-c9 done, 9 fixes** — `artifacts/content-v18/review/c9.md`; all SQLite/knex/pg claims re-run in `scratch/r-c9/`, PG facts re-checked on docs/17+18; 0 wrong outputs, 2 overstated claims fixed (FK-index "only PK/UNIQUE" ignored EXCLUDE; JSON "cannot CHECK items"), plus wording/self-containment fixes; `validate.mjs c9` PASS, 0 WARN. Nothing in `src/`/`scripts/` touched, nothing committed.
+- 2026-09-28, R-c10: **R-c10 done, 7 fixes** in `artifacts/content-v18/staging/c10.json` (+16 reviewer verification entries); review in `artifacts/content-v18/review/c10.md`. All outputs re-run in `scratch/r-c10` (Node 22/Express 5.2.1/React 19.2.7+happy-dom/Rolldown 1.1.4/SQLite 3.49.1), docs re-read. Main fixes: app-cache "100 calls -> 1 upstream" only holds for sequential calls; composite-order skip-scan nuance (SQLite only with few owner_ids, still sorts); lodash entry-point wording + sizes framed as one measurement. `validate.mjs c10` and `--all` PASS, 0 WARN. Nothing in `src/`/`scripts/` touched, nothing committed.
+- 2026-09-28, I2: **I2 DONE** (integration → curriculum v18, uncommitted). Start state HEAD b10e2a5 (v17 +
+  workshop), content-corrections length 2236. Appended staging c9/c10 verbatim (fields in the existing
+  order, `deck` kept): `applied-decks.json` 8→10 decks (7009 "29 · Data modeling and migrations",
+  7010 "30 · Performance and caching basics"), `applied-lessons.json` 80→100, `reviewed-scenarios.json`
+  new groups 7009 and 7010 (6 each) at the end — pure insertions, no existing line changed.
+  `CURRICULUM_VERSION` 17→18 (`scripts/build-reviewed-content.mjs`). Ran under `artifacts/heavy-lock`:
+  build-applied-lessons → export-retrieval-baseline → build-reviewed-content → content:check. Result:
+  manifest v18, **3,155 active cards** (2,999 base + 156 scenarios), **85 decks**, **376 guided lessons**,
+  appliedLessons 100 / appliedCards 200; content:check PASS; content-corrections length **2236 → 2236**
+  (file untouched), reviewed-corrections untouched; all 76 pre-existing expanded-cards packs byte-identical
+  (2 new packs appended); builder re-run = "No changes" (md5 of all src/data JSON identical).
+  Runtime app total = 3,155 + 76 workshop = 3,231. Install key becomes `starter_curriculum_v18_workshop1`
+  (derived from manifest.version), so v17 phones run `installStarterDecks` and get the 2 new decks.
+  Tests: `applied-curriculum.test.ts` → 100 lessons / 10 decks / 200 cards (deck-id check now
+  padStart-based for 7010); `seed.test.ts` new **v17 upgrade case** (count 2959 = v16 2799 + 160;
+  excludes Workshop track and decks 7009/7010 via new optional `excludedDecks`); v2/v3/v4/v16 cases
+  unchanged (they exclude the whole Build real apps track). practical/dotnet tests already derive from
+  applied lessons — unchanged; curriculum.test.ts untouched and passing.
+  Checks: `npx vitest run src/data src/teaching src/db/retiredCurriculum.test.ts src/db/seed.test.ts`
+  8/9 files, 30/31 tests — only seed "rolls back every batch" timed out (120 s, known throughput issue);
+  seed.test.ts re-run alone: 9/9 PASS (175 s). tsc PASS; lint PASS; prettier clean on the 2 edited tests.
+  Not run: build, e2e, features tests. Not updated: docs/CURRICULUM.md, README counts (V2).

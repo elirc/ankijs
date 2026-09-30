@@ -5,7 +5,7 @@ import {
   studyLink,
 } from "./db/repos/learningRepo";
 import { ApplyReadingPreferences } from "./components/ReadingPreferences";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   BarChart3,
   BookOpen,
@@ -19,9 +19,21 @@ import {
   WifiOff,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { SyncBadge } from "./components/SyncBadge";
+import { isSupabaseConfigured } from "./db/sync/supabaseClient";
 import { UpdateToast } from "./components/UpdateToast";
-import { hasPendingPracticeWrites } from "./db/repos/practiceRepo";
+import { hasPendingPracticeWrites } from "./db/repos/practiceWrites";
+
+const SyncBadge = lazy(() =>
+  import("./components/SyncBadge").then((module) => ({
+    default: module.SyncBadge,
+  })),
+);
+const localSaveStatus = (
+  <span className="inline-flex items-center gap-2 text-[10px] text-[#839175]">
+    <span className="status-dot" />
+    Saved on this device
+  </span>
+);
 
 const studyNav = [
   { to: "/", label: "Today", icon: LayoutDashboard },
@@ -30,6 +42,7 @@ const studyNav = [
   { to: "/progress", label: "Progress", icon: BarChart3 },
   { to: "/dotnet", label: "C# & .NET", icon: Code2 },
   { to: "/workshop", label: "Guided workshop", icon: Hammer },
+  { to: "/effect-lab", label: "Effect & agentic CRUD", icon: Code2 },
   { to: "/paths", label: "Learning paths", icon: Library },
   { to: "/library", label: "Find cards", icon: BookOpen },
   { to: "/practice", label: "Engineering practice", icon: Hammer },
@@ -137,8 +150,12 @@ export function App() {
                 <WifiOff size={14} />
                 Offline · study still works
               </span>
+            ) : isSupabaseConfigured() ? (
+              <Suspense fallback={localSaveStatus}>
+                <SyncBadge />
+              </Suspense>
             ) : (
-              <SyncBadge />
+              localSaveStatus
             )}
             <NavLink
               to="/settings"

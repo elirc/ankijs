@@ -1,0 +1,151 @@
+{
+  "scope": "Documentation routes only; no new curriculum identities or progress writes",
+  "routes": [
+    {
+      "id": "foundations",
+      "deckIds": [
+        "a0000000-0000-4000-8000-000000000002",
+        "a0000000-0000-4000-8000-000000000007"
+      ],
+      "units": [
+        {
+          "id": "debug-stale-search",
+          "missionId": "lab-debug-stale-search",
+          "deckId": "a0000000-0000-4000-8000-000000090002",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000030",
+            "f0000000-0000-4000-8000-000000000031"
+          ],
+          "fixture": "/workshop/debug-stale-search.md"
+        },
+        {
+          "id": "debug-partial-import",
+          "missionId": "lab-debug-partial-import",
+          "deckId": "a0000000-0000-4000-8000-000000090002",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000080",
+            "f0000000-0000-4000-8000-000000000081"
+          ],
+          "fixture": "/workshop/debug-partial-import.md"
+        }
+      ]
+    },
+    {
+      "id": "reliability",
+      "deckIds": [
+        "a0000000-0000-4000-8000-000000090002",
+        "a0000000-0000-4000-8000-000000090005"
+      ],
+      "units": [
+        {
+          "id": "debug-stale-edit",
+          "missionId": "lab-debug-stale-edit",
+          "deckId": "a0000000-0000-4000-8000-000000090002",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000050",
+            "f0000000-0000-4000-8000-000000000051"
+          ],
+          "fixture": "/workshop/debug-stale-edit.md"
+        },
+        {
+          "id": "integration-idempotency",
+          "missionId": "lab-integration-idempotency",
+          "deckId": "a0000000-0000-4000-8000-000000090005",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000240",
+            "f0000000-0000-4000-8000-000000000241"
+          ],
+          "fixture": "/workshop/integration-idempotency.md"
+        },
+        {
+          "id": "integration-outbox",
+          "missionId": "lab-integration-outbox",
+          "deckId": "a0000000-0000-4000-8000-000000090005",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000260",
+            "f0000000-0000-4000-8000-000000000261"
+          ],
+          "fixture": "/workshop/integration-outbox.md"
+        }
+      ]
+    },
+    {
+      "id": "ownership",
+      "deckIds": [
+        "a0000000-0000-4000-8000-000000090006",
+        "a0000000-0000-4000-8000-000000090001"
+      ],
+      "units": [
+        {
+          "id": "ops-restore",
+          "missionId": "lab-ops-restore",
+          "deckId": "a0000000-0000-4000-8000-000000090006",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000300",
+            "f0000000-0000-4000-8000-000000000301"
+          ],
+          "fixture": "/workshop/ops-restore.md"
+        },
+        {
+          "id": "ops-bad-rollout",
+          "missionId": "lab-ops-bad-rollout",
+          "deckId": "a0000000-0000-4000-8000-000000090006",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000280",
+            "f0000000-0000-4000-8000-000000000281"
+          ],
+          "fixture": "/workshop/ops-bad-rollout.md"
+        },
+        {
+          "id": "capstone-typescript",
+          "missionId": "lab-capstone-typescript",
+          "deckId": "a0000000-0000-4000-8000-000000090001",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000010",
+            "f0000000-0000-4000-8000-000000000011"
+          ],
+          "fixture": "/workshop/capstone-typescript.md"
+        }
+      ]
+    },
+    {
+      "id": "review-practice",
+      "deckIds": [
+        "a0000000-0000-4000-8000-000000090003",
+        "a0000000-0000-4000-8000-000000090007"
+      ],
+      "units": [
+        {
+          "id": "review-false-positive-test",
+          "missionId": "lab-review-false-positive-test",
+          "deckId": "a0000000-0000-4000-8000-000000090003",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000120",
+            "f0000000-0000-4000-8000-000000000121"
+          ],
+          "fixture": "/workshop/review-false-positive-test.md"
+        },
+        {
+          "id": "ai-challenge-tests",
+          "missionId": "lab-ai-challenge-tests",
+          "deckId": "a0000000-0000-4000-8000-000000090007",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000350",
+            "f0000000-0000-4000-8000-000000000351"
+          ],
+          "fixture": "/workshop/ai-challenge-tests.md"
+        },
+        {
+          "id": "ai-evidence-report",
+          "missionId": "lab-ai-evidence-report",
+          "deckId": "a0000000-0000-4000-8000-000000090007",
+          "cardIds": [
+            "f0000000-0000-4000-8000-000000000380",
+            "f0000000-0000-4000-8000-000000000381"
+          ],
+          "fixture": "/workshop/ai-evidence-report.md"
+        }
+      ]
+    }
+  ]
+}

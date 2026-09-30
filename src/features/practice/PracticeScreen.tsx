@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -26,7 +27,7 @@ import {
 } from "../../db/repos/practiceRepo";
 import "./practice.css";
 import { workshopUnits } from "../../data/workshop";
-import { curriculum } from "../../data/curriculum";
+import { curriculum } from "../../data/curriculum-catalog";
 
 function nextMission(entries: PracticeEntry[]) {
   return (
@@ -316,12 +317,20 @@ export function PracticeScreen() {
   );
 }
 
-function MissionWorkspace({
+export function MissionWorkspace({
   mission,
   initial,
+  backTo = "/practice",
+  backLabel = "All engineering missions",
+  nextLink,
+  learningContent,
 }: {
   mission: EngineeringMission;
   initial: PracticeDraft;
+  backTo?: string;
+  backLabel?: string;
+  nextLink?: { to: string; label: string } | null;
+  learningContent?: ReactNode;
 }) {
   const [draft, setDraft] = useState<PracticeDraft>(initial);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">(
@@ -357,6 +366,10 @@ function MissionWorkspace({
     );
   }
   const next = engineeringMissions[engineeringMissions.indexOf(mission) + 1];
+  const onward =
+    nextLink === undefined
+      ? next && { to: `/practice/${next.id}`, label: "Next mission" }
+      : nextLink;
   const lab = workshopUnits.find((u) => "lab-" + u.id === mission.id);
   const related = lab
     ? curriculum.filter((d) => d.id === lab.deckId)
@@ -369,8 +382,8 @@ function MissionWorkspace({
         .slice(0, 3);
   return (
     <div className="practice-screen mission-workspace">
-      <Link className="text-link" to="/practice">
-        <ArrowLeft size={16} /> All engineering missions
+      <Link className="text-link" to={backTo}>
+        <ArrowLeft size={16} /> {backLabel}
       </Link>
       <div className="page-heading">
         <div>
@@ -387,6 +400,7 @@ function MissionWorkspace({
       </p>
       <div className="mission-work-grid">
         <div className="mission-instructions">
+          {learningContent}
           <section className="content-panel">
             <h2>Your assignment</h2>
             <ol className="mission-steps">
@@ -513,9 +527,9 @@ function MissionWorkspace({
               >
                 Reopen mission
               </Button>
-              {next && (
-                <Link className="text-link" to={`/practice/${next.id}`}>
-                  Next mission <ArrowRight size={15} />
+              {onward && (
+                <Link className="text-link" to={onward.to}>
+                  {onward.label} <ArrowRight size={15} />
                 </Link>
               )}
             </div>

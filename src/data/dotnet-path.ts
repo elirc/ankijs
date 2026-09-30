@@ -1,4 +1,4 @@
-import { curriculum } from "./curriculum";
+import { curriculum } from "./curriculum-catalog";
 
 export const DOTNET_TRACK = "C# & .NET";
 export const dotnetDecks = curriculum.filter(
